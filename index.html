@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Graveborne">
+<meta name="theme-color" content="#08070c">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<title>GRAVEBORNE — A Dark Fantasy Dungeon Crawler</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="frame">
+
+  <div id="hud">
+    <div class="hud-left">
+      <span id="hud-name" class="hud-name">—</span>
+      <div class="bars">
+        <div class="bar hp"><div id="hp-fill" class="fill"></div><span id="hp-txt" class="bar-txt">0/0</span></div>
+        <div class="bar sp"><div id="sp-fill" class="fill"></div><span id="sp-txt" class="bar-txt">0/0</span></div>
+      </div>
+    </div>
+    <div class="hud-right">
+      <div class="honor">
+        <span class="lbl">HONOR</span>
+        <div class="honor-track"><div id="honor-mark" class="honor-mark"></div></div>
+        <span id="honor-txt" class="honor-txt">0</span>
+        <span id="align-badge" class="align-badge"></span>
+      </div>
+      <div id="bounty" class="bounty hidden">
+        <span class="lbl">BOUNTY</span>
+        <div class="bounty-track"><div id="bounty-fill" class="fill"></div></div>
+        <span id="bounty-tier" class="bounty-tier">—</span>
+      </div>
+      <div class="pills">
+        <span class="pill gold">✦ <span id="gold-txt">0</span></span>
+        <span class="pill souls">◈ <span id="souls-txt">0</span></span>
+        <span class="pill depth">DEPTH <span id="depth-txt">1</span></span>
+      </div>
+    </div>
+  </div>
+
+  <div id="stage">
+    <canvas id="game" width="336" height="208"></canvas>
+    <div id="fx"></div>
+    <div id="hint" class="hint">Move: WASD / Arrows &nbsp;·&nbsp; Inventory: I &nbsp;·&nbsp; Wait: Space</div>
+  </div>
+
+  <div id="touch-controls" class="touch-controls">
+    <div class="dpad">
+      <button class="dpad-btn up"    data-dx="0"  data-dy="-1">▲</button>
+      <button class="dpad-btn left"  data-dx="-1" data-dy="0">◀</button>
+      <button class="dpad-btn wait"  data-wait="1">●</button>
+      <button class="dpad-btn right" data-dx="1"  data-dy="0">▶</button>
+      <button class="dpad-btn down"  data-dx="0"  data-dy="1">▼</button>
+    </div>
+    <div class="touch-hint">Hold to repeat · ● waits</div>
+  </div>
+
+  <div id="dock">
+    <div id="log" class="log"></div>
+    <div id="actions" class="actions"></div>
+  </div>
+
+  <div id="modal" class="modal hidden"></div>
+
+</div>
+
+<script src="js/util.js"></script>
+<script src="js/save.js"></script>
+<script src="js/sprites.js"></script>
+<script src="js/data.js"></script>
+<script src="js/dungeon.js"></script>
+<script src="js/game.js"></script>
+<script>
+// offline cache — only on HTTPS/localhost (iOS home-screen apps included)
+if ('serviceWorker' in navigator && window.isSecureContext){
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
+}
+</script>
+</body>
+</html>
