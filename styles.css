@@ -269,7 +269,7 @@ button{touch-action:manipulation}
 .dpad-btn.left{grid-area:left}
 .dpad-btn.right{grid-area:right}
 .dpad-btn.wait{grid-area:wait;color:var(--gold);font-size:16px}
-.touch-controls.combat .dpad-btn{opacity:.35;pointer-events:none}
+.touch-controls.combat{display:none !important}   /* in combat the skill buttons take the stage */
 .touch-hint{font-size:10px;color:var(--ink-dim)}
 
 /* show touch controls on coarse-pointer devices or when JS detects touch */
@@ -285,24 +285,28 @@ body.touch .touch-controls{display:flex}
     overflow-y:auto;
     overflow-x:hidden;
   }
+  /* one-screen app layout: the frame fills the visible viewport, the log flexes */
   #frame{
     width:100vw;
-    padding:6px 6px 24px;
+    min-height:100dvh;
+    padding:6px 6px 8px;
     padding-left:calc(6px + env(safe-area-inset-left));
     padding-right:calc(6px + env(safe-area-inset-right));
     padding-top:calc(6px + env(safe-area-inset-top));
-    padding-bottom:calc(24px + env(safe-area-inset-bottom));
+    padding-bottom:calc(8px + env(safe-area-inset-bottom));
     gap:6px;
   }
-  #hud{flex-wrap:wrap;gap:6px;padding:6px 8px}
-  .hud-right{align-items:flex-start}
+  #hud{flex-wrap:wrap;gap:5px;padding:5px 8px}
+  .hud-left{min-width:150px}
+  .hud-right{align-items:flex-start;gap:4px}
   .honor-track{width:96px}
   .bounty-track{width:80px}
-  .bars{max-width:100%}
+  .bars{max-width:100%;gap:3px}
   .hint{display:none}
-  #dock{flex-direction:column;min-height:0}
+  #stage{flex-shrink:0}
+  #dock{flex:1 1 auto;flex-direction:column;min-height:0}
   .actions{width:100%}
-  .log{max-height:140px;font-size:12px}
+  .log{flex:1 1 auto;min-height:72px;max-height:190px;font-size:12px}
   .btn{padding:11px 12px;font-size:13px;min-height:44px}
   .sheet{padding:14px 12px;max-height:88vh}
   .title-big{font-size:26px;letter-spacing:5px}
@@ -310,4 +314,19 @@ body.touch .touch-controls{display:flex}
   .codex-grid{grid-template-columns:1fr}
   .row .btn{min-width:0;flex:1 1 40%}
   .modal{padding:10px}
+  /* compact D-pad so everything fits on one screen */
+  .touch-controls{gap:0}
+  .touch-hint{display:none}
+  .dpad{grid-template-columns:repeat(3,56px);grid-template-rows:repeat(3,56px);gap:5px}
+  .dpad-btn{font-size:18px}
+}
+
+/* ---------- Large phones (iPhone Pro Max & friends, ~430pt wide) ---------- */
+@media (min-width:410px) and (max-width:700px){
+  .dpad{grid-template-columns:repeat(3,62px);grid-template-rows:repeat(3,62px);gap:6px}
+  .dpad-btn{font-size:20px}
+  .log{max-height:230px;font-size:12.5px}
+  .honor-track{width:120px}
+  .bounty-track{width:100px}
+  .btn{min-height:46px}
 }
