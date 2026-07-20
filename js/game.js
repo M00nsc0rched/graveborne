@@ -510,6 +510,7 @@ function startCombat(entity, ambush){
   const carriedPoison = p.statuses.poison;   // spore-sickness follows you into the fight
   p.statuses = {}; p.shield = 0;
   if (carriedPoison) p.statuses.poison = carriedPoison;
+  G.usedActives = {};                        // relic powers reset each battle
   G.combat = { enemy, origin:entity, turn:'player', boss:enemy.boss };
   G.state = 'COMBAT';
   log(`— ${enemy.name}${enemy.boss?' (BOSS)':''} blocks your path! ${ambress(ambush)}—`, 'bad');
@@ -622,6 +623,20 @@ function doPlayer(skillId){
   setTimeout(beginEnemyTurn, 620);
 }
 
+// call on an equipped relic's power — once per battle
+function doActive(itemId){
+  if (G.busy || G.state !== 'COMBAT' || !G.combat || G.combat.turn !== 'player') return;
+  const it = Data.ITEMS[itemId];
+  if (!it || !it.active || G.usedActives[itemId]) return;
+  G.usedActives[itemId] = true;
+  G.busy = true; G.combat.turn = 'enemy'; renderActions();
+  log(`You call on the ${it.name} — ${it.active.name}!`, 'gold');
+  resolveAction(G.player, G.combat.enemy, { ...it.active.action }, true);
+  updateHUD();
+  if (G.combat.enemy.hp <= 0){ setTimeout(win, 550); return; }
+  setTimeout(beginEnemyTurn, 620);
+}
+
 function usePotion(){
   if (G.busy) return;
   const p = G.player, i = p.inv.indexOf('potion_heal');
@@ -666,7 +681,12 @@ function win(){
   log(`${en.name} falls. +${gold} gold.`, 'gold'); floatOn(false, `+${gold}✦`, '#d0a84e');
   const earnedSouls = gainSouls((en.boss ? 15 : en.guardian ? 10 : en.elite ? 6 : 2) * (en.hunter ? 3 : 1) * mods.soulMult);
   G.floor.removeEntity(c.origin);
-  if (en.boss){ log(`The Gloamlord's death releases ${earnedSouls} Souls.`, 'mag'); G.combat=null; setTimeout(victory, 700); updateHUD(); return; }
+  if (en.boss){
+    log(`The Gloamlord's death releases ${earnedSouls} Souls.`, 'mag');
+    grantItem('gloamheart');
+    log('From the collapsing ribcage you take the Gloamheart — still beating, to a slower clock.', 'gold');
+    G.combat=null; setTimeout(victory, 700); updateHUD(); return;
+  }
   // drops — guardians and elites pay a guaranteed premium; hunters likewise; alignment shifts the rest
   if (en.guardian){
     if (en.dialogue && en.dialogue.defeat) log(`${en.name}: ${en.dialogue.defeat}`, 'mag');
@@ -752,8 +772,8 @@ function chooseOutcome(eventId, outId, entity){
       text = "The coin rings off the black iron, spins — and lands. “HEADS,” says the voice, from inside your own chest. “THE GOD IS AMUSED.” Strength floods you like cold water poured into a cracked jug.";
       eff = { maxhp:6, atk:2, codex:'coin_bless' };
     } else {
-      text = "The coin rings off the black iron, spins — and lands. “TAILS,” says the voice, from inside your own chest. “THE GOD IS AMUSED.” Something is taken. You feel lighter afterward, and less.";
-      eff = { maxhp:-8, honor:-4, codex:'coin_curse', reveal:'The coin has no faces. It decides anyway. It always decides.' };
+      text = "The coin rings off the black iron, spins — and lands. “TAILS,” says the voice, from inside your own chest, and the taking begins. A rib folds inward like wet paper. Something behind your eyes is unthreaded, slowly, with great care. The god does not hurry. The god is never finished being amused.";
+      eff = { lethalMaxhp:-10, honor:-4, codex:'coin_curse', reveal:'The coin has no faces. It decides anyway. It has decided men to death.' };
     }
   }
 
@@ -778,6 +798,9 @@ function applyEffects(eff){
   if (eff.heal){ const before=p.hp; p.hp = eff.heal>=99 ? p.maxhp : Math.min(p.maxhp, p.hp+eff.heal); out.push([`+${p.hp-before} HP`, 'good']); }
   if (eff.sp){ const before=p.sp; p.sp = eff.sp>=99 ? p.maxsp : Math.min(p.maxsp, p.sp+eff.sp); if (p.sp-before) out.push([`+${p.sp-before} SP`, 'good']); }
   if (eff.maxhp){ p.baseHp += eff.maxhp; recomputeStats(p); p.hp = Math.max(1, Math.min(p.maxhp, p.hp + eff.maxhp)); out.push([`${eff.maxhp>0?'+':''}${eff.maxhp} Max HP`, eff.maxhp>0?'good':'bad']); }
+  if (eff.lethalMaxhp){ p.baseHp += eff.lethalMaxhp; recomputeStats(p); p.hp = Math.min(p.maxhp, p.hp + eff.lethalMaxhp);
+    out.push([`${eff.lethalMaxhp} Max HP`, 'bad']);
+    if (p.hp <= 0) out.push(['Your life is forfeit', 'bad']); }
   if (eff.atk){ p.baseAtk += eff.atk; recomputeStats(p); out.push([`+${eff.atk} ATK`, 'good']); }
   if (eff.def){ p.baseDef += eff.def; recomputeStats(p); out.push([`+${eff.def} DEF`, 'good']); }
   if (eff.mag){ p.baseMag += eff.mag; recomputeStats(p); out.push([`+${eff.mag} MAG`, 'good']); }
@@ -1033,6 +1056,16 @@ function renderActions(){
       b.disabled = !myTurn || sk.cost > p.sp;
       box.appendChild(b);
     });
+    // relic powers — once per battle
+    for (const slot of ['weapon','armor','trinket']){
+      const id = p.equip[slot]; if (!id) continue;
+      const it = Data.ITEMS[id]; if (!it.active) continue;
+      const used = !!G.usedActives[id];
+      const b = Btn('', ()=>doActive(id), 'btn');
+      b.innerHTML = `<span class="k">◆</span>${it.active.name}<span class="cost">${used?'spent':'1/battle'}</span><span class="sub">${it.active.desc}</span>`;
+      b.disabled = !myTurn || used;
+      box.appendChild(b);
+    }
     const potions = p.inv.filter(x=>x==='potion_heal').length;
     if (potions){ const b = Btn(`Draught of Mending ×${potions}`, usePotion, 'btn good'); b.disabled=!myTurn; box.appendChild(b); }
     if (!G.combat.boss && !G.combat.enemy.guardian){ const b = Btn('Flee', flee, 'btn'); b.disabled=!myTurn; box.appendChild(b); }
@@ -1112,12 +1145,14 @@ function showOutcome(title, text, summary, reveal, combat){
     s.appendChild(wrap);
   }
   const row = U.make('div','row');
-  const label = combat ? 'Draw steel' : 'Continue';
+  const died = G.player.hp <= 0;
+  const label = died ? 'Your heart stops' : combat ? 'Draw steel' : 'Continue';
   row.appendChild(Btn(label, ()=>{
     hideModal();
+    if (died){ lose(); return; }
     if (combat){ const def = Data.ENEMIES[combat]; startCombat({ type:'enemy', enemyId:combat, hunter:!!def.hunter, elite:!!def.elite }, false); }
     else { G.state='EXPLORE'; G.busy=false; renderActions(); }
-  }, combat ? 'btn danger center' : 'btn center'));
+  }, (died || combat) ? 'btn danger center' : 'btn center'));
   s.appendChild(row);
   setModal(s);
 }
