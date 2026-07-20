@@ -528,6 +528,21 @@ const SPR = {
     "  KK    KK N",
   ],
 
+  en_butcher: [
+    "   KffffK   ",
+    "  KffffffK  ",
+    "  KfKhhKfK  ",
+    "  KffffffK s",
+    " KfffrrfffKs",
+    "KfRRrrrrRRKs",
+    "KfRrrrrrrRKs",
+    "KfRrrrrrrRss",
+    " KRrrrrrrRKs",
+    " KrrrrrrrrK ",
+    " Kff    ffK ",
+    " KK      KK ",
+  ],
+
   en_captain: [
     "  y KFFK y  ",
     "   KFyyFK   ",
