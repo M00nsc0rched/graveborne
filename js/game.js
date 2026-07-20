@@ -7,6 +7,12 @@ const HALLOW_AT = 40;  // honor >= this  → Hallowed: safe, friendly encounters
 
 function alignment(h){ return h <= MARK_AT ? 'MARKED' : h >= HALLOW_AT ? 'HALLOWED' : 'MORTAL'; }
 
+// ---- Hunger: the body keeps a ledger, and the deep always collects ----
+const FOOD_MAX = 100, FOOD_DRAIN = 0.35;   // ~285 steps from fed to starved
+// 0 fed · 1 hungry · 2 starving (weakened) · 3 starved (flesh pays)
+function hungerStage(p){ return p.food <= 0 ? 3 : p.food <= 20 ? 2 : p.food <= 45 ? 1 : 0; }
+const HUNGER_NAMES = ['', 'Hungry', 'STARVING', 'STARVED'];
+
 // ---- Biomes: helpers for the current floor's terrain ----
 function curBiome(){ return Data.BIOMES[G.biome || 'catacombs']; }
 function biomeClassMods(p){ const b = (typeof G !== 'undefined' && G.biome) ? Data.BIOMES[G.biome] : null; return (b && b.classMods && b.classMods[p.classId]) || {}; }
@@ -116,10 +122,10 @@ function newPlayer(classId){
   const p = {
     classId, name:c.name, sprite:c.sprite,
     baseHp:c.base.hp, baseSp:c.base.sp, baseAtk:c.base.atk, baseDef:c.base.def, baseMag:c.base.mag, baseSpd:c.base.spd,
-    hp:c.base.hp, sp:c.base.sp, honor:c.honor, gold:20,
+    hp:c.base.hp, sp:c.base.sp, honor:c.honor, gold:20, food:FOOD_MAX,
     skills:c.skills.slice(), equip:{weapon:null,armor:null,trinket:null}, inv:[],
     statuses:{}, shield:0, x:0, y:0, dir:1, allies:[],
-    heat:0, reinforceCd:null,
+    heat:0, reinforceCd:null, pocketCoin:false,
   };
   applySanctum(p);
   recomputeStats(p);
@@ -138,6 +144,7 @@ function applySanctum(p){
   p.gold    += 15 * S.sanctumLevel('pockets');
   p.honor    = U.clamp(p.honor + 8 * S.sanctumLevel('oath'), -100, 100);
   for (let i = 0; i < S.sanctumLevel('provision'); i++) p.inv.push('potion_heal');
+  for (let i = 0; i < S.sanctumLevel('larder'); i++) p.inv.push('ration');
 }
 function siphonMult(){ return 1 + 0.2 * Save.sanctumLevel('siphon'); }
 function sanctumCost(u, rank){ return Math.round(u.base + u.growth * (rank - 1)); }
@@ -146,6 +153,7 @@ function sanctumSummary(){
   const map = [['vigor','HP',6],['whet','ATK',1],['ward','DEF',1],['arcane','MAG',1],['focus','SP',1],['pockets','Gold',15],['oath','Honor',8]];
   for (const [id,label,per] of map){ const l = S.sanctumLevel(id); if (l) parts.push(`+${per*l} ${label}`); }
   const prov = S.sanctumLevel('provision'); if (prov) parts.push(`${prov} Draught${prov>1?'s':''}`);
+  const lard = S.sanctumLevel('larder'); if (lard) parts.push(`${lard} Grave-Bread`);
   const si = S.sanctumLevel('siphon'); if (si) parts.push(`+${20*si}% Souls`);
   const fa = S.sanctumLevel('favor'); if (fa) parts.push(`−${10*fa}% shop`);
   return parts.join(' · ');
@@ -390,7 +398,8 @@ function openChest(e){
   p.gold += gold;
   log(`You pry open a chest — ${gold} gold.`, 'gold');
   if (U.chance(U.clamp(0.55 + mods.dropBonus, 0.1, 0.95))) grantItem(Data.rollItemId(tier));
-  else { p.inv.push('potion_heal'); log('Inside rests a Draught of Mending.', 'good'); }
+  else if (U.chance(0.5)){ p.inv.push('potion_heal'); log('Inside rests a Draught of Mending.', 'good'); }
+  else { p.inv.push('ration'); log('Inside, wrapped in wax cloth: Grave-Bread. Down here, that is treasure.', 'good'); }
   G.floor.removeEntity(e);
   updateHUD();
 }
@@ -436,11 +445,39 @@ function maybeWhisper(){
   if (listening && U.chance(0.025)) log('<i>' + U.choice(Data.WHISPERS) + '</i>', 'mag');
 }
 
+// hunger drains with every step; announce stage changes, and at zero the body pays in flesh
+function updateHunger(){
+  const p = G.player;
+  const before = hungerStage(p);
+  p.food = Math.max(0, p.food - FOOD_DRAIN);
+  const now = hungerStage(p);
+  if (now !== before && now > 0){
+    if (now === 1) log('Your stomach tightens. You should eat soon.', 'dim');
+    else if (now === 2) log('You are STARVING. Your blows land soft and your focus frays — find food.', 'bad');
+    else if (now === 3){
+      log('There is nothing left to burn. Your body begins eating itself.', 'bad');
+      discoverCodex('starved_hollow');
+    }
+  }
+  if (now === 3){
+    p.hp -= 2; floatOn(true, '-2', '#a87e34');
+    updateHUD();
+    if (p.hp <= 0){ log('Hunger finishes what the dark began.', 'bad'); lose(); return false; }
+  }
+  return true;
+}
+
+// unlock a codex entry from gameplay (not an event) — same reward as applyEffects
+function discoverCodex(id){
+  if (Save.discover(id)){ const g = gainSouls(4); log(`✦ Codex unlocked (+${g} Souls)`, 'mag'); }
+}
+
 // enemies take a step toward the player; one may ambush into combat
 function worldTurn(){
   const p = G.player, f = G.floor;
   updateHeat();
   maybeWhisper();
+  if (!updateHunger()) return;   // starvation killed you
   // poison ticks with every step taken in the world
   if (p.statuses.poison){
     const d = p.statuses.poison.dmg;
@@ -495,13 +532,25 @@ function makeEnemyInstance(id){
   const e = Data.ENEMIES[id];
   let f = e.boss ? 1 : (1 + (G.depth - 1) * 0.12);
   if (e.hunter) f *= heatScale();   // the hunt grows stronger with your bounty
-  return {
+  const maxhp = Math.round(e.hp*f);
+  const inst = {
     id, name:e.name, sprite:e.sprite,
-    maxhp:Math.round(e.hp*f), hp:Math.round(e.hp*f),
+    maxhp, hp:maxhp,
     atk:Math.round(e.atk*(e.boss?1:f)), def:e.def, mag:Math.round(e.mag*(e.boss?1:f)), spd:e.spd,
-    moves:e.moves, tags:e.tags||[], gold:e.gold, boss:!!e.boss, hunter:!!e.hunter, elite:!!e.elite, guardian:!!e.guardian, drop:e.drop, dialogue:e.dialogue, isEnemy:true,
+    moves:e.moves.map(m => ({ ...m })),   // instance-local: severing may disable moves
+    tags:e.tags||[], gold:e.gold, boss:!!e.boss, hunter:!!e.hunter, elite:!!e.elite, guardian:!!e.guardian, drop:e.drop, dialogue:e.dialogue, isEnemy:true,
     shield:0, statuses:{},
   };
+  // anatomy — spirits are smoke and grudge; everything else can be taken apart
+  if (!inst.tags.includes('spirit')){
+    const beast = inst.tags.includes('beast');
+    inst.parts = {
+      arms: { name: beast ? 'MAW'  : 'ARMS', hp: Math.ceil(maxhp*0.35), max: Math.ceil(maxhp*0.35), cut:false },
+      legs: { name: 'LEGS', hp: Math.ceil(maxhp*0.35), max: Math.ceil(maxhp*0.35), cut:false },
+      head: { name: 'HEAD', hp: Math.ceil(maxhp*0.30), max: Math.ceil(maxhp*0.30), cut:false },
+    };
+  }
+  return inst;
 }
 
 function startCombat(entity, ambush){
@@ -511,9 +560,11 @@ function startCombat(entity, ambush){
   p.statuses = {}; p.shield = 0;
   if (carriedPoison) p.statuses.poison = carriedPoison;
   G.usedActives = {};                        // relic powers reset each battle
-  G.combat = { enemy, origin:entity, turn:'player', boss:enemy.boss };
+  G.combat = { enemy, origin:entity, turn:'player', boss:enemy.boss, target:'body' };
   G.state = 'COMBAT';
   log(`— ${enemy.name}${enemy.boss?' (BOSS)':''} blocks your path! ${ambress(ambush)}—`, 'bad');
+  if (!enemy.parts) log('It has no body to unmake — only the whole of it can be broken.', 'dim');
+  if (hungerStage(p) >= 2) log('You fight starving. Your blows land soft, and no focus will return to you.', 'bad');
   beginPlayerTurn();
 }
 function ambress(a){ return a ? 'It ambushes you! ' : ''; }
@@ -573,10 +624,40 @@ function resolveAction(src, dst, action, srcIsPlayer){
   if (type === 'magic') dmg = action.power * src.mag/10 - dst.def*0.25;
   else                  dmg = action.power * effAtk(src)/10 - dst.def*0.5;
   if (action.holy && dst.tags && dst.tags.includes('undead')){ dmg *= 1.5; }
+  if (srcIsPlayer && hungerStage(src) >= 2) dmg *= 0.7;   // a starving arm swings soft
   dmg *= U.rand(0.9, 1.1);
   let crit = false;
   if (action.effect && action.effect.crit && U.chance(action.effect.crit)){ dmg *= 1.8; crit = true; }
   dmg = Math.max(1, Math.round(dmg));
+
+  // ---- aimed blows: physical attacks may target a limb instead of the body ----
+  const aim = (srcIsPlayer && type === 'attack' && G.combat && G.combat.target !== 'body') ? G.combat.target : null;
+  if (aim && dst.parts && dst.parts[aim] && !dst.parts[aim].cut){
+    const part = dst.parts[aim];
+    if (aim === 'head' && !U.chance(0.65)){
+      log(`It guards its skull — your ${action.name} goes wide.`, 'dim');
+      floatOn(false, 'miss', '#8a7f9e');
+      return;
+    }
+    if (dst.shield > 0){ const ab = Math.min(dst.shield, dmg); dst.shield -= ab; dmg -= ab;
+      if (ab > 0) log(`${dst.name}'s shield absorbs ${ab}.`, 'dim');
+      if (dmg <= 0) return; }
+    part.hp -= dmg;
+    const bleed = Math.max(1, Math.round(dmg * 0.4));
+    dst.hp -= bleed;
+    log(`Your ${action.name}${crit?' — CRITICAL!':''} bites into its ${part.name.toLowerCase()} — ${dmg} to the limb, ${bleed} bleeds through.`, 'hi');
+    floatOn(false, `-${bleed}`, crit?'#ffcf5a':'#c03636');
+    let ls2 = (action.effect && action.effect.lifesteal) || 0;
+    ls2 += (G.player.flags.lifesteal || 0);
+    if (ls2 > 0){ const h = Math.max(1, Math.round(bleed*ls2)); src.hp = Math.min(maxHp(src,true), src.hp+h);
+      log(`You drain ${h} HP.`, 'mag'); floatOn(true, `+${h}`, '#a85cc8'); }
+    const ef2 = action.effect || {};
+    if (ef2.poison){ dst.statuses.poison = { ...ef2.poison }; log(`${dst.name} is afflicted!`, 'bad'); }
+    if (ef2.weaken){ dst.statuses.weaken = { ...ef2.weaken }; log(`${dst.name}'s strength wanes.`, 'mag'); }
+    if (ef2.stun && U.chance(ef2.stun)){ dst.statuses.stun = 1; log(`${dst.name} is stunned!`, 'hi'); }
+    if (part.hp <= 0) severLimb(dst, aim);
+    return;
+  }
 
   // shield absorb
   if (dst.shield > 0){ const ab = Math.min(dst.shield, dmg); dst.shield -= ab; dmg -= ab;
@@ -599,6 +680,40 @@ function resolveAction(src, dst, action, srcIsPlayer){
   if (ef.stun && U.chance(ef.stun)){ dst.statuses.stun = 1; log(`${dstIsPlayer?'You are':dst.name+' is'} stunned!`, 'hi'); }
 }
 
+// a limb gives out — what it took with it depends on which one
+function severLimb(en, key){
+  const part = en.parts[key];
+  part.cut = true; part.hp = 0;
+  if (G.combat && G.combat.target === key) G.combat.target = 'body';
+  const beast = en.tags.includes('beast');
+  if (key === 'arms'){
+    en.atk = Math.max(1, Math.ceil(en.atk * 0.55));
+    let best = null;
+    for (const m of en.moves){ if (m.type === 'attack' && !m.disabled && (!best || m.power > best.power)) best = m; }
+    if (best) best.disabled = true;
+    log(beast
+      ? `You ruin its jaw with a wet crack. Its ${best ? best.name : 'bite'} is a memory now, and its fury is worth half as much.`
+      : `You take the ${en.name}'s weapon arm at the joint. ${best ? `It will never use ${best.name} again. ` : ''}It fights on — worse.`, 'gold');
+  } else if (key === 'legs'){
+    en.spd = 0;
+    log(`You cut the legs from under it. The ${en.name} drags itself toward you on what remains, and you may simply walk away from this fight.`, 'gold');
+  } else if (key === 'head'){
+    if (en.boss || en.guardian || en.elite){
+      const burst = Math.ceil(en.maxhp * 0.22);
+      en.hp -= burst;
+      en.mag = Math.max(0, Math.ceil(en.mag * 0.4));
+      for (const m of en.moves){ if (m.type === 'magic') m.disabled = true; }
+      log(`You ruin what it thinks with — ${burst} damage, and its sorcery dies mid-word. It does not fall. Things like this keep older ledgers than a skull.`, 'gold');
+      floatOn(false, `-${burst}`, '#ffcf5a');
+    } else {
+      en.hp = 0;
+      log(`One clean stroke. The ${en.name}'s head leaves its shoulders, and the argument is over.`, 'gold');
+      discoverCodex('head_taken');
+    }
+  }
+  discoverCodex('sever_first');
+}
+
 function beginPlayerTurn(){
   const p = G.player;
   startOfTurn(p, true);
@@ -606,7 +721,7 @@ function beginPlayerTurn(){
   if (p.hp <= 0){ lose(); return; }
   if (p.statuses.stun){ delete p.statuses.stun; log('You are stunned and lose your turn!', 'bad');
     G.combat.turn='enemy'; renderActions(); setTimeout(beginEnemyTurn, 650); return; }
-  p.sp = Math.min(p.maxsp, p.sp + 1);
+  if (hungerStage(p) < 2) p.sp = Math.min(p.maxsp, p.sp + 1);   // the starving recover no focus
   G.combat.turn = 'player'; G.busy = false;
   updateHUD(); renderActions();
 }
@@ -637,6 +752,33 @@ function doActive(itemId){
   setTimeout(beginEnemyTurn, 620);
 }
 
+// mid-battle, the pocketed coin decides — someone pays either way
+function doCoinFlip(){
+  if (G.busy || G.state !== 'COMBAT' || !G.combat || G.combat.turn !== 'player') return;
+  const p = G.player, en = G.combat.enemy;
+  if (!p.pocketCoin || G.usedActives.coin_war) return;
+  G.usedActives.coin_war = true;
+  G.busy = true; G.combat.turn = 'enemy'; renderActions();
+  log('You flip the stolen coin. It rings, spins — the whole fight holds its breath —', 'mag');
+  if (U.chance(0.5)){
+    const dmg = Math.max(12, Math.ceil(en.maxhp * 0.35));
+    en.hp -= dmg;
+    log(`“HEADS,” says the voice from inside your chest. Something reaches out of the air and TAKES from ${en.name} — ${dmg} damage. “THE GOD IS AMUSED.”`, 'gold');
+    floatOn(false, `-${dmg}`, '#ffcf5a');
+    discoverCodex('coin_war_heads');
+  } else {
+    const cost = Math.max(6, Math.ceil(p.hp * 0.3));
+    p.hp = Math.max(1, p.hp - cost);
+    gainHonor(-2);
+    log(`“TAILS,” says the voice, and the taking turns on you — ${cost} HP, unthreaded slowly, with great care. The god is never finished being amused.`, 'bad');
+    floatOn(true, `-${cost}`, '#c03636');
+    discoverCodex('coin_war_tails');
+  }
+  updateHUD();
+  if (en.hp <= 0){ setTimeout(win, 550); return; }
+  setTimeout(beginEnemyTurn, 620);
+}
+
 function usePotion(){
   if (G.busy) return;
   const p = G.player, i = p.inv.indexOf('potion_heal');
@@ -650,8 +792,33 @@ function usePotion(){
   else renderActions();
 }
 
+// eat from the pack; in combat it spends your turn, as all honest meals do
+function eatFood(id){
+  if (G.busy) return;
+  const p = G.player, i = p.inv.indexOf(id);
+  if (i < 0) return;
+  const it = Data.CONSUMABLES[id];
+  p.inv.splice(i, 1);
+  const before = Math.round(p.food);
+  p.food = Math.min(FOOD_MAX, p.food + it.food);
+  log(`You eat the ${it.name} (+${Math.round(p.food) - before} FOOD).`, 'good');
+  floatOn(true, `+${Math.round(p.food) - before}`, '#a87e34');
+  if (it.risky && U.chance(0.3)){
+    p.statuses.poison = { dmg:3, turns:3 };
+    log('It goes down warm — then turns on you. Whatever it was, it disagrees with being eaten.', 'bad');
+    discoverCodex('meat_price');
+  }
+  updateHUD();
+  if (G.state === 'COMBAT'){ G.busy=true; G.combat.turn='enemy'; renderActions(); setTimeout(beginEnemyTurn, 500); }
+  else renderActions();
+}
+
 function flee(){
   if (G.busy || G.combat.boss || G.combat.enemy.guardian) return;
+  if (G.combat.enemy.parts && G.combat.enemy.parts.legs.cut){
+    log('It cannot follow on ruined legs. You walk away from it — slowly, to make the point.', 'hi');
+    endCombatReturn(); return;
+  }
   const p = G.player, en = G.combat.enemy;
   const chance = U.clamp(0.45 + (p.spd - en.spd)*0.03, 0.15, 0.85);
   if (U.chance(chance)){ log('You break away into the dark.', 'hi'); endCombatReturn(); }
@@ -664,7 +831,12 @@ function beginEnemyTurn(){
   startOfTurn(en, false); updateHUD();
   if (en.hp <= 0){ win(); return; }
   if (en.statuses.stun){ delete en.statuses.stun; log(`${en.name} is stunned!`, 'good'); setTimeout(beginPlayerTurn, 550); return; }
-  const move = U.weighted(en.moves);
+  if (en.parts && en.parts.legs.cut && U.chance(0.3)){
+    log(`${en.name} drags itself, and its moment passes.`, 'good');
+    setTimeout(beginPlayerTurn, 550); return;
+  }
+  const usable = en.moves.filter(m => !m.disabled);
+  const move = usable.length ? U.weighted(usable) : { name:'Desperate Flail', type:'attack', power:6 };
   resolveAction(en, p, move, false);
   updateHUD();
   if (p.hp <= 0){ lose(); return; }
@@ -708,6 +880,11 @@ function win(){
     const tier = U.clamp(Math.ceil(G.depth/2) + mods.tierMod, 1, 3);
     if (U.chance(dropChance)) grantItem(Data.rollItemId(tier));
     else if (U.chance(0.25)){ p.inv.push('potion_heal'); log('It dropped a Draught of Mending.', 'good'); }
+  }
+  // the practical butchery of survival — beasts are made of meat
+  if (en.tags.includes('beast') && U.chance(0.3)){
+    p.inv.push('strange_meat');
+    log('You carve what travels well. Down here, no one asks what the meat is.', 'dim');
   }
   G.combat = null; G.state = 'EXPLORE'; G.busy = false;
   updateHUD(); renderActions();
@@ -806,6 +983,10 @@ function applyEffects(eff){
   if (eff.mag){ p.baseMag += eff.mag; recomputeStats(p); out.push([`+${eff.mag} MAG`, 'good']); }
   if (eff.item){ grantItem(eff.item); out.push([`Received: ${Data.ITEMS[eff.item].name}`, 'gold']); }
   if (eff.potion){ p.inv.push(eff.potion); out.push([`Received: ${Data.CONSUMABLES[eff.potion].name}`, 'gold']); }
+  if (eff.potion2){ p.inv.push(eff.potion2, eff.potion2); out.push([`Received: ${Data.CONSUMABLES[eff.potion2].name} ×2`, 'gold']); }
+  if (eff.food){ const before = Math.round(p.food); p.food = eff.food >= 99 ? FOOD_MAX : Math.min(FOOD_MAX, p.food + eff.food);
+    out.push([`+${Math.round(p.food) - before} FOOD`, 'good']); }
+  if (eff.pocketCoin){ p.pocketCoin = true; out.push(['The coin rides in your pocket — flip it when steel fails', 'mag']); }
   if (eff.fovBoost){ G.floorFov = (G.floorFov || 0) + eff.fovBoost; revealFOV(); out.push([`+${eff.fovBoost} sight this floor`, 'good']); }
   if (eff.clearHunters){ const n = G.floor.entities.filter(e=>e.hunter).length; G.floor.entities = G.floor.entities.filter(e=>!e.hunter); if (n) out.push(['The hunters withdraw', 'good']); }
   if (eff.heatDown){ p.heat = Math.max(0, (p.heat||0) - eff.heatDown); out.push(['The hunt cools', 'good']); }
@@ -954,6 +1135,18 @@ function renderCombat(){
   ctx.fillStyle='#eae0f0'; ctx.font='7px monospace'; ctx.fillText(`${Math.max(0,en.hp)}/${en.maxhp}`, 16, 27);
   if (en.shield>0){ ctx.fillStyle='#8ab0e0'; ctx.fillText(`⛊${en.shield}`, 120, 27); }
   drawStatusIcons(en, 12, 30);
+  // anatomy readout — what still works, and what you've taken from it
+  if (en.parts){
+    let lx = 12;
+    ctx.font = '7px monospace';
+    for (const key of ['arms','legs','head']){
+      const part = en.parts[key];
+      const txt = part.cut ? `${part.name} ✂` : `${part.name} ${Math.max(0,part.hp)}`;
+      ctx.fillStyle = part.cut ? '#c05070' : (G.combat.target===key ? '#d0a84e' : '#8a7f9e');
+      ctx.fillText(txt, lx, 38);
+      lx += ctx.measureText(txt).width + 8;
+    }
+  }
 
   // player sprite (left/lower)
   Sprites.draw(ctx, p.sprite, 40, canvas.height-84, 5);
@@ -980,6 +1173,9 @@ function updateHUD(){
   const p = G.player; if (!p) return;
   U.el('hud-name').textContent = p.name;
   setBar('hp', p.hp, p.maxhp); setBar('sp', p.sp, p.maxsp);
+  setBar('fd', Math.round(p.food), FOOD_MAX);
+  const fdBar = U.el('fd-fill').parentElement;
+  fdBar.classList.toggle('low', hungerStage(p) >= 2);
   const tier = Data.honorTier(p.honor);
   U.el('honor-mark').style.left = ((p.honor+100)/200*100) + '%';
   const ht = U.el('honor-txt'); ht.textContent = p.honor; ht.style.color = tier.color;
@@ -1049,6 +1245,27 @@ function renderActions(){
     tip.style.marginTop='4px'; box.appendChild(tip);
   } else if (G.state === 'COMBAT' && G.combat){
     const p = G.player, myTurn = G.combat.turn === 'player' && !G.busy;
+    // ---- aim row: physical attacks strike the chosen part ----
+    const en = G.combat.enemy;
+    if (en.parts){
+      const row = U.make('div','target-row');
+      const mkT = (key, label, subHTML) => {
+        const t = U.make('button','tbtn' + (G.combat.target===key?' sel':'') + (key!=='body'&&en.parts[key].cut?' cut':''));
+        t.innerHTML = label + (subHTML?`<span class="lhp">${subHTML}</span>`:'');
+        const severed = key!=='body' && en.parts[key].cut;
+        t.disabled = severed;
+        t.onclick = () => { if (!severed){ G.combat.target = key; renderActions(); } };
+        return t;
+      };
+      row.appendChild(mkT('body','BODY','full harm'));
+      for (const key of ['arms','legs','head']){
+        const part = en.parts[key];
+        row.appendChild(mkT(key, part.name, part.cut ? '✂ severed' : (key==='head'?`${part.hp} · may miss`:`${part.hp}`)));
+      }
+      box.appendChild(row);
+      if (G.combat.target !== 'body')
+        box.appendChild(U.make('div','line dim','Aimed blows harm the limb; some damage bleeds through. Severed limbs stay severed.'));
+    }
     p.skills.forEach((id, idx) => {
       const sk = Data.SKILLS[id];
       const b = Btn('', ()=>doPlayer(id), 'btn '+(sk.type==='defend'||sk.type==='heal'||sk.type==='buff'?'good':''), String(idx+1));
@@ -1066,8 +1283,21 @@ function renderActions(){
       b.disabled = !myTurn || used;
       box.appendChild(b);
     }
+    // the pocketed coin — call on the Nameless god, once per battle
+    if (p.pocketCoin && !G.usedActives.coin_war){
+      const b = Btn('', doCoinFlip, 'btn danger');
+      b.innerHTML = `<span class="k">◎</span>Flip the Nameless Coin<span class="cost">1/battle</span><span class="sub">Heads: it takes from them. Tails: it takes from you. The god is amused either way.</span>`;
+      b.disabled = !myTurn;
+      box.appendChild(b);
+    }
     const potions = p.inv.filter(x=>x==='potion_heal').length;
     if (potions){ const b = Btn(`Draught of Mending ×${potions}`, usePotion, 'btn good'); b.disabled=!myTurn; box.appendChild(b); }
+    if (hungerStage(p) >= 1){
+      const breads = p.inv.filter(x=>x==='ration').length;
+      const meats = p.inv.filter(x=>x==='strange_meat').length;
+      if (breads){ const b = Btn(`Eat Grave-Bread ×${breads} (+35 FOOD)`, ()=>eatFood('ration'), 'btn good'); b.disabled=!myTurn; box.appendChild(b); }
+      if (meats){ const b = Btn(`Eat Strange Meat ×${meats} (+60 FOOD…)`, ()=>eatFood('strange_meat'), 'btn danger'); b.disabled=!myTurn; box.appendChild(b); }
+    }
     if (!G.combat.boss && !G.combat.enemy.guardian){ const b = Btn('Flee', flee, 'btn'); b.disabled=!myTurn; box.appendChild(b); }
   }
 }
@@ -1233,6 +1463,11 @@ function renderShop(){
 
   s.appendChild(U.make('div','sect','Services · Gold'));
   const restCost=goldPrice(12+G.depth*6), medCost=goldPrice(8+G.depth*3), potCost=goldPrice(16+G.depth*2), absCost=goldPrice(20+G.depth*4);
+  const mealCost=goldPrice(6+G.depth*3), breadCost=goldPrice(10+G.depth);
+  s.appendChild(shopLine('A hot meal','Eat well — FOOD restored to full',`<span class="price g">✦ ${mealCost}</span>`,
+    p.gold<mealCost||p.food>=FOOD_MAX, ()=>{ p.gold-=mealCost; p.food=FOOD_MAX; log('The merchant ladles out something hot. You do not ask. It is wonderful.','good'); updateHUD(); renderShop(); }));
+  s.appendChild(shopLine('Grave-Bread','A loaf for the road (+35 FOOD when eaten)',`<span class="price g">✦ ${breadCost}</span>`,
+    p.gold<breadCost, ()=>{ p.gold-=breadCost; p.inv.push('ration'); log('You buy a loaf of Grave-Bread.','gold'); updateHUD(); renderShop(); }));
   s.appendChild(shopLine('Tend your wounds','Restore HP to full',`<span class="price g">✦ ${restCost}</span>`,
     p.gold<restCost||p.hp>=p.maxhp, ()=>{ p.gold-=restCost; p.hp=p.maxhp; log('The merchant tends your wounds.','good'); updateHUD(); renderShop(); }));
   s.appendChild(shopLine('Meditate','Restore SP to full',`<span class="price g">✦ ${medCost}</span>`,
@@ -1298,10 +1533,12 @@ function showInventory(){
   const s = U.make('div','sheet');
   s.appendChild(U.make('div','sect', p.name + ' — Depth ' + G.depth));
   const tier = Data.honorTier(p.honor);
+  const hs = hungerStage(p);
   s.appendChild(U.make('div','p',
     `<b>HP</b> ${p.hp}/${p.maxhp} · <b>SP</b> ${p.sp}/${p.maxsp} · <b>Gold</b> <span style="color:#d0a84e">${p.gold}</span><br>` +
     `<b>ATK</b> ${p.atk} · <b>DEF</b> ${p.def} · <b>MAG</b> ${p.mag} · <b>SPD</b> ${p.spd}<br>` +
-    `<b>Honor</b> <span style="color:${tier.color}">${p.honor} (${tier.name})</span>`));
+    `<b>Honor</b> <span style="color:${tier.color}">${p.honor} (${tier.name})</span> · ` +
+    `<b>FOOD</b> <span style="color:${hs>=2?'#c05030':'#a87e34'}">${Math.round(p.food)}/${FOOD_MAX}${hs?' — '+HUNGER_NAMES[hs]:''}</span>`));
 
   s.appendChild(U.make('div','sect','Equipment'));
   for (const slot of ['weapon','armor','trinket']){
@@ -1316,11 +1553,19 @@ function showInventory(){
     s.appendChild(U.make('div','p dim',`<span style="color:#c8a24a">${sk.name}</span> ${sk.cost?`(${sk.cost} SP)`:'(free)'} — ${sk.desc}`)); }
 
   const potions = p.inv.filter(x=>x==='potion_heal').length;
+  const breads = p.inv.filter(x=>x==='ration').length;
+  const meats = p.inv.filter(x=>x==='strange_meat').length;
   s.appendChild(U.make('div','sect','Provisions'));
-  s.appendChild(U.make('div','p dim', potions ? `Draught of Mending ×${potions}` : '<i>none</i>'));
+  const provParts = [];
+  if (potions) provParts.push(`Draught of Mending ×${potions}`);
+  if (breads) provParts.push(`Grave-Bread ×${breads}`);
+  if (meats) provParts.push(`Strange Meat ×${meats}`);
+  s.appendChild(U.make('div','p dim', provParts.length ? provParts.join(' · ') : '<i>none</i>'));
 
   const row = U.make('div','row');
   if (potions && p.hp < p.maxhp) row.appendChild(Btn('Drink Draught (+26 HP)', ()=>{ usePotion(); hideModal(); }, 'btn good'));
+  if (breads && p.food < FOOD_MAX) row.appendChild(Btn('Eat Grave-Bread (+35 FOOD)', ()=>{ eatFood('ration'); hideModal(); }, 'btn good'));
+  if (meats && p.food < FOOD_MAX) row.appendChild(Btn('Eat Strange Meat (+60 FOOD…)', ()=>{ eatFood('strange_meat'); hideModal(); }, 'btn danger'));
   row.appendChild(Btn('Close', hideModal, 'btn center'));
   s.appendChild(row);
   setModal(s);

@@ -305,6 +305,8 @@ const ITEMS = {
 
 const CONSUMABLES = {
   potion_heal: { id:'potion_heal', name:'Draught of Mending', heal:26, desc:'Restores 26 HP in combat.' },
+  ration:      { id:'ration', name:'Grave-Bread', food:35, desc:'Coarse dark bread, baked by no one you want to meet. Restores 35 FOOD.' },
+  strange_meat:{ id:'strange_meat', name:'Strange Meat', food:60, risky:true, desc:'Unlabeled, generous, still faintly warm. Restores 60 FOOD. Ask nothing.' },
 };
 
 // item pools by tier for treasure rolls
@@ -616,8 +618,35 @@ const EVENTS = {
     },
     outcomes:{
       coin_flip:  { special:'coin_flip', text:"", effects:{} },
-      coin_pocket:{ text:"You take the coin and do not play. The voice does not stop you. It laughs — softly, patiently, the way one laughs at a child who has pocketed a live ember.", effects:{ gold:15, honor:-8, heatUp:10, codex:'coin_theft', reveal:'Some debts are not collected. They are grown.' } },
+      coin_pocket:{ text:"You take the coin and do not play. The voice does not stop you. It laughs — softly, patiently, the way one laughs at a child who has pocketed a live ember. The coin sits heavy in your pocket. It wants to be flipped. You can feel it deciding things in there.", effects:{ gold:15, honor:-8, heatUp:10, pocketCoin:true, codex:'coin_theft', reveal:'Some debts are not collected. They are grown.' } },
       coin_leave: { text:"You leave the game unplayed. The voice says nothing at all, which is somehow worse.", effects:{ honor:2 } },
+    }
+  },
+
+  larder: {
+    name:'The Larder',
+    perceive: clearIfHonored,
+    variants:{
+      clear:{ art:'npc_cage',
+        text:"A cellar door stands ajar, breathing cold air that smells of salt and smoke. Inside: shelves. Hooks. Provisions enough for a garrison that never came back up. Somebody stocked this larder with great care, and that somebody is not here.",
+        choices:[
+          { label:'Eat your fill, here and now', to:'lard_feast' },
+          { label:'Take provisions for the road', to:'lard_take' },
+          { label:'Touch nothing that is not yours', to:'lard_leave' },
+        ] },
+      warped:{ art:'npc_cage',
+        text:"A cellar door stands ajar, breathing cold air that smells of salt and smoke. Inside: shelves. Hooks. MEAT — hanging in neat rows, trimmed by a practiced hand. Your stomach votes before your eyes finish counting the hooks. Some of the cuts are long. Some of the cuts are very long.",
+        choices:[
+          { label:'Eat. Starving men can\'t be choosers', to:'lard_gorge', kind:'danger' },
+          { label:'Take some for the road, don\'t look close', to:'lard_take' },
+          { label:'Back out of this place', to:'lard_leave' },
+        ] },
+    },
+    outcomes:{
+      lard_feast: { text:"You sit among the shelves and eat like a person again — bread, salt fish, something that was honestly a pear once. Strength settles back into your hands. On the way out you leave two coins on a shelf, for whoever keeps this place. It felt important to.", effects:{ food:99, heal:8, gold:-2, honor:3, codex:'lard_fed' } },
+      lard_gorge: { text:"You eat in the dark, fast, standing up, the way animals do. It is the best meal you have had down here and you know better than to wonder why the portions are so long. Behind you, on the stair, something heavy pauses — approves — and moves on. You have been fed. The word sits in your head like a hook: fed, the way livestock is fed.", effects:{ food:99, heal:10, honor:-6, heatUp:5, codex:'lard_gorged', reveal:'A cleaner soul would have found bread and salt fish here — and left coins for the keeper.' } },
+      lard_take:  { text:"You wrap what travels well and fill your pack. The door swings shut behind you on its own, gently, like something saying: come back hungry.", effects:{ potion2:'strange_meat', codex:'lard_took' } },
+      lard_leave: { text:"You close the cellar door on the smell of smoke and salt. Your stomach files a formal complaint. Your spine thanks you.", effects:{ honor:4 } },
     }
   },
 
@@ -1090,6 +1119,15 @@ const CODEX = [
   { id:'velvet_yielded', title:'The Chapel: Two Candles', tag:'bad',  hint:'You woke rested, and lighter, and you do not speak of it.' },
   { id:'velvet_prayed',  title:'The Chapel: Colder Prayers', tag:'good', hint:'You prayed to anything older than comfort. It answered.' },
   { id:'velvet_faced',   title:'The Chapel: Under the Veil', tag:'bad', hint:'It is not a face. It has been patient long enough.' },
+  { id:'lard_fed',     title:'The Larder: A Guest',        tag:'good', hint:'Bread and salt fish, and two coins left for the keeper.' },
+  { id:'lard_gorged',  title:'The Larder: Livestock',      tag:'bad',  hint:'Something on the stair approved of how well you ate.' },
+  { id:'lard_took',    title:'The Larder: Provisions',     tag:'mag',  hint:'The door closed gently, like something saying: come back hungry.' },
+  { id:'sever_first',  title:'Butchery: The First Cut',    tag:'bad',  hint:'Something lost a piece of itself, and kept fighting anyway.' },
+  { id:'head_taken',   title:'Butchery: The Clean Take',   tag:'bad',  hint:'There is a stroke that ends every argument at once.' },
+  { id:'starved_hollow', title:'Hunger: The Body\'s Ledger', tag:'bad', hint:'Past a certain point, the body starts paying its debts in flesh.' },
+  { id:'meat_price',   title:'Hunger: The Meat\'s Price',  tag:'bad',  hint:'It was filling. It was warm. It was not free.' },
+  { id:'coin_war_heads', title:'The Coin, Drawn in Battle: Heads', tag:'mag', hint:'Mid-fight, someone asked an old god to decide. It said yes.' },
+  { id:'coin_war_tails', title:'The Coin, Drawn in Battle: Tails', tag:'bad', hint:'Mid-fight, someone asked an old god to decide. It decided against them.' },
 ];
 
 // ---------- Whispers: the deep talks to the damned (flavor lines, no mechanics) ----------
@@ -1118,6 +1156,10 @@ const WHISPERS = [
   'Whatever is beneath the veil, it smiled just now.',
   'The dolls are seated by size. There is an empty chair your size.',
   'Do not pray for rescue. Down here, something might answer.',
+  'Your stomach growls, and something growls back, politely.',
+  'Everything down here is missing a piece. You will fit right in.',
+  'The larder is always stocked. Try not to learn the supplier.',
+  'An arm is a tool. A leg is a promise. A head is a decision.',
 ];
 
 // ---------- Biomes: each depth may shift terrain, light, foes — and how it treats each class ----------
@@ -1170,6 +1212,7 @@ const SANCTUM = [
   { id:'focus',     name:'Reserve of Focus',   desc:'+1 Max SP each run, per rank.',              max:4, base:22, growth:16 },
   { id:'pockets',   name:'Deep Pockets',       desc:'+15 starting Gold, per rank.',               max:4, base:12, growth:8 },
   { id:'provision', name:"Provisioner's Pact", desc:'Start with a Draught of Mending, per rank.', max:2, base:25, growth:20 },
+  { id:'larder',    name:'The Deep Larder',    desc:'Start with a Grave-Bread, per rank.',        max:2, base:14, growth:10 },
   { id:'oath',      name:"Oathkeeper's Seal",  desc:'Start with +8 Honor, per rank.',             max:3, base:20, growth:15 },
   { id:'siphon',    name:'Soul Siphon',        desc:'Earn +20% Souls from deeds, per rank.',       max:3, base:35, growth:25 },
   { id:'favor',     name:"Merchant's Favor",   desc:'Shop Gold prices −10%, per rank.',           max:2, base:30, growth:20 },

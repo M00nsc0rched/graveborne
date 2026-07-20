@@ -56,8 +56,48 @@ on depth 5 to win.
   hostile silhouette you feel compelled to attack).
 - Because presentation is tied to honor, **you must play different moral roads to see
   every variant** — the Codex (title screen / pause) shows locked entries with teasing
-  hints for the ones you haven't found yet. There are **59 codex entries** across
-  twenty encounters to uncover.
+  hints for the ones you haven't found yet. There are **86 codex entries** to uncover,
+  across twenty-one encounters plus feats of butchery, hunger, and gambling.
+
+## The body is a resource: hunger, limbs, and the coin
+
+Three systems that make the deep feel like it's eating you back:
+
+### FOOD (hunger)
+
+A third HUD bar drains with **every step** (~285 steps from fed to starved). Stages:
+**Hungry** (≤45) is a warning; **STARVING** (≤20, bar pulses red) cuts your attack and
+magic damage by 30% and stops SP regeneration in combat; at **0 FOOD** your body eats
+itself — 2 HP per step. Eat to refill: **Grave-Bread** (+35) from chests, shops, and
+the Sanctum's *Deep Larder* rank; **Strange Meat** (+60) carved from slain beasts
+(~30% drop) or found in *The Larder* encounter — filling, warm, and with a ~30% chance
+it *disagrees with being eaten* (poison). The Hollow Merchant also serves **a hot
+meal** (FOOD to full). Eating mid-combat spends your turn, as all honest meals do.
+
+### Aimed blows (limb combat)
+
+Every foe that isn't pure spirit has an **anatomy**: ARMS (or MAW), LEGS, HEAD — each
+with its own HP pool, shown under the enemy's health bar and as a target row above
+your skills. Physical attacks strike the chosen part; damage hits the limb and **40%
+bleeds through** to the body. Severed limbs stay severed:
+
+- **ARMS / MAW cut** — its ATK drops ~45% and its **heaviest attack move is gone for
+  good** (a disarmed foe falls back on a Desperate Flail).
+- **LEGS cut** — its SPD hits 0, it loses ~30% of its turns dragging itself, and
+  **fleeing always succeeds** — you may simply walk away from the fight.
+- **HEAD** — blows go wide 35% of the time, but on a common foe a finished head is a
+  **decapitation: the fight ends instantly**. Bosses, guardians and elites are made of
+  older law: they instead take a burst (~22% max HP) and **lose their magic**.
+
+Body blows remain the fastest pure kill — aiming is a trade: safety now versus speed.
+
+### The Nameless god's coin, mid-battle
+
+If you **pocket the coin** at its altar (instead of flipping it there), it rides with
+you for the rest of the run: once per battle you may **flip it in combat**. Heads —
+something reaches out of the air and takes ~35% of the enemy's max HP. Tails — the
+taking turns on you (~30% of your current HP, floored at 1, and −2 Honor). The god is
+amused either way. Both results are Codex entries.
 
 ## Alignment: the low-vs-high tradeoff
 
@@ -234,6 +274,7 @@ bank Souls → grow stronger → descend deeper. Each has ranks with rising cost
 | Reserve of Focus | +1 Max SP / rank |
 | Deep Pockets | +15 starting Gold / rank |
 | Provisioner's Pact | Start with a Draught of Mending / rank |
+| The Deep Larder | Start with a Grave-Bread / rank |
 | Oathkeeper's Seal | Start with +8 Honor / rank |
 | Soul Siphon | +20% Souls earned from deeds / rank |
 | Merchant's Favor | −10% shop Gold prices / rank |
