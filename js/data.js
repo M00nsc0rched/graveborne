@@ -130,12 +130,24 @@ Object.assign(ENEMIES, {
             {name:'Censure',type:'magic',power:9,effect:{weaken:{amt:5,turns:3}},w:1}, {name:'Aegis of the Choir',type:'defend',shield:'def2',w:1} ] },
 });
 
-// The Butcher — summoned only through his red door (event), never spawned on floors
+// Grimdark minibosses — summoned only through their events, never spawned on floors
 Object.assign(ENEMIES, {
   butcher: { id:'butcher', name:'The Butcher', sprite:'en_butcher', elite:true, tier:1, tags:['human'],
-    hp:95, atk:19, def:8, mag:0, spd:7, gold:[35,55], drop:'butchers_cleaver',
-    moves:[ {name:'Cleave',type:'attack',power:18,w:3}, {name:'Hook',type:'attack',power:12,effect:{stun:0.4},w:2},
-            {name:'Fresh Meat',type:'heal',healFlat:12,w:1} ] },
+    hp:150, atk:22, def:10, mag:0, spd:8, gold:[50,80], drop:'butchers_cleaver',
+    moves:[ {name:'Cleave',type:'attack',power:20,w:3}, {name:'Hook',type:'attack',power:14,effect:{stun:0.45},w:2},
+            {name:'Fresh Meat',type:'heal',healFlat:16,w:1}, {name:'Red Frenzy',type:'buff',effect:{atkbuff:{amt:6,turns:3}},w:1} ] },
+  seamstress: { id:'seamstress', name:'The Seamstress', sprite:'en_seamstress', elite:true, tier:1, tags:['human','spirit'],
+    hp:110, atk:16, def:9, mag:14, spd:11, gold:[40,60], drop:'skinners_needle',
+    moves:[ {name:'Needle Rake',type:'attack',power:15,effect:{poison:{dmg:5,turns:3}},w:3}, {name:'Unpick Seams',type:'magic',power:12,effect:{weaken:{amt:6,turns:3}},w:2},
+            {name:'Thread the Flesh',type:'attack',power:13,effect:{stun:0.35},w:2}, {name:'Mend Herself',type:'heal',healFlat:14,w:1} ] },
+  starveling: { id:'starveling', name:'The Starveling King', sprite:'en_starveling', elite:true, tier:1, tags:['undead'],
+    hp:130, atk:18, def:7, mag:10, spd:9, gold:[45,70], drop:'starveling_crown',
+    moves:[ {name:'Devouring Bite',type:'attack',power:16,effect:{lifesteal:0.8},w:3}, {name:'Hollow Roar',type:'magic',power:11,effect:{weaken:{amt:5,turns:3}},w:2},
+            {name:'Feast on Marrow',type:'heal',healFlat:18,w:1}, {name:'Famine\'s Reach',type:'attack',power:19,w:2} ] },
+  velvetsaint: { id:'velvetsaint', name:'The Velvet Saint', sprite:'en_velvet', elite:true, tier:1, tags:['spirit'],
+    hp:105, atk:12, def:8, mag:17, spd:12, gold:[40,65], drop:'velvet_shroud',
+    moves:[ {name:'Adoring Touch',type:'magic',power:14,effect:{lifesteal:0.7},w:3}, {name:'Sweet Nothings',type:'magic',power:9,effect:{weaken:{amt:6,turns:3}},w:2},
+            {name:'Smothering Embrace',type:'attack',power:13,effect:{stun:0.4},w:2}, {name:'Drink Deep',type:'magic',power:16,effect:{lifesteal:0.5},w:1} ] },
 });
 
 // which named terror may prowl each biome's floors
@@ -271,6 +283,24 @@ const ITEMS = {
   nights_eye:     { id:'nights_eye', name:'Night\'s Eye', slot:'trinket', mods:{mag:6,spd:3}, tier:3, desc:'It blinks when you are not looking.' },
   butchers_cleaver:{ id:'butchers_cleaver', name:'Butcher\'s Cleaver', slot:'weapon', mods:{atk:9}, flag:{lifesteal:0.12}, tier:3, desc:'Still warm. It has never once been washed.' },
   soulstone:      { id:'soulstone', name:'Soulstone', slot:'trinket', mods:{mag:6,sp:2}, tier:3, desc:'A shard of burning red. It whispers your name in a voice you almost know.' },
+
+  // ---- Legendary relics: a passive gift, and a power you may call on once per battle ----
+  skinners_needle:{ id:'skinners_needle', name:'Skinner\'s Needle', slot:'weapon', mods:{atk:8}, flag:{lifesteal:0.1}, tier:3,
+    desc:'It sews shut, and it sews open. Passive: drinks a little of every wound.',
+    active:{ name:'Unstitch', desc:'Open every seam of the foe — weakness and deep bleeding.',
+      action:{ name:'Unstitch', type:'magic', power:10, effect:{ weaken:{amt:8,turns:3}, poison:{dmg:6,turns:3} } } } },
+  starveling_crown:{ id:'starveling_crown', name:'Crown of the Starveling', slot:'trinket', mods:{hp:12,mag:3}, tier:3,
+    desc:'A crown of fused finger-bones. Passive: you are harder to empty.',
+    active:{ name:'Devour', desc:'Bite with the King\'s own hunger — heal for all damage dealt.',
+      action:{ name:'Devour', type:'attack', power:16, effect:{ lifesteal:1.0 } } } },
+  velvet_shroud:  { id:'velvet_shroud', name:'Velvet Shroud', slot:'armor', mods:{def:6,spd:2}, tier:3,
+    desc:'Warm as a held breath. Passive: the dark mistakes you for one of its own.',
+    active:{ name:'Beguile', desc:'One adoring glance — the foe forgets to fight.',
+      action:{ name:'Beguile', type:'magic', power:6, effect:{ stun:1.0, weaken:{amt:4,turns:3} } } } },
+  gloamheart:     { id:'gloamheart', name:'Gloamheart', slot:'trinket', mods:{mag:5,hp:8}, tier:3,
+    desc:'The Gloamlord\'s heart, still beating to a slower clock. Passive: old power seeps into you.',
+    active:{ name:'Gloamfire', desc:'Unleash the Warden\'s cold flame in a single breath.',
+      action:{ name:'Gloamfire', type:'magic', power:22, effect:{ poison:{dmg:5,turns:2} } } } },
 };
 
 const CONSUMABLES = {
@@ -616,6 +646,86 @@ const EVENTS = {
       prince_leave:{ text:"You bow and withdraw. Behind you he resumes his rounds of the empty tables, asking, asking.", effects:{} },
       prince_slay: { text:"You cut the crooning thing down. It does not fight. It folds itself around the veiled bundle as it falls, shielding it to the last — and the bundle is bones, small ones, holding a dried bouquet. Not a lure. A mourner. The rings it wore are gold, at least.", effects:{ gold:18, honor:-13, codex:'prince_slain', reveal:'It was a groom at the grave of his bride. A century of grief, ended by a stranger in one stroke.' } },
       prince_watch:{ text:"You lower your blade and listen. The croon resolves into a wedding-song, sung in a voice worn to threads — a groom, keeping vigil over a bride a hundred years gone. He sees you, and bows. You bow back. Some things need witnesses more than they need mercy.", effects:{ sp:99, honor:9, codex:'prince_feast' } },
+    }
+  },
+
+  seamparlor: {
+    name:"The Seamstress' Parlor",
+    perceive: clearIfHonored,
+    variants:{
+      clear:{ art:'en_seamstress',
+        text:"A parlor hung with finished work: coats, gloves, a wedding dress — all of leather too soft and too pale to ask about. At her bench, a long-fingered woman looks up over needles that were never made for cloth. “Sit, dear. You're coming apart at the seams. Everyone down here is. I can take you in.”",
+        choices:[
+          { label:'Refuse her — and her wares', to:'seam_refuse' },
+          { label:'Sell her a strip of your skin', to:'seam_trade', kind:'danger' },
+          { label:'End her tailoring forever', to:'seam_fight', kind:'danger' },
+        ] },
+      warped:{ art:'en_seamstress',
+        text:"A parlor of DOLLS — rows of them, seated, dressed, glass-eyed. Some of them are breathing. The long-fingered thing at the bench pats an empty chair without looking up. “I saved you a seat, dear. I measured you three floors ago.”",
+        choices:[
+          { label:'Take the seat', to:'seam_trade', kind:'danger' },
+          { label:'Burn the parlor bench and all', to:'seam_fight', kind:'danger' },
+          { label:'Back out, slowly', to:'seam_refuse' },
+        ] },
+    },
+    outcomes:{
+      seam_refuse:{ text:"You keep your skin and your distance. As the door closes she calls after you, unbothered: “No hurry, dear. You'll come apart eventually. They all do. I do alterations.”", effects:{ honor:2, codex:'seam_refused' } },
+      seam_trade: { text:"Her needle works quickly and without cruelty, which is somehow worse. She takes a hand's width from your back, nods at the grain of it, and pays in coin and a stitched blessing — the wound closes into a seam finer than any scar. You are less than you were, and neater.", effects:{ maxhp:-4, gold:30, def:2, honor:-6, codex:'seam_traded', reveal:'What she takes, she keeps. Somewhere in that parlor, a glove now fits perfectly.' } },
+      seam_fight: { text:"You move — and every needle in the parlor rises with her. “A pity, dear,” she sighs, threading the first one with something red. “I had you down for a winter coat.”", effects:{ combat:'seamstress', codex:'seam_faced' } },
+    }
+  },
+
+  banquet: {
+    name:'The Banquet of the Starveling King',
+    perceive: clearIfHonored,
+    variants:{
+      clear:{ art:'en_starveling',
+        text:"A feast-hall where the smell reaches you first. At its head, a giant of jaundiced skin and jutting bone wears a crown grown into his skull. Around him, a banquet without end — and every dish is bones, sucked clean and arranged like delicacies. “SIT,” the Starveling King says, gracious, hollow. “EAT. NOTHING LEAVES MY TABLE FULL. NOT EVEN ME.”",
+        choices:[
+          { label:'Sit, and eat what is served', to:'banq_eat', kind:'danger' },
+          { label:'Offer your own rations to the King', to:'banq_offer' },
+          { label:'Overturn his table', to:'banq_fight', kind:'danger' },
+        ] },
+      warped:{ art:'en_starveling',
+        text:"A feast-hall, and it smells GLORIOUS. Roast meat, warm bread, wine. At the head sits a starved giant in a crown, not eating any of it. Your stomach twists like a fist. Surely one plate. Surely he owes you one plate.",
+        choices:[
+          { label:'Fall on the feast and gorge', to:'banq_eat', kind:'danger' },
+          { label:'Look at the food. Really look', to:'banq_look' },
+          { label:'Overturn his table', to:'banq_fight', kind:'danger' },
+        ] },
+    },
+    outcomes:{
+      banq_eat:  { text:"You eat. It is bones and grave-dust and it is the finest meal of your life; you weep while you chew and cannot stop. The King watches with something like love. “GOOD,” he says. “NOW YOU UNDERSTAND ME.” The hunger will pass. Most of it.", effects:{ heal:40, maxhp:-4, honor:-8, codex:'banq_ate', reveal:'His table only serves what you brought to it. There was never any food.' } },
+      banq_offer:{ text:"You lay your rations before him. The hall goes silent. The King lifts the dried bread like a relic, and for a moment his ruined face remembers being a face. “NO ONE,” he says slowly, “HAS FED ME. IN A VERY LONG TIME.” He does not eat it. He has it set at the head of the table, and lets you pass with a king's blessing.", effects:{ maxhp:6, honor:12, codex:'banq_fed' } },
+      banq_look: { text:"You force yourself to look — truly look. The roast is a ribcage. The bread is vertebrae. The wine is nothing you will name even to yourself. Your hunger curdles into clarity, and the King nods, almost approving. “WISE,” he says. “STARVE STANDING.”", effects:{ sp:99, honor:8, codex:'banq_fed' } },
+      banq_fight:{ text:"You put your boot through a century of arranged bones. The King rises — and rises, and rises — joints cracking like green wood. “I HAVE EATEN KINGDOMS,” he says, without anger. “YOU ARE BARELY A MOUTHFUL.”", effects:{ combat:'starveling', codex:'banq_faced' } },
+    }
+  },
+
+  velvetchapel: {
+    name:'The Velvet Chapel',
+    perceive: clearIfHonored,
+    variants:{
+      clear:{ art:'en_velvet',
+        text:"A side-chapel upholstered in red velvet, warm as a body, lit by candles that do not flicker. On the altar steps reclines a veiled figure of impossible grace. “Pilgrim,” she says, and the word is a hand on your neck. “You have carried so much, so far. Set it down. Rest with me a while. All I ask is a little of your warmth.”",
+        choices:[
+          { label:'Accept her comfort', to:'velvet_yield', kind:'danger' },
+          { label:'Pray at the altar instead — to anything else', to:'velvet_pray' },
+          { label:'Tear down the veil', to:'velvet_fight', kind:'danger' },
+        ] },
+      warped:{ art:'en_velvet',
+        text:"A chapel of red velvet, and SHE is waiting in it — for you, only ever for you, she has always been waiting for you. You cannot see her face through the veil. You do not need to. Every step toward her feels like being forgiven.",
+        choices:[
+          { label:'Go to her', to:'velvet_yield', kind:'danger' },
+          { label:'Grip your weapon until it hurts', to:'velvet_resist' },
+          { label:'Tear down the veil', to:'velvet_fight', kind:'danger' },
+        ] },
+    },
+    outcomes:{
+      velvet_yield:{ text:"You set your burdens down. What follows is warmth, and hunger, and you do not speak of it after. You wake on the chapel steps alone, rested as you have not been in years — and lighter in a way that has nothing to do with your pack. Two candles have gone out. You are fairly sure they were yours.", effects:{ heal:99, sp:99, maxhp:-6, honor:-8, codex:'velvet_yielded', reveal:'She keeps what she is given. She is owed so much warmth by now that she will never be warm.' } },
+      velvet_pray: { text:"You kneel past her, to the cold stone under the velvet, and pray to anything older than comfort. The warmth recoils like a touched snail. Behind you her voice loses its music for just one syllable — and that syllable is very, very old.", effects:{ sp:99, def:2, honor:9, codex:'velvet_prayed' } },
+      velvet_resist:{ text:"You grip your weapon until your knuckles crack, and the pain cuts the perfume. The chapel is cold. It was always cold. The candles are tallow and the velvet is moth-eaten and SHE is still on the steps — but now you see the veil move wrong, like breath through cloth with nothing behind it. You keep your warmth, and your name.", effects:{ maxhp:4, honor:11, codex:'velvet_prayed' } },
+      velvet_fight:{ text:"You take the veil in your fist and pull. What is under it is not a face. It is a mouth, and it has been patient with you long enough. “UNGRATEFUL,” the chapel says, from every seam of it at once.", effects:{ combat:'velvetsaint', codex:'velvet_faced' } },
     }
   },
 
@@ -971,6 +1081,15 @@ const CODEX = [
   { id:'prince_truth', title:'The Prince: The Truth',     tag:'mag',  hint:'His grace collapsed like the lie it was — and thanked you for it.' },
   { id:'prince_feast', title:'The Prince: The Wedding Guest', tag:'good', hint:'An empty cup, raised to a hundred-year-old happy day.' },
   { id:'prince_slain', title:'The Prince: The Mourner',   tag:'bad',  hint:'A groom at the grave of his bride, ended in one stroke.' },
+  { id:'seam_refused', title:'The Parlor: Unaltered',     tag:'good', hint:'You kept your skin. She does alterations, whenever you change your mind.' },
+  { id:'seam_traded',  title:'The Parlor: A Hand\'s Width', tag:'bad', hint:'Somewhere in that parlor, a glove now fits perfectly.' },
+  { id:'seam_faced',   title:'The Parlor: Every Needle Rose', tag:'bad', hint:'She had you down for a winter coat.' },
+  { id:'banq_ate',     title:'The Banquet: The Finest Meal', tag:'bad', hint:'You wept while you chewed. There was never any food.' },
+  { id:'banq_fed',     title:'The Banquet: The King Fed',  tag:'good', hint:'No one had fed him in a very long time.' },
+  { id:'banq_faced',   title:'The Banquet: Barely a Mouthful', tag:'bad', hint:'He has eaten kingdoms. He rose without anger.' },
+  { id:'velvet_yielded', title:'The Chapel: Two Candles', tag:'bad',  hint:'You woke rested, and lighter, and you do not speak of it.' },
+  { id:'velvet_prayed',  title:'The Chapel: Colder Prayers', tag:'good', hint:'You prayed to anything older than comfort. It answered.' },
+  { id:'velvet_faced',   title:'The Chapel: Under the Veil', tag:'bad', hint:'It is not a face. It has been patient long enough.' },
 ];
 
 // ---------- Whispers: the deep talks to the damned (flavor lines, no mechanics) ----------
@@ -987,6 +1106,18 @@ const WHISPERS = [
   'The coin is still spinning, somewhere. It never landed.',
   'All the old tales were warnings. No one listened to a single one.',
   'The hooks are never empty for long.',
+  'Skin is just a door. Everything down here knows how to knock.',
+  'The needle remembers every hem it has ever closed. Including yours.',
+  'Set another place at the table. Someone is always about to arrive.',
+  'You are marinating. That is the word for what the deep is doing to you.',
+  'Somewhere, a coat is being fitted. Try not to think about the measurements.',
+  'The candles in the chapel are counting down. Two of them are yours.',
+  'She has been waiting for you. She tells everyone that.',
+  'Hunger is the oldest king. His table is never cleared.',
+  'Your blood is only borrowed. The deep keeps a ledger.',
+  'Whatever is beneath the veil, it smiled just now.',
+  'The dolls are seated by size. There is an empty chair your size.',
+  'Do not pray for rescue. Down here, something might answer.',
 ];
 
 // ---------- Biomes: each depth may shift terrain, light, foes — and how it treats each class ----------
