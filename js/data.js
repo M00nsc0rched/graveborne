@@ -130,6 +130,14 @@ Object.assign(ENEMIES, {
             {name:'Censure',type:'magic',power:9,effect:{weaken:{amt:5,turns:3}},w:1}, {name:'Aegis of the Choir',type:'defend',shield:'def2',w:1} ] },
 });
 
+// The Butcher — summoned only through his red door (event), never spawned on floors
+Object.assign(ENEMIES, {
+  butcher: { id:'butcher', name:'The Butcher', sprite:'en_butcher', elite:true, tier:1, tags:['human'],
+    hp:95, atk:19, def:8, mag:0, spd:7, gold:[35,55], drop:'butchers_cleaver',
+    moves:[ {name:'Cleave',type:'attack',power:18,w:3}, {name:'Hook',type:'attack',power:12,effect:{stun:0.4},w:2},
+            {name:'Fresh Meat',type:'heal',healFlat:12,w:1} ] },
+});
+
 // which named terror may prowl each biome's floors
 const BIOME_ELITES = { catacombs:'gravemaw', fungal:'sporetyrant', drowned:'undertow', ember:'cinderprophet', ossuary:'marrowcantor', umbral:'rootwolf' };
 
@@ -261,6 +269,8 @@ const ITEMS = {
   hunters_fang:   { id:'hunters_fang', name:'Hunter\'s Fang', slot:'trinket', mods:{atk:4,spd:2}, tier:2, desc:'Taken from something that took from others.' },
   saints_knuckle: { id:'saints_knuckle', name:'Saint\'s Knucklebone', slot:'trinket', mods:{hp:10,sp:2}, flag:{honorMul:1.25}, tier:3, desc:'One relic the Curator never catalogued.' },
   nights_eye:     { id:'nights_eye', name:'Night\'s Eye', slot:'trinket', mods:{mag:6,spd:3}, tier:3, desc:'It blinks when you are not looking.' },
+  butchers_cleaver:{ id:'butchers_cleaver', name:'Butcher\'s Cleaver', slot:'weapon', mods:{atk:9}, flag:{lifesteal:0.12}, tier:3, desc:'Still warm. It has never once been washed.' },
+  soulstone:      { id:'soulstone', name:'Soulstone', slot:'trinket', mods:{mag:6,sp:2}, tier:3, desc:'A shard of burning red. It whispers your name in a voice you almost know.' },
 };
 
 const CONSUMABLES = {
@@ -535,6 +545,80 @@ const EVENTS = {
   },
 
   // ---------- Biome-native encounters (only appear on their home floor) ----------
+  butcherdoor: {
+    name:"The Butcher's Door",
+    perceive: clearIfHonored,
+    variants:{
+      clear:{ art:'en_butcher',
+        text:"A red door, warm to the touch. From beyond: the wet sound of work, and a voice like grease in a cold pan. “Ahhh… fresh meat.” Through the crack you see hooks — and on one of them, something still moving.",
+        choices:[
+          { label:'Break in and face the Butcher', to:'butcher_fight', kind:'danger' },
+          { label:'Slip in and free the one on the hook', to:'butcher_free' },
+          { label:'Take meat from the hooks and go', to:'butcher_meat', kind:'danger' },
+        ] },
+      warped:{ art:'en_butcher',
+        text:"A red door, warm to the touch. The wet sound of work. “Ahhh… fresh meat.” Through the crack: hooks, and hanging things. Meat is meat, your stomach says. Whatever hangs in there is already past saving.",
+        choices:[
+          { label:'Break in and face the Butcher', to:'butcher_fight', kind:'danger' },
+          { label:'Take meat from the hooks and go', to:'butcher_meat', kind:'danger' },
+          { label:'Walk away from the warm door', to:'butcher_leave' },
+        ] },
+    },
+    outcomes:{
+      butcher_fight:{ text:"You put your shoulder through the red door. The thing inside turns — an apron the color of its work, a cleaver the size of a tombstone, a smile with too few teeth in it. “FRESH. MEAT.”", effects:{ combat:'butcher', codex:'butcher_faced' } },
+      butcher_free: { text:"You slip in while the work is loud. The one on the hook is a man — barely, still. You take him down; he does not scream, because he has learned not to. He points once at the door, presses his bandages into your hands, and runs without a word.", effects:{ heal:20, honor:12, codex:'butcher_freed' } },
+      butcher_meat: { text:"You lift a wet parcel from the nearest hook and go, quickly. Later, in the dark, you eat. Warmth spreads through you like forgiveness. You do not ask what it was. That is the mercy you allow yourself.", effects:{ heal:35, honor:-10, codex:'butcher_meat', reveal:'A cleaner soul would have seen what else hung there — and who could still be saved.' } },
+      butcher_leave:{ text:"You walk away. Behind you the wet work resumes, unhurried. It was never worried you would stay.", effects:{ honor:-2 } },
+    }
+  },
+
+  namelesscoin: {
+    name:'The Coin of the Nameless',
+    perceive:()=> 'clear',
+    variants:{
+      clear:{ art:'npc_shrine',
+        text:"An altar of black iron, bare but for a single coin — older than any kingdom's mint, faces worn off both sides. A voice speaks without a mouth, from everywhere at once: “ALL THINGS ARE DECIDED THUS. CALL IT.”",
+        choices:[
+          { label:'Flip the coin', to:'coin_flip', kind:'danger' },
+          { label:'Pocket the coin without flipping', to:'coin_pocket', kind:'danger' },
+          { label:'Refuse the game and leave', to:'coin_leave' },
+        ] },
+    },
+    outcomes:{
+      coin_flip:  { special:'coin_flip', text:"", effects:{} },
+      coin_pocket:{ text:"You take the coin and do not play. The voice does not stop you. It laughs — softly, patiently, the way one laughs at a child who has pocketed a live ember.", effects:{ gold:15, honor:-8, heatUp:10, codex:'coin_theft', reveal:'Some debts are not collected. They are grown.' } },
+      coin_leave: { text:"You leave the game unplayed. The voice says nothing at all, which is somehow worse.", effects:{ honor:2 } },
+    }
+  },
+
+  hollowprince: {
+    name:'The Hollow Prince',
+    perceive: clearIfHonored,
+    variants:{
+      clear:{ art:'npc_fallen',
+        text:"A figure in tarnished court finery bows with perfect grace. “Have you seen her? My bride. Hair like spun gold. The wedding is— the wedding was—” Behind him stretches a hall of dust: a feast laid for guests a hundred years dead, and a small veiled bundle at the head table.",
+        choices:[
+          { label:'Tell him the truth', to:'prince_truth', kind:'danger' },
+          { label:'Play the guest — toast the happy day', to:'prince_feast' },
+          { label:'Bow out of the hall', to:'prince_leave' },
+        ] },
+      warped:{ art:'npc_fallen',
+        text:"A GROTESQUE in rotted finery croons over a bundle of bones in a bridal veil, rocking it gently. Its feast-hall is dust and worse. Things like this do not grieve. Things like this lure.",
+        choices:[
+          { label:'Cut it down mid-song', to:'prince_slay', kind:'danger' },
+          { label:'Watch the crooning a while', to:'prince_watch' },
+          { label:'Back out of the hall', to:'prince_leave' },
+        ] },
+    },
+    outcomes:{
+      prince_truth:{ text:"“She is dust, my lord. A hundred years of it.” He goes very still. “Dust. Yes. I remember now. I remember the fire. I remember what I—” His grace collapses like the lie it was, and he with it, weeping, thanking you. Where he knelt lies a shard of burning red, finally still.", effects:{ item:'soulstone', honor:10, codex:'prince_truth' } },
+      prince_feast:{ text:"You take a seat among the dust and raise an empty cup to the happy couple. He glows. For one hour the hall is warm and golden and full of music only he can hear — and, seated in his lie, you rest better than you have in days.", effects:{ heal:25, sp:99, honor:2, codex:'prince_feast' } },
+      prince_leave:{ text:"You bow and withdraw. Behind you he resumes his rounds of the empty tables, asking, asking.", effects:{} },
+      prince_slay: { text:"You cut the crooning thing down. It does not fight. It folds itself around the veiled bundle as it falls, shielding it to the last — and the bundle is bones, small ones, holding a dried bouquet. Not a lure. A mourner. The rings it wore are gold, at least.", effects:{ gold:18, honor:-13, codex:'prince_slain', reveal:'It was a groom at the grave of his bride. A century of grief, ended by a stranger in one stroke.' } },
+      prince_watch:{ text:"You lower your blade and listen. The croon resolves into a wedding-song, sung in a voice worn to threads — a groom, keeping vigil over a bride a hundred years gone. He sees you, and bows. You bow back. Some things need witnesses more than they need mercy.", effects:{ sp:99, honor:9, codex:'prince_feast' } },
+    }
+  },
+
   sporewife: {
     name:'The Sporewife', biome:'fungal',
     perceive: clearIfHonored,
@@ -878,6 +962,31 @@ const CODEX = [
   { id:'wolf_offer',   title:'The Wolfmother: Pack-Scent',tag:'good', hint:'Feed a mother in the dark, and move like one of hers.' },
   { id:'wolf_den',     title:'The Wolfmother: The Den',   tag:'bad',  hint:'The pelt is worth a month above ground. She makes you earn it.' },
   { id:'wolf_truth',   title:'The Wolfmother: Weighed',   tag:'mag',  hint:'She watched to see what you were, and decided.' },
+  { id:'butcher_faced',title:'The Red Door: Faced',       tag:'bad',  hint:'Fresh meat, it said. It meant you.' },
+  { id:'butcher_freed',title:'The Red Door: Unhooked',    tag:'good', hint:'He had learned not to scream. He remembered how to run.' },
+  { id:'butcher_meat', title:'The Red Door: The Parcel',  tag:'bad',  hint:'Warmth like forgiveness. You did not ask what it was.' },
+  { id:'coin_bless',   title:'The Coin: Heads',           tag:'mag',  hint:'The god was amused. This time, that was enough.' },
+  { id:'coin_curse',   title:'The Coin: Tails',           tag:'bad',  hint:'Something was taken. The god was amused either way.' },
+  { id:'coin_theft',   title:'The Coin: Pocketed',        tag:'bad',  hint:'Some debts are not collected. They are grown.' },
+  { id:'prince_truth', title:'The Prince: The Truth',     tag:'mag',  hint:'His grace collapsed like the lie it was — and thanked you for it.' },
+  { id:'prince_feast', title:'The Prince: The Wedding Guest', tag:'good', hint:'An empty cup, raised to a hundred-year-old happy day.' },
+  { id:'prince_slain', title:'The Prince: The Mourner',   tag:'bad',  hint:'A groom at the grave of his bride, ended in one stroke.' },
+];
+
+// ---------- Whispers: the deep talks to the damned (flavor lines, no mechanics) ----------
+const WHISPERS = [
+  'The walls here were grown, not built.',
+  'Something below is counting your steps.',
+  'You have been down here longer than you think.',
+  'The dark does not hate you. It is worse than that. It is hungry.',
+  'Turn back, says a voice that sounds exactly like yours.',
+  'The stone remembers being bone.',
+  '“Fresh meat,” something sighs — far away, or very near.',
+  'Your shadow moved first just now. You are almost certain.',
+  'Somewhere above, the sun has given up on you.',
+  'The coin is still spinning, somewhere. It never landed.',
+  'All the old tales were warnings. No one listened to a single one.',
+  'The hooks are never empty for long.',
 ];
 
 // ---------- Biomes: each depth may shift terrain, light, foes — and how it treats each class ----------
@@ -935,7 +1044,7 @@ const SANCTUM = [
   { id:'favor',     name:"Merchant's Favor",   desc:'Shop Gold prices −10%, per rank.',           max:2, base:30, growth:20 },
 ];
 
-const Data = { SKILLS, CLASSES, ENEMIES, ITEMS, CONSUMABLES, ITEM_POOL, HUNTER_POOL, BIOME_ELITES, BIOME_GUARDIANS, HONOR_TIERS, EVENTS, CODEX, SANCTUM, BIOMES,
+const Data = { SKILLS, CLASSES, ENEMIES, ITEMS, CONSUMABLES, ITEM_POOL, HUNTER_POOL, BIOME_ELITES, BIOME_GUARDIANS, HONOR_TIERS, EVENTS, CODEX, SANCTUM, BIOMES, WHISPERS,
   honorTier(h){ for (const t of HONOR_TIERS){ if (h >= t.min) return t; } return HONOR_TIERS[HONOR_TIERS.length-1]; },
   enemyPool(depth){
     const ids = [];

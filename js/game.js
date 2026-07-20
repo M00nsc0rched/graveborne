@@ -429,10 +429,18 @@ function spawnReinforcement(){
   log('The hunt closes in — Inquisition reinforcements arrive.', 'bad');
 }
 
+// the deep talks to the damned — flavor whispers for tainted souls, hunted marks, and the truly deep
+function maybeWhisper(){
+  const p = G.player;
+  const listening = p.honor <= -20 || (p.heat || 0) >= 50 || G.depth >= 4;
+  if (listening && U.chance(0.025)) log('<i>' + U.choice(Data.WHISPERS) + '</i>', 'mag');
+}
+
 // enemies take a step toward the player; one may ambush into combat
 function worldTurn(){
   const p = G.player, f = G.floor;
   updateHeat();
+  maybeWhisper();
   // poison ticks with every step taken in the world
   if (p.statuses.poison){
     const d = p.statuses.poison.dmg;
@@ -738,6 +746,17 @@ function chooseOutcome(eventId, outId, entity){
   let text = out.text;
 
   // ----- special: mirror gaze resolves by honor tier -----
+  // ----- special: the Nameless god's coin — all things are decided thus -----
+  if (out.special === 'coin_flip'){
+    if (U.chance(0.5)){
+      text = "The coin rings off the black iron, spins — and lands. “HEADS,” says the voice, from inside your own chest. “THE GOD IS AMUSED.” Strength floods you like cold water poured into a cracked jug.";
+      eff = { maxhp:6, atk:2, codex:'coin_bless' };
+    } else {
+      text = "The coin rings off the black iron, spins — and lands. “TAILS,” says the voice, from inside your own chest. “THE GOD IS AMUSED.” Something is taken. You feel lighter afterward, and less.";
+      eff = { maxhp:-8, honor:-4, codex:'coin_curse', reveal:'The coin has no faces. It decides anyway. It always decides.' };
+    }
+  }
+
   if (out.special === 'mirror_gaze'){
     const h = G.player.honor;
     if (h >= 20){ text = "The reflection straightens, and light pours from it like dawn through a cracked door. It sets a phantom crown upon your brow. You feel larger than your wounds."; eff = { maxhp:8, heal:99, honor:4, codex:'mir_saint' }; }
@@ -758,7 +777,7 @@ function applyEffects(eff){
   if (eff.gold){ p.gold = Math.max(0, p.gold + eff.gold); out.push([`${eff.gold>0?'+':''}${eff.gold} Gold`, eff.gold>0?'good':'bad']); }
   if (eff.heal){ const before=p.hp; p.hp = eff.heal>=99 ? p.maxhp : Math.min(p.maxhp, p.hp+eff.heal); out.push([`+${p.hp-before} HP`, 'good']); }
   if (eff.sp){ const before=p.sp; p.sp = eff.sp>=99 ? p.maxsp : Math.min(p.maxsp, p.sp+eff.sp); if (p.sp-before) out.push([`+${p.sp-before} SP`, 'good']); }
-  if (eff.maxhp){ p.baseHp += eff.maxhp; recomputeStats(p); p.hp += eff.maxhp; out.push([`+${eff.maxhp} Max HP`, 'good']); }
+  if (eff.maxhp){ p.baseHp += eff.maxhp; recomputeStats(p); p.hp = Math.max(1, Math.min(p.maxhp, p.hp + eff.maxhp)); out.push([`${eff.maxhp>0?'+':''}${eff.maxhp} Max HP`, eff.maxhp>0?'good':'bad']); }
   if (eff.atk){ p.baseAtk += eff.atk; recomputeStats(p); out.push([`+${eff.atk} ATK`, 'good']); }
   if (eff.def){ p.baseDef += eff.def; recomputeStats(p); out.push([`+${eff.def} DEF`, 'good']); }
   if (eff.mag){ p.baseMag += eff.mag; recomputeStats(p); out.push([`+${eff.mag} MAG`, 'good']); }
