@@ -1,4 +1,7 @@
 // ================= GRAVEBORNE — main engine =================
+// shown on the title screen; keep in step with CACHE in sw.js — the game is
+// served from that cache, so the number you see is the build you're running
+const GAME_VERSION = 6;
 const VW = 21, VH = 13, TS = 16;      // viewport tiles + tile size
 const FINAL_DEPTH = 5;
 const FOV_R = 5;
@@ -1328,6 +1331,7 @@ function showTitle(){
   row.appendChild(Btn('Sanctum ◈', showSanctum, 'btn center'));
   row.appendChild(Btn('Codex', ()=>showCodex(false), 'btn center'));
   s.appendChild(row);
+  s.appendChild(U.make('div','p center dim', 'v' + GAME_VERSION));
   setModal(s);
 }
 
