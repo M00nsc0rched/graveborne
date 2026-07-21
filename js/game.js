@@ -1,7 +1,7 @@
 // ================= GRAVEBORNE — main engine =================
 // shown on the title screen; keep in step with CACHE in sw.js — the game is
 // served from that cache, so the number you see is the build you're running
-const GAME_VERSION = 7;
+const GAME_VERSION = 8;
 const VW = 21, VH = 13, TS = 16;      // viewport tiles + tile size
 const FINAL_DEPTH = 5;
 const FOV_R = 5;
@@ -1020,9 +1020,50 @@ function applyEffects(eff){
 // ================= RENDERING =================
 function render(){
   if (!ctx) return;
+  updateStageBtn();
   if (G.state === 'COMBAT' && G.combat) renderCombat();
   else if (G.player && G.floor) renderExplore();
   else { ctx.fillStyle = '#08070c'; ctx.fillRect(0,0,canvas.width,canvas.height); }
+}
+
+// context button on the stage: ☰ opens the menu in exploration, Flee in combat
+function updateStageBtn(){
+  document.body.classList.toggle('in-combat', G.state === 'COMBAT');
+  const b = U.el('stage-btn'); if (!b) return;
+  if (G.state === 'EXPLORE' && !G.busy){
+    b.classList.remove('hidden','flee'); b.textContent = '☰ Menu';
+    b.disabled = false; b.onclick = showInventory;
+  } else if (G.state === 'COMBAT' && G.combat){
+    const en = G.combat.enemy, canFlee = !G.combat.boss && !en.guardian;
+    if (!canFlee){ b.classList.add('hidden'); return; }
+    b.classList.remove('hidden'); b.classList.add('flee'); b.textContent = 'Flee';
+    b.disabled = G.busy || G.combat.turn !== 'player';
+    b.onclick = flee;
+  } else {
+    b.classList.add('hidden');
+  }
+}
+
+// crisp enemy readout in the DOM (replaces the blurry canvas-drawn text)
+function updateEnemyPanel(){
+  document.body.classList.toggle('in-combat', G.state === 'COMBAT');
+  const panel = U.el('enemy-panel'); if (!panel) return;
+  if (G.state !== 'COMBAT' || !G.combat){ panel.classList.add('hidden'); return; }
+  const en = G.combat.enemy;
+  panel.classList.remove('hidden');
+  const nameEl = U.el('en-name');
+  nameEl.textContent = (en.guardian ? '◆ ' : en.elite ? '★ ' : '') + en.name.toUpperCase() + (en.boss ? ' · BOSS' : '');
+  nameEl.className = 'en-name' + ((en.elite || en.guardian || en.boss) ? ' elite' : '');
+  U.el('en-hpfill').style.width = U.clamp(en.hp / en.maxhp * 100, 0, 100) + '%';
+  U.el('en-hptxt').textContent = `${Math.max(0, en.hp)}/${en.maxhp}` + (en.shield > 0 ? `  ⛊${en.shield}` : '');
+  const limbs = U.el('en-limbs'); limbs.innerHTML = '';
+  if (en.parts){
+    for (const key of ['arms','legs','head']){
+      const part = en.parts[key];
+      const cls = 'en-limb' + (part.cut ? ' cut' : (G.combat.target === key ? ' aim' : ''));
+      limbs.appendChild(U.make('span', cls, part.name + ' ' + (part.cut ? '✂' : Math.max(0, part.hp))));
+    }
+  }
 }
 
 function drawTile(t, sx, sy, x, y){
@@ -1144,30 +1185,11 @@ function renderCombat(){
   radial(canvas.width*0.62, 74, 90, 'rgba(150,60,120,0.10)');
   ctx.globalCompositeOperation='source-over';
 
-  // enemy sprite (right/upper) — bosses, guardians and elites loom larger
+  // enemy sprite (right/upper) — bosses, guardians and elites loom larger.
+  // its name / HP / limbs / statuses are drawn crisply in the DOM enemy panel.
   const es = (en.boss || en.elite || en.guardian) ? 7 : 6;
   const ex = Math.round(canvas.width*0.60), ey = 34;
   Sprites.draw(ctx, en.sprite, ex, ey, es);
-  // enemy nameplate + hp (gold for named elites, gold ◆ for guardians)
-  ctx.textAlign='left'; ctx.textBaseline='alphabetic';
-  ctx.fillStyle = (en.elite || en.guardian) ? '#d0a84e' : '#c9bfd6'; ctx.font='8px monospace';
-  ctx.fillText((en.guardian ? '◆ ' : en.elite ? '★ ' : '') + en.name.toUpperCase(), 12, 16);
-  bar(12, 20, 150, 8, en.hp/en.maxhp, '#7a1f1f', '#c03636');
-  ctx.fillStyle='#eae0f0'; ctx.font='7px monospace'; ctx.fillText(`${Math.max(0,en.hp)}/${en.maxhp}`, 16, 27);
-  if (en.shield>0){ ctx.fillStyle='#8ab0e0'; ctx.fillText(`⛊${en.shield}`, 120, 27); }
-  drawStatusIcons(en, 12, 30);
-  // anatomy readout — what still works, and what you've taken from it
-  if (en.parts){
-    let lx = 12;
-    ctx.font = '7px monospace';
-    for (const key of ['arms','legs','head']){
-      const part = en.parts[key];
-      const txt = part.cut ? `${part.name} ✂` : `${part.name} ${Math.max(0,part.hp)}`;
-      ctx.fillStyle = part.cut ? '#c05070' : (G.combat.target===key ? '#d0a84e' : '#8a7f9e');
-      ctx.fillText(txt, lx, 38);
-      lx += ctx.measureText(txt).width + 8;
-    }
-  }
 
   // player sprite (left/lower)
   Sprites.draw(ctx, p.sprite, 40, canvas.height-84, 5);
@@ -1230,6 +1252,7 @@ function updateHUD(){
   } else {
     bounty.className = 'bounty hidden';
   }
+  updateEnemyPanel();
 }
 function setBar(kind, cur, max){
   U.el(kind+'-fill').style.width = U.clamp(cur/max*100,0,100)+'%';
@@ -1321,8 +1344,10 @@ function renderActions(){
       if (breads){ const b = Btn(`Eat Grave-Bread ×${breads} (+35 FOOD)`, ()=>eatFood('ration'), 'btn good'); b.disabled=!myTurn; box.appendChild(b); }
       if (meats){ const b = Btn(`Eat Strange Meat ×${meats} (+60 FOOD…)`, ()=>eatFood('strange_meat'), 'btn danger'); b.disabled=!myTurn; box.appendChild(b); }
     }
-    if (!G.combat.boss && !G.combat.enemy.guardian){ const b = Btn('Flee', flee, 'btn'); b.disabled=!myTurn; box.appendChild(b); }
+    // Flee lives on the stage (top-right) so it's always in reach without scrolling
   }
+  updateEnemyPanel();
+  updateStageBtn();
 }
 
 function Btn(label, fn, cls, key){

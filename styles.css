@@ -112,10 +112,41 @@ button{touch-action:manipulation}
   aspect-ratio:336/208;
 }
 #game{
-  display:block;width:100%;height:100%;
+  display:block;width:100%;height:100%;object-fit:contain;
   image-rendering:pixelated;image-rendering:crisp-edges;
 }
 #fx{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+
+/* crisp enemy readout (DOM, not canvas — stays sharp when the stage is scaled) */
+.enemy-panel{
+  position:absolute;top:6px;left:6px;right:auto;max-width:64%;z-index:3;
+  background:linear-gradient(180deg,rgba(9,7,16,.86),rgba(9,7,16,.55));
+  border:1px solid var(--edge);border-radius:3px;padding:5px 7px;pointer-events:none;
+  box-shadow:0 2px 10px rgba(0,0,0,.5);
+}
+.enemy-panel.hidden{display:none}
+.en-name{font-size:11px;letter-spacing:1px;color:var(--ink);text-transform:uppercase;
+  text-shadow:0 1px 2px #000;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.en-name.elite{color:var(--gold)}
+.en-hpbar{position:relative;height:12px;margin-top:3px;background:#000;border:1px solid #5a2f3e;border-radius:2px;overflow:hidden}
+.en-hpbar .fill{position:absolute;inset:0;width:100%;background:linear-gradient(90deg,#7a1f1f,#c03636);transition:width .2s ease}
+.en-hptxt{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;text-shadow:0 1px 0 #000}
+.en-limbs{display:flex;gap:8px;margin-top:4px;flex-wrap:wrap}
+.en-limb{font-size:9.5px;letter-spacing:.5px;color:var(--ink-dim)}
+.en-limb.aim{color:var(--gold)}
+.en-limb.cut{color:var(--bad);text-decoration:line-through}
+
+/* context button on the stage: ☰ menu in exploration, Flee in combat */
+.stage-btn{
+  position:absolute;top:6px;right:6px;z-index:4;font-family:inherit;font-size:12px;letter-spacing:1px;
+  color:var(--ink);background:linear-gradient(180deg,var(--panel2),var(--panel));
+  border:2px solid var(--edge);border-radius:4px;padding:7px 11px;cursor:pointer;
+  box-shadow:0 2px 0 #000;min-height:36px;
+}
+.stage-btn:active{transform:translateY(1px);box-shadow:0 1px 0 #000}
+.stage-btn.flee{color:var(--bad);border-color:#5a2f3e}
+.stage-btn:disabled{opacity:.35;cursor:not-allowed}
+.stage-btn.hidden{display:none}
 .float{
   position:absolute;font-size:12px;font-weight:bold;
   text-shadow:0 1px 0 #000,0 0 4px #000;
@@ -294,36 +325,52 @@ button{touch-action:manipulation}
 }
 body.touch .touch-controls{display:flex}
 
-/* ---------- Small screens (phones) ---------- */
+/* ---------- Small screens (phones): everything on one screen, no page scroll ---------- */
 @media (max-width:700px){
   body{
-    align-items:flex-start;
-    overflow-y:auto;
-    overflow-x:hidden;
+    align-items:stretch;
+    overflow:hidden;                 /* the page never scrolls */
+    overscroll-behavior:none;
   }
-  /* one-screen app layout: the frame fills the visible viewport, the log flexes */
+  /* the frame is exactly the visible viewport; inner regions flex to fit */
   #frame{
     width:100vw;
-    min-height:100dvh;
-    padding:6px 6px 8px;
+    height:100dvh;
+    overflow:hidden;
+    padding:5px 6px;
     padding-left:calc(6px + env(safe-area-inset-left));
     padding-right:calc(6px + env(safe-area-inset-right));
-    padding-top:calc(6px + env(safe-area-inset-top));
-    padding-bottom:calc(8px + env(safe-area-inset-bottom));
-    gap:6px;
+    padding-top:calc(4px + env(safe-area-inset-top));
+    padding-bottom:calc(5px + env(safe-area-inset-bottom));
+    gap:5px;
   }
-  #hud{flex-wrap:wrap;gap:5px;padding:5px 8px}
+  #hud{flex-wrap:wrap;gap:5px;padding:5px 8px;flex:0 0 auto}
   .hud-left{min-width:150px}
   .hud-right{align-items:flex-start;gap:4px}
   .honor-track{width:96px}
   .bounty-track{width:80px}
   .bars{max-width:100%;gap:3px}
   .hint{display:none}
-  #stage{flex-shrink:0}
-  #dock{flex:1 1 auto;flex-direction:column;min-height:0}
-  .actions{width:100%}
-  .log{flex:1 1 auto;min-height:72px;max-height:190px;font-size:12px}
-  .btn{padding:11px 12px;font-size:13px;min-height:44px}
+
+  /* stage: fixed share of the screen, shrinks further in combat to free room for skills */
+  #stage{flex:0 0 auto;aspect-ratio:auto;height:30vh}
+  body.in-combat #stage{height:21vh}
+
+  /* dock takes the rest; in exploration the log fills it, in combat the skills do */
+  #dock{flex:1 1 auto;flex-direction:column;min-height:0;gap:5px}
+  .actions{width:100%;flex:0 0 auto}
+  .log{flex:1 1 auto;min-height:52px;font-size:12px}
+  body.in-combat .log{flex:0 0 auto;height:56px}
+  body.in-combat .actions{flex:1 1 auto;min-height:0;overflow-y:auto}
+  body.in-combat #actions::-webkit-scrollbar{width:6px}
+  body.in-combat #actions::-webkit-scrollbar-thumb{background:var(--edge);border-radius:3px}
+
+  /* compact combat buttons so all four skills fit without scrolling */
+  .btn{padding:9px 11px;font-size:12.5px;min-height:40px}
+  .btn .sub{font-size:9.5px;margin-top:1px}
+  .target-row{gap:4px;margin-bottom:5px}
+  .stage-btn{font-size:13px;padding:8px 12px}
+
   .sheet{padding:14px 12px;max-height:88vh}
   .title-big{font-size:26px;letter-spacing:5px}
   .cards{grid-template-columns:1fr}
@@ -331,18 +378,23 @@ body.touch .touch-controls{display:flex}
   .row .btn{min-width:0;flex:1 1 40%}
   .modal{padding:10px}
   /* compact D-pad so everything fits on one screen */
-  .touch-controls{gap:0}
+  .touch-controls{gap:0;flex:0 0 auto}
   .touch-hint{display:none}
-  .dpad{grid-template-columns:repeat(3,56px);grid-template-rows:repeat(3,56px);gap:5px}
+  .dpad{grid-template-columns:repeat(3,52px);grid-template-rows:repeat(3,52px);gap:5px}
   .dpad-btn{font-size:18px}
 }
 
 /* ---------- Large phones (iPhone Pro Max & friends, ~430pt wide) ---------- */
 @media (min-width:410px) and (max-width:700px){
-  .dpad{grid-template-columns:repeat(3,62px);grid-template-rows:repeat(3,62px);gap:6px}
+  .dpad{grid-template-columns:repeat(3,58px);grid-template-rows:repeat(3,58px);gap:6px}
   .dpad-btn{font-size:20px}
-  .log{max-height:230px;font-size:12.5px}
   .honor-track{width:120px}
   .bounty-track{width:100px}
-  .btn{min-height:46px}
+}
+
+/* ---------- Short viewports (landscape phones): trim the stage further ---------- */
+@media (max-width:900px) and (max-height:520px){
+  #stage{height:38vh}
+  body.in-combat #stage{height:30vh}
+  .dpad{grid-template-columns:repeat(3,44px);grid-template-rows:repeat(3,44px)}
 }
