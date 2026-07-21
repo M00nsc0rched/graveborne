@@ -14,6 +14,16 @@ const SKILLS = {
   heal:        { name:'Mend',         type:'heal',   cost:3, healBase:8, desc:'Mend wounds (MAG×2 + 8).' },
   smite:       { name:'Smite',        type:'magic',  cost:3, power:18, holy:true, desc:'Holy fire; scourges the undead.' },
   prayer:      { name:'Warding Prayer', type:'buff', cost:2, effect:{regen:{amt:6,turns:3}, shield:'def'}, desc:'Regen and a warding shield.' },
+
+  // ---- learnable via the Soul level-up system (bought and swapped in mid-run) ----
+  cleave:      { name:'Cleave',       type:'attack', cost:2, power:17, learnable:true, desc:'A wide two-handed swing.' },
+  execute:     { name:'Execute',      type:'attack', cost:3, power:22, effect:{crit:0.4}, learnable:true, desc:'A brutal finisher; often critical.' },
+  siphoncut:   { name:'Siphon Cut',   type:'attack', cost:2, power:12, effect:{lifesteal:0.5}, learnable:true, desc:'Steal vitality with steel.' },
+  warcry:      { name:'War Cry',      type:'buff',   cost:2, effect:{atkbuff:{amt:6,turns:4}}, learnable:true, desc:'A roar that swells your strength.' },
+  ironskin:    { name:'Iron Skin',    type:'defend', cost:2, shield:'def2', learnable:true, desc:'A heavy guard (DEF×2 + honor).' },
+  frostlance:  { name:'Frost Lance',  type:'magic',  cost:3, power:17, effect:{stun:0.3}, learnable:true, desc:'Piercing cold that may freeze.' },
+  plaguetouch: { name:'Plague Touch', type:'magic',  cost:2, power:9,  effect:{poison:{dmg:6,turns:4}}, learnable:true, desc:'A rot that festers deep.' },
+  sanctuary:   { name:'Sanctuary',    type:'buff',   cost:3, effect:{regen:{amt:8,turns:3}, shield:'def'}, learnable:true, desc:'Strong regen and a warding shield.' },
 };
 
 const CLASSES = {

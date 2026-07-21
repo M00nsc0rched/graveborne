@@ -99,6 +99,26 @@ something reaches out of the air and takes ~35% of the enemy's max HP. Tails —
 taking turns on you (~30% of your current HP, floored at 1, and −2 Honor). The god is
 amused either way. Both results are Codex entries.
 
+## The Reckoning: spend Souls on the run itself
+
+Souls no longer only pile up between runs for the Sanctum — you spend them **mid-descent**,
+from the **Inventory & Skills** screen, to grow the character you're playing *right now*.
+When you can afford a level, the Inventory button lights up **◈ Level Up ready**.
+
+- **Raise a stat** — pick **HP (+8)**, **SP / ATK / DEF / MAG / SPD (+2)**. Each level costs
+  **more Souls than the last** (12 → 18 → 27 → 41 → 61 → 91 …, ×1.5 per level), so every
+  point is a deliberate buy. Your level shows on the HUD (`· Lv N`).
+- **Bind a new skill** — buy one of eight learnable skills (Cleave, Execute, Siphon Cut,
+  War Cry, Iron Skin, Frost Lance, Plague Touch, Sanctuary) with Souls, then **swap it in for
+  one of your current four**. Each skill you buy makes the next pricier (30 → 55 → 80 …).
+
+The bite: these are the **same Souls the Sanctum keeps**, and unspent Souls survive death
+while spent ones are gone for good. So every Reckoning is a wager — grow now to go deeper and
+earn more, or bank for permanent upgrades. Level and learned skills last **only for the
+current descent** (they reset on a new run); the Souls you spent do not come back. Formulas
+live in `levelUpCost` / `skillLearnCost` and `LEVEL_STATS` in `js/game.js`; learnable skills
+are the `learnable:true` entries in `SKILLS` (`js/data.js`).
+
 ## Alignment: the low-vs-high tradeoff
 
 Your honor total pushes you into one of three alignments (shown as a HUD badge), each a

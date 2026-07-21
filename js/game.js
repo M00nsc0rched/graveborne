@@ -1,7 +1,7 @@
 // ================= GRAVEBORNE — main engine =================
 // shown on the title screen; keep in step with CACHE in sw.js — the game is
 // served from that cache, so the number you see is the build you're running
-const GAME_VERSION = 6;
+const GAME_VERSION = 7;
 const VW = 21, VH = 13, TS = 16;      // viewport tiles + tile size
 const FINAL_DEPTH = 5;
 const FOV_R = 5;
@@ -15,6 +15,23 @@ const FOOD_MAX = 100, FOOD_DRAIN = 0.35;   // ~285 steps from fed to starved
 // 0 fed · 1 hungry · 2 starving (weakened) · 3 starved (flesh pays)
 function hungerStage(p){ return p.food <= 0 ? 3 : p.food <= 20 ? 2 : p.food <= 45 ? 1 : 0; }
 const HUNGER_NAMES = ['', 'Hungry', 'STARVING', 'STARVED'];
+
+// ---- The Reckoning: spend the persistent Soul bank on THIS run's power ----
+// Souls no longer just pile up for the Sanctum — you feed them to your flesh
+// mid-descent. Each level costs more than the last, so every spend is a real
+// choice between growing now and banking for permanent Sanctum upgrades.
+const LEVEL_STATS = [
+  { key:'hp',  base:'baseHp',  amt:8, label:'Max HP' },
+  { key:'sp',  base:'baseSp',  amt:2, label:'Max SP' },
+  { key:'atk', base:'baseAtk', amt:2, label:'ATK' },
+  { key:'def', base:'baseDef', amt:2, label:'DEF' },
+  { key:'mag', base:'baseMag', amt:2, label:'MAG' },
+  { key:'spd', base:'baseSpd', amt:2, label:'SPD' },
+];
+// escalating: 12, 18, 27, 41, 61, 91, 137, …  (×1.5 per level reached)
+function levelUpCost(p){ return Math.round(12 * Math.pow(1.5, (p.level || 1) - 1)); }
+// each new skill you buy makes the next one pricier
+function skillLearnCost(p){ return 30 + 25 * (p.skillsBought || 0); }
 
 // ---- Biomes: helpers for the current floor's terrain ----
 function curBiome(){ return Data.BIOMES[G.biome || 'catacombs']; }
@@ -129,6 +146,7 @@ function newPlayer(classId){
     skills:c.skills.slice(), equip:{weapon:null,armor:null,trinket:null}, inv:[],
     statuses:{}, shield:0, x:0, y:0, dir:1, allies:[],
     heat:0, reinforceCd:null, pocketCoin:false,
+    level:1, skillsBought:0,
   };
   applySanctum(p);
   recomputeStats(p);
@@ -1174,7 +1192,7 @@ function drawStatusIcons(c, x, y){
 // ================= HUD / LOG / FX =================
 function updateHUD(){
   const p = G.player; if (!p) return;
-  U.el('hud-name').textContent = p.name;
+  U.el('hud-name').textContent = p.name + ' · Lv ' + (p.level || 1);
   setBar('hp', p.hp, p.maxhp); setBar('sp', p.sp, p.maxsp);
   setBar('fd', Math.round(p.food), FOOD_MAX);
   const fdBar = U.el('fd-fill').parentElement;
@@ -1241,7 +1259,9 @@ function renderActions(){
   if (tc) tc.classList.toggle('combat', G.state === 'COMBAT');
   if (G.state === 'EXPLORE'){
     const onStairs = false;
-    box.appendChild(Btn('Inventory & Skills', showInventory, 'btn', 'I'));
+    const canLevel = G.player && Save.souls() >= levelUpCost(G.player);
+    box.appendChild(Btn('Inventory & Skills' + (canLevel ? '  ◈ Level Up ready' : ''),
+      showInventory, 'btn' + (canLevel ? ' good' : ''), 'I'));
     box.appendChild(Btn('Codex of Encounters', ()=>showCodex(true), 'btn', 'C'));
     box.appendChild(Btn('Abandon Run', confirmAbandon, 'btn danger'));
     const tip = U.make('div','line dim','Walk into foes to fight · ✦ chests · ! events · stairs descend · glowing tiles are hazards.');
@@ -1531,6 +1551,74 @@ function buySanctum(u){
   showSanctum();
 }
 
+// spend Souls to raise a chosen stat; the price climbs with your level
+function buyLevel(statKey){
+  const p = G.player, cost = levelUpCost(p);
+  const st = LEVEL_STATS.find(s => s.key === statKey);
+  if (!st || Save.souls() < cost || !Save.spendSouls(cost)) return;
+  p[st.base] += st.amt;
+  p.level = (p.level || 1) + 1;
+  const beforeHp = p.hp, beforeSp = p.sp;
+  recomputeStats(p);
+  if (statKey === 'hp') p.hp = beforeHp + st.amt;          // enjoy the new HP right away
+  if (statKey === 'sp') p.sp = beforeSp + st.amt;
+  log(`You feed ◈ ${cost} Souls to your flesh. Level ${p.level} — +${st.amt} ${st.label}.`, 'mag');
+  floatOn(true, `+${st.amt} ${st.label}`, '#7fb0d0');
+  updateHUD();
+  showInventory();
+}
+
+// choose a new skill to learn (paid in Souls); then pick which one it replaces
+function showLearnSkill(){
+  const p = G.player, cost = skillLearnCost(p), souls = Save.souls();
+  const pool = Object.keys(Data.SKILLS).filter(id => Data.SKILLS[id].learnable && !p.skills.includes(id));
+  const s = U.make('div','sheet');
+  s.appendChild(U.make('div','sect','Bind a New Skill'));
+  s.appendChild(U.make('div','p dim',
+    `Burn Souls to carve a new skill into your soul for this descent — then give up one you already carry. ` +
+    `Cost: <span style="color:#7fb0d0">◈ ${cost} Souls</span> · you hold <span style="color:#7fb0d0">◈ ${souls}</span>.`));
+  if (!pool.length){
+    s.appendChild(U.make('div','p dim','<i>You have already learned every skill on offer.</i>'));
+  } else {
+    for (const id of pool){
+      const sk = Data.SKILLS[id];
+      s.appendChild(shopLine(sk.name, `${sk.cost?sk.cost+' SP':'free'} — ${sk.desc}`,
+        `<span class="price s">◈ ${cost}</span>`, souls < cost, () => showSwapSkill(id)));
+    }
+  }
+  const row = U.make('div','row');
+  row.appendChild(Btn('Back', showInventory, 'btn center'));
+  s.appendChild(row);
+  setModal(s);
+}
+
+function showSwapSkill(newId){
+  const p = G.player, sk = Data.SKILLS[newId];
+  const s = U.make('div','sheet');
+  s.appendChild(U.make('div','sect', `Learn ${sk.name} — give up which skill?`));
+  s.appendChild(U.make('div','p',`<span style="color:#c8a24a">${sk.name}</span> ${sk.cost?`(${sk.cost} SP)`:'(free)'} — ${sk.desc}`));
+  s.appendChild(U.make('div','p dim','Choose the skill it will replace:'));
+  for (const id of p.skills){
+    const old = Data.SKILLS[id];
+    s.appendChild(shopLine(`Replace ${old.name}`, `${old.cost?old.cost+' SP':'free'} — ${old.desc}`, '', false, () => learnSkill(newId, id)));
+  }
+  const row = U.make('div','row');
+  row.appendChild(Btn('Cancel', showLearnSkill, 'btn center'));
+  s.appendChild(row);
+  setModal(s);
+}
+
+function learnSkill(newId, replaceId){
+  const p = G.player, cost = skillLearnCost(p);
+  const idx = p.skills.indexOf(replaceId);
+  if (idx < 0 || Save.souls() < cost || !Save.spendSouls(cost)) return;
+  p.skills[idx] = newId;
+  p.skillsBought = (p.skillsBought || 0) + 1;
+  log(`You bind ${Data.SKILLS[newId].name} in place of ${Data.SKILLS[replaceId].name} for ◈ ${cost} Souls.`, 'mag');
+  updateHUD();
+  showInventory();
+}
+
 function showInventory(){
   if (G.state !== 'EXPLORE') return;
   const p = G.player;
@@ -1543,6 +1631,28 @@ function showInventory(){
     `<b>ATK</b> ${p.atk} · <b>DEF</b> ${p.def} · <b>MAG</b> ${p.mag} · <b>SPD</b> ${p.spd}<br>` +
     `<b>Honor</b> <span style="color:${tier.color}">${p.honor} (${tier.name})</span> · ` +
     `<b>FOOD</b> <span style="color:${hs>=2?'#c05030':'#a87e34'}">${Math.round(p.food)}/${FOOD_MAX}${hs?' — '+HUNGER_NAMES[hs]:''}</span>`));
+
+  // ---- The Reckoning: spend Souls on this run's power ----
+  const lvlCost = levelUpCost(p), souls = Save.souls();
+  s.appendChild(U.make('div','sect', `The Reckoning — Level ${p.level || 1}`));
+  s.appendChild(U.make('div','p dim',
+    `You hold <span style="color:#7fb0d0">◈ ${souls} Souls</span>. Feed them to your flesh to grow — but they are the same Souls the Sanctum keeps, and the dark takes what you fail to bank. These gains last only this descent.`));
+  s.appendChild(U.make('div','p',
+    `<b>Raise a stat</b> — <span style="color:#7fb0d0">◈ ${lvlCost} Souls</span> (rises each level):`));
+  const grid = U.make('div','row');
+  for (const st of LEVEL_STATS){
+    const b = Btn(`${st.label} +${st.amt}`, () => buyLevel(st.key), 'btn' + (souls >= lvlCost ? ' good' : ''));
+    b.disabled = souls < lvlCost;
+    b.style.minWidth = '96px';
+    grid.appendChild(b);
+  }
+  s.appendChild(grid);
+  const learnRow = U.make('div','row');
+  const learnable = Object.keys(Data.SKILLS).some(id => Data.SKILLS[id].learnable && !p.skills.includes(id));
+  const lb = Btn(`Bind a New Skill — ◈ ${skillLearnCost(p)}`, showLearnSkill, 'btn');
+  lb.disabled = !learnable;
+  learnRow.appendChild(lb);
+  s.appendChild(learnRow);
 
   s.appendChild(U.make('div','sect','Equipment'));
   for (const slot of ['weapon','armor','trinket']){
