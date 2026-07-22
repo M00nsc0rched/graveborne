@@ -1,8 +1,9 @@
 // ================= GRAVEBORNE — main engine =================
 // shown on the title screen; keep in step with CACHE in sw.js — the game is
 // served from that cache, so the number you see is the build you're running
-const GAME_VERSION = 12;
-const VW = 21, VH = 13, TS = 16;      // viewport tiles + tile size
+const GAME_VERSION = 13;
+let VW = 21, VH = 13;                 // viewport in tiles — reshaped to the stage on phones
+const TS = 16;                        // tile size in canvas pixels
 const FINAL_DEPTH = 5;
 const FOV_R = 5;
 const MARK_AT = -40;   // honor <= this  → Marked: hunted by the Inquisition, richer loot
@@ -1257,9 +1258,36 @@ function applyEffects(eff){
 }
 
 // ================= RENDERING =================
+// The exploration viewport is reshaped to the stage. On a phone the stage is tall
+// and portrait while the canvas is a squat landscape strip, so `object-fit:contain`
+// used to letterbox a small picture into the middle of a big black box. Matching
+// the canvas to the stage's shape — with fewer, bigger tiles — fills it instead.
+function fitViewport(){
+  if (!canvas || !ctx) return;
+  const stage = U.el('stage'); if (!stage) return;
+  const cw = stage.clientWidth, ch = stage.clientHeight;
+  // combat scenes are composed for the fixed 336x208 frame; desktop already fits
+  if (G.state === 'COMBAT' || window.innerWidth > 700 || cw < 40 || ch < 40){
+    if (VW !== 21 || VH !== 13){
+      VW = 21; VH = 13; canvas.width = 336; canvas.height = 208; ctx.imageSmoothingEnabled = false;
+    }
+    return;
+  }
+  // 40px/tile lands the viewport at ~11 wide, so the lit radius (FOV_R) spans the
+  // full width — no dark margin left of the torchlight, tiles twice their old size
+  const target = 40;                                     // wanted on-screen px per tile
+  const vw = U.clamp(Math.round(cw / target) | 1, 9, 25); // odd keeps the player dead centre
+  const vh = U.clamp(Math.round(ch / target) | 1, 9, 31);
+  if (vw === VW && vh === VH) return;
+  VW = vw; VH = vh;
+  canvas.width = VW * TS; canvas.height = VH * TS;
+  ctx.imageSmoothingEnabled = false;
+}
+
 function render(){
   if (!ctx) return;
   updateStageBtn();
+  fitViewport();
   if (G.state === 'COMBAT' && G.combat) renderCombat();
   else if (G.player && G.floor) renderExplore();
   else { ctx.fillStyle = '#08070c'; ctx.fillRect(0,0,canvas.width,canvas.height); }
