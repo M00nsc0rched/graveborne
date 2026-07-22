@@ -74,6 +74,24 @@ the Sanctum's *Deep Larder* rank; **Strange Meat** (+60) carved from slain beast
 it *disagrees with being eaten* (poison). The Hollow Merchant also serves **a hot
 meal** (FOOD to full). Eating mid-combat spends your turn, as all honest meals do.
 
+### SP (focus) — and never being stuck
+
+**Draught of Focus** restores **5 SP**, carried in the pack and drunk like any other
+draught (it spends your combat turn). Found in chests, sold by the Hollow Merchant.
+
+Not every kit has a free skill — the **Hollow Witch** starts with none, and anyone can
+swap Strike away at the Reckoning. At 0 SP that used to leave you staring at a wall of
+greyed-out buttons with no way to end the turn, so SP never regenerated. Now:
+
+- Whenever no skill is affordable, a **Catch your breath** button appears — yield the
+  turn deliberately and your focus ticks back up.
+- If you are *genuinely* cornered — no affordable skill, nothing usable in the pack, no
+  relic power left, and a boss or guardian you cannot flee — the turn **passes to the
+  enemy automatically** rather than dead-ending.
+- The auto-pass deliberately does **not** fire while you still hold a draught, a relic
+  power, or an escape: handing your turn away at 5 HP with a potion in your pack would
+  be a worse bug than the one it fixes.
+
 ### Aimed blows (limb combat)
 
 Every foe that isn't pure spirit has an **anatomy**: ARMS (or MAW), LEGS, HEAD — each

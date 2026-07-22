@@ -1,7 +1,7 @@
 // ================= GRAVEBORNE — main engine =================
 // shown on the title screen; keep in step with CACHE in sw.js — the game is
 // served from that cache, so the number you see is the build you're running
-const GAME_VERSION = 8;
+const GAME_VERSION = 9;
 const VW = 21, VH = 13, TS = 16;      // viewport tiles + tile size
 const FINAL_DEPTH = 5;
 const FOV_R = 5;
@@ -419,7 +419,8 @@ function openChest(e){
   p.gold += gold;
   log(`You pry open a chest — ${gold} gold.`, 'gold');
   if (U.chance(U.clamp(0.55 + mods.dropBonus, 0.1, 0.95))) grantItem(Data.rollItemId(tier));
-  else if (U.chance(0.5)){ p.inv.push('potion_heal'); log('Inside rests a Draught of Mending.', 'good'); }
+  else if (U.chance(0.38)){ p.inv.push('potion_heal'); log('Inside rests a Draught of Mending.', 'good'); }
+  else if (U.chance(0.5)){ p.inv.push('potion_focus'); log('Inside rests a Draught of Focus — cold, blue and still thinking.', 'hi'); }
   else { p.inv.push('ration'); log('Inside, wrapped in wax cloth: Grave-Bread. Down here, that is treasure.', 'good'); }
   G.floor.removeEntity(e);
   updateHUD();
@@ -745,6 +746,13 @@ function beginPlayerTurn(){
   if (hungerStage(p) < 2) p.sp = Math.min(p.maxsp, p.sp + 1);   // the starving recover no focus
   G.combat.turn = 'player'; G.busy = false;
   updateHUD(); renderActions();
+  // spent, empty-handed and cornered — the foe simply presses on rather than
+  // leaving you staring at a wall of greyed-out buttons
+  if (!hasAffordableSkill(p) && !hasOtherAction(p) && !canFleeNow()){
+    G.busy = true; G.combat.turn = 'enemy'; renderActions();
+    log('Your focus is spent and there is nothing left to reach for — the assault comes anyway.', 'bad');
+    setTimeout(beginEnemyTurn, 700);
+  }
 }
 
 function doPlayer(skillId){
@@ -800,17 +808,52 @@ function doCoinFlip(){
   setTimeout(beginEnemyTurn, 620);
 }
 
-function usePotion(){
+// drink a draught from the pack; in combat it spends your turn
+function usePotion(id){
   if (G.busy) return;
-  const p = G.player, i = p.inv.indexOf('potion_heal');
+  id = id || 'potion_heal';
+  const p = G.player, i = p.inv.indexOf(id);
   if (i < 0) return;
+  const it = Data.CONSUMABLES[id];
   p.inv.splice(i,1);
-  const heal = Data.CONSUMABLES.potion_heal.heal;
-  p.hp = Math.min(p.maxhp, p.hp + heal);
-  log(`You drink a Draught of Mending (+${heal} HP).`, 'good'); floatOn(true, `+${heal}`, '#6fbf6a');
+  if (it.heal){
+    const before = p.hp;
+    p.hp = Math.min(p.maxhp, p.hp + it.heal);
+    log(`You drink a ${it.name} (+${p.hp - before} HP).`, 'good'); floatOn(true, `+${p.hp - before}`, '#6fbf6a');
+  }
+  if (it.sp){
+    const before = p.sp;
+    p.sp = Math.min(p.maxsp, p.sp + it.sp);
+    log(`You drink a ${it.name} (+${p.sp - before} SP).`, 'hi'); floatOn(true, `+${p.sp - before} SP`, '#4a74c0');
+  }
   updateHUD();
   if (G.state === 'COMBAT'){ G.busy=true; G.combat.turn='enemy'; renderActions(); setTimeout(beginEnemyTurn, 500); }
   else renderActions();
+}
+
+// ---- turn flow when the well runs dry ----
+// Some kits (the Hollow Witch, or anyone who swaps out Strike) have no free
+// skill, so at 0 SP there was nothing to press and the turn could never pass —
+// which also meant SP never regenerated. These keep the fight moving.
+function hasAffordableSkill(p){ return p.skills.some(id => Data.SKILLS[id].cost <= p.sp); }
+function canFleeNow(){ return !!G.combat && !G.combat.boss && !G.combat.enemy.guardian; }
+// anything other than a skill worth spending the turn on?
+function hasOtherAction(p){
+  if (p.inv.some(x => x === 'potion_heal' || x === 'potion_focus')) return true;
+  if (hungerStage(p) >= 1 && p.inv.some(x => x === 'ration' || x === 'strange_meat')) return true;
+  if (p.pocketCoin && !G.usedActives.coin_war) return true;
+  for (const slot of ['weapon','armor','trinket']){
+    const id = p.equip[slot];
+    if (id && Data.ITEMS[id].active && !G.usedActives[id]) return true;
+  }
+  return false;
+}
+// voluntarily yield the turn — SP ticks back up on the way round
+function passTurn(){
+  if (G.busy || G.state !== 'COMBAT' || !G.combat || G.combat.turn !== 'player') return;
+  G.busy = true; G.combat.turn = 'enemy'; renderActions();
+  log('You give ground and catch your breath.', 'dim');
+  setTimeout(beginEnemyTurn, 450);
 }
 
 // eat from the pack; in combat it spends your turn, as all honest meals do
@@ -1337,7 +1380,16 @@ function renderActions(){
       box.appendChild(b);
     }
     const potions = p.inv.filter(x=>x==='potion_heal').length;
-    if (potions){ const b = Btn(`Draught of Mending ×${potions}`, usePotion, 'btn good'); b.disabled=!myTurn; box.appendChild(b); }
+    if (potions){ const b = Btn(`Draught of Mending ×${potions}`, ()=>usePotion('potion_heal'), 'btn good'); b.disabled=!myTurn; box.appendChild(b); }
+    const focuses = p.inv.filter(x=>x==='potion_focus').length;
+    if (focuses){ const b = Btn(`Draught of Focus ×${focuses} (+5 SP)`, ()=>usePotion('potion_focus'), 'btn'); b.disabled=!myTurn || p.sp>=p.maxsp; box.appendChild(b); }
+    // no skill you can pay for — offer an explicit way to yield the turn so SP ticks back
+    if (!hasAffordableSkill(p)){
+      const b = Btn('', passTurn, 'btn danger');
+      b.innerHTML = `<span class="k">⏳</span>Catch your breath<span class="sub">No focus left for any skill — yield the turn and recover SP.</span>`;
+      b.disabled = !myTurn;
+      box.appendChild(b);
+    }
     if (hungerStage(p) >= 1){
       const breads = p.inv.filter(x=>x==='ration').length;
       const meats = p.inv.filter(x=>x==='strange_meat').length;
@@ -1512,7 +1564,7 @@ function renderShop(){
 
   s.appendChild(U.make('div','sect','Services · Gold'));
   const restCost=goldPrice(12+G.depth*6), medCost=goldPrice(8+G.depth*3), potCost=goldPrice(16+G.depth*2), absCost=goldPrice(20+G.depth*4);
-  const mealCost=goldPrice(6+G.depth*3), breadCost=goldPrice(10+G.depth);
+  const mealCost=goldPrice(6+G.depth*3), breadCost=goldPrice(10+G.depth), focusCost=goldPrice(18+G.depth*2);
   s.appendChild(shopLine('A hot meal','Eat well — FOOD restored to full',`<span class="price g">✦ ${mealCost}</span>`,
     p.gold<mealCost||p.food>=FOOD_MAX, ()=>{ p.gold-=mealCost; p.food=FOOD_MAX; log('The merchant ladles out something hot. You do not ask. It is wonderful.','good'); updateHUD(); renderShop(); }));
   s.appendChild(shopLine('Grave-Bread','A loaf for the road (+35 FOOD when eaten)',`<span class="price g">✦ ${breadCost}</span>`,
@@ -1523,6 +1575,8 @@ function renderShop(){
     p.gold<medCost||p.sp>=p.maxsp, ()=>{ p.gold-=medCost; p.sp=p.maxsp; log('Your reserves return.','good'); updateHUD(); renderShop(); }));
   s.appendChild(shopLine('Draught of Mending','A healing potion for your pack',`<span class="price g">✦ ${potCost}</span>`,
     p.gold<potCost, ()=>{ p.gold-=potCost; p.inv.push('potion_heal'); log('You buy a Draught of Mending.','gold'); updateHUD(); renderShop(); }));
+  s.appendChild(shopLine('Draught of Focus','Restores 5 SP when drunk — carry your reserves with you',`<span class="price g">✦ ${focusCost}</span>`,
+    p.gold<focusCost, ()=>{ p.gold-=focusCost; p.inv.push('potion_focus'); log('You buy a Draught of Focus.','gold'); updateHUD(); renderShop(); }));
   s.appendChild(shopLine('Rite of Absolution','Honor +15 — buy back your name',`<span class="price g">✦ ${absCost}</span>`,
     p.gold<absCost||sh.absDone||p.honor>=100, ()=>{ p.gold-=absCost; gainHonor(15); sh.absDone=true; log('You are absolved. Honor +15.','good'); updateHUD(); renderShop(); }));
 
@@ -1695,14 +1749,17 @@ function showInventory(){
   const breads = p.inv.filter(x=>x==='ration').length;
   const meats = p.inv.filter(x=>x==='strange_meat').length;
   s.appendChild(U.make('div','sect','Provisions'));
+  const focuses = p.inv.filter(x=>x==='potion_focus').length;
   const provParts = [];
   if (potions) provParts.push(`Draught of Mending ×${potions}`);
+  if (focuses) provParts.push(`Draught of Focus ×${focuses}`);
   if (breads) provParts.push(`Grave-Bread ×${breads}`);
   if (meats) provParts.push(`Strange Meat ×${meats}`);
   s.appendChild(U.make('div','p dim', provParts.length ? provParts.join(' · ') : '<i>none</i>'));
 
   const row = U.make('div','row');
-  if (potions && p.hp < p.maxhp) row.appendChild(Btn('Drink Draught (+26 HP)', ()=>{ usePotion(); hideModal(); }, 'btn good'));
+  if (potions && p.hp < p.maxhp) row.appendChild(Btn('Drink Draught (+26 HP)', ()=>{ usePotion('potion_heal'); hideModal(); }, 'btn good'));
+  if (focuses && p.sp < p.maxsp) row.appendChild(Btn('Drink Focus (+5 SP)', ()=>{ usePotion('potion_focus'); hideModal(); }, 'btn'));
   if (breads && p.food < FOOD_MAX) row.appendChild(Btn('Eat Grave-Bread (+35 FOOD)', ()=>{ eatFood('ration'); hideModal(); }, 'btn good'));
   if (meats && p.food < FOOD_MAX) row.appendChild(Btn('Eat Strange Meat (+60 FOOD…)', ()=>{ eatFood('strange_meat'); hideModal(); }, 'btn danger'));
   row.appendChild(Btn('Close', hideModal, 'btn center'));

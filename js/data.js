@@ -314,7 +314,8 @@ const ITEMS = {
 };
 
 const CONSUMABLES = {
-  potion_heal: { id:'potion_heal', name:'Draught of Mending', heal:26, desc:'Restores 26 HP in combat.' },
+  potion_heal:  { id:'potion_heal', name:'Draught of Mending', heal:26, desc:'Restores 26 HP in combat.' },
+  potion_focus: { id:'potion_focus', name:'Draught of Focus', sp:5, desc:'Restores 5 SP — thought sharpened back into a blade.' },
   ration:      { id:'ration', name:'Grave-Bread', food:35, desc:'Coarse dark bread, baked by no one you want to meet. Restores 35 FOOD.' },
   strange_meat:{ id:'strange_meat', name:'Strange Meat', food:60, risky:true, desc:'Unlabeled, generous, still faintly warm. Restores 60 FOOD. Ask nothing.' },
 };
