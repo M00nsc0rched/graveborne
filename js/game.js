@@ -1,7 +1,7 @@
 // ================= GRAVEBORNE — main engine =================
 // shown on the title screen; keep in step with CACHE in sw.js — the game is
 // served from that cache, so the number you see is the build you're running
-const GAME_VERSION = 10;
+const GAME_VERSION = 11;
 const VW = 21, VH = 13, TS = 16;      // viewport tiles + tile size
 const FINAL_DEPTH = 5;
 const FOV_R = 5;
@@ -123,7 +123,7 @@ function handToFollower(id){
   if (i < 0 || !fo) return;
   p.inv.splice(i,1); fo.inv.push(id);
   log(`You hand ${Data.CONSUMABLES[id].name} to ${fo.name}.`, 'dim');
-  showInventory();
+  showFollowers();
 }
 function followerConsume(id){
   const fo = G.player.follower;
@@ -140,7 +140,7 @@ function followerConsume(id){
     if (it.risky && U.chance(0.3)){ fo.hp = Math.max(1, fo.hp - 6); log(`It disagrees with ${fo.name} — 6 HP.`, 'bad'); }
   }
   updateHUD();
-  showInventory();
+  showFollowers();
 }
 
 // escalating: 12, 18, 27, 41, 61, 91, 137, …  (×1.5 per level reached)
@@ -245,6 +245,8 @@ function onKey(e){
     else if (k === ' '){ worldTurn(); revealFOV(); e.preventDefault(); }   // wait
     else if (k === 'i'){ showInventory(); }
     else if (k === 'c'){ showCodex(true); }
+    else if (k === 'f'){ showFollowers(); }
+    else if (k === 'm' || k === 'escape'){ showMenu(); }
   } else if (G.state === 'COMBAT' && !G.busy && G.combat && G.combat.turn === 'player'){
     const n = parseInt(k, 10);
     if (n >= 1 && n <= G.player.skills.length){ doPlayer(G.player.skills[n-1]); }
@@ -1268,7 +1270,7 @@ function updateStageBtn(){
   const b = U.el('stage-btn'); if (!b) return;
   if (G.state === 'EXPLORE' && !G.busy){
     b.classList.remove('hidden','flee'); b.textContent = '☰ Menu';
-    b.disabled = false; b.onclick = showInventory;
+    b.disabled = false; b.onclick = showMenu;
   } else if (G.state === 'COMBAT' && G.combat){
     const en = G.combat.enemy, canFlee = !G.combat.boss && !en.guardian;
     if (!canFlee){ b.classList.add('hidden'); return; }
@@ -1533,14 +1535,8 @@ function renderActions(){
   const tc = U.el('touch-controls');
   if (tc) tc.classList.toggle('combat', G.state === 'COMBAT');
   if (G.state === 'EXPLORE'){
-    const onStairs = false;
-    const canLevel = G.player && Save.souls() >= levelUpCost(G.player);
-    box.appendChild(Btn('Inventory & Skills' + (canLevel ? '  ◈ Level Up ready' : ''),
-      showInventory, 'btn' + (canLevel ? ' good' : ''), 'I'));
-    box.appendChild(Btn('Codex of Encounters', ()=>showCodex(true), 'btn', 'C'));
-    box.appendChild(Btn('Abandon Run', confirmAbandon, 'btn danger'));
-    const tip = U.make('div','line dim','Walk into foes to fight · ✦ chests · ! events · stairs descend · glowing tiles are hazards.');
-    tip.style.marginTop='4px'; box.appendChild(tip);
+    // nothing here: everything lives behind the ☰ Menu on the stage, so the
+    // log gets the whole dock and the D-pad sits at the bottom of the screen
   } else if (G.state === 'COMBAT' && G.combat){
     const p = G.player, myTurn = G.combat.turn === 'player' && !G.busy;
     // ---- aim row: physical attacks strike the chosen part ----
@@ -1907,6 +1903,93 @@ function learnSkill(newId, replaceId){
   showInventory();
 }
 
+// the ☰ Menu: everything that used to crowd the bottom of the screen
+function showMenu(){
+  if (G.state !== 'EXPLORE' || !G.player) return;
+  const p = G.player;
+  const canLevel = Save.souls() >= levelUpCost(p);
+  const s = U.make('div','sheet');
+  s.appendChild(U.make('div','sect', `Menu — ${p.name} · Lv ${p.level || 1} · Depth ${G.depth}`));
+
+  const list = U.make('div','menu-list');
+  list.appendChild(Btn('Inventory & Skills' + (canLevel ? '  ◈ Level Up ready' : ''),
+    ()=>{ hideModal(); showInventory(); }, 'btn' + (canLevel ? ' good' : ''), 'I'));
+  list.appendChild(Btn(p.follower ? `Followers — ${p.follower.name}` : 'Followers',
+    ()=>{ hideModal(); showFollowers(); }, 'btn', 'F'));
+  list.appendChild(Btn('Codex of Encounters', ()=>{ hideModal(); showCodex(true); }, 'btn', 'C'));
+  list.appendChild(Btn('Abandon Run', confirmAbandon, 'btn danger'));
+  s.appendChild(list);
+
+  s.appendChild(U.make('div','p dim center',
+    'Walk into foes to fight · ✦ chests · ! events · stairs descend · glowing tiles are hazards.'));
+  const row = U.make('div','row');
+  row.appendChild(Btn('Close', hideModal, 'btn center'));
+  s.appendChild(row);
+  setModal(s);
+}
+
+// the one walking behind you: their bars and their own pack, on their own screen
+function showFollowers(){
+  if (G.state !== 'EXPLORE' || !G.player) return;
+  const p = G.player, fo = p.follower;
+  const s = U.make('div','sheet');
+  s.appendChild(U.make('div','sect','Followers'));
+
+  if (!fo){
+    if (p.followerLost){
+      s.appendChild(U.make('div','p','Someone used to walk with you.'));
+      s.appendChild(U.make('div','p dim','<i>They followed you down. They did not come back up. Your name has not recovered, and it will not.</i>'));
+    } else {
+      s.appendChild(U.make('div','p dim','<i>No one walks with you. The deep is not generous with company — but it offers, sometimes, to those who go looking.</i>'));
+      s.appendChild(U.make('div','p dim','Taking someone on means feeding them, mending them and keeping them standing out of their own pack. If they die, your honor falls to the absolute floor and stays there.'));
+    }
+  } else {
+    const fh = followerHunger(fo);
+    const art = U.make('canvas'); art.width = 64; art.height = 64; art.className = 'merchant-art';
+    s.appendChild(art); Sprites.toCanvas(art, fo.sprite, 5);
+    s.appendChild(U.make('div','p center', `<b style="color:#9a5cc0">${fo.name}</b>`));
+    s.appendChild(U.make('div','p',
+      `<b>HP</b> <span style="color:${fo.hp < fo.maxhp*0.35 ? '#c05070' : '#c9bfd6'}">${fo.hp}/${fo.maxhp}</span> · ` +
+      `<b>SP</b> ${fo.sp}/${fo.maxsp} · ` +
+      `<b>FOOD</b> <span style="color:${fh>=2?'#c05030':'#a87e34'}">${Math.round(fo.food)}/${FOLLOWER_FOOD_MAX}${fh?' — '+HUNGER_NAMES[fh]:''}</span><br>` +
+      `<b>ATK</b> ${fo.atk} · <b>DEF</b> ${fo.def} · <b>MAG</b> ${fo.mag} · <b>SPD</b> ${fo.spd}`));
+    s.appendChild(U.make('div','p dim','<i>They act each round after you. If they die, your honor drops to the absolute floor — permanently.</i>'));
+
+    const packCounts = {};
+    for (const id of fo.inv) packCounts[id] = (packCounts[id]||0) + 1;
+    const packNames = Object.keys(packCounts).map(id => `${Data.CONSUMABLES[id].name} ×${packCounts[id]}`);
+    s.appendChild(U.make('div','sect','Their pack'));
+    s.appendChild(U.make('div','p dim', packNames.length ? packNames.join(' · ') : '<i>empty — they have nothing to fall back on</i>'));
+
+    const useRow = U.make('div','row');
+    for (const id of Object.keys(packCounts)){
+      const it = Data.CONSUMABLES[id];
+      const useless = (it.heal && fo.hp >= fo.maxhp) || (it.sp && fo.sp >= fo.maxsp) || (it.food && fo.food >= FOLLOWER_FOOD_MAX);
+      const b = Btn(`Use ${it.name}`, ()=>followerConsume(id), 'btn good');
+      b.disabled = useless;
+      useRow.appendChild(b);
+    }
+    if (useRow.children.length) s.appendChild(useRow);
+
+    const giveIds = ['potion_heal','potion_focus','ration','strange_meat'].filter(id => p.inv.includes(id));
+    if (giveIds.length){
+      s.appendChild(U.make('div','sect','Hand over from your pack'));
+      const giveRow = U.make('div','row');
+      for (const id of giveIds){
+        const n = p.inv.filter(x=>x===id).length;
+        giveRow.appendChild(Btn(`Give ${Data.CONSUMABLES[id].name} ×${n}`, ()=>handToFollower(id), 'btn'));
+      }
+      s.appendChild(giveRow);
+    }
+  }
+
+  const row = U.make('div','row');
+  row.appendChild(Btn('Back to Menu', ()=>{ hideModal(); showMenu(); }, 'btn center'));
+  row.appendChild(Btn('Close', hideModal, 'btn center'));
+  s.appendChild(row);
+  setModal(s);
+}
+
 function showInventory(){
   if (G.state !== 'EXPLORE') return;
   const p = G.player;
@@ -1958,41 +2041,6 @@ function showInventory(){
   const breads = p.inv.filter(x=>x==='ration').length;
   const meats = p.inv.filter(x=>x==='strange_meat').length;
   s.appendChild(U.make('div','sect','Provisions'));
-  // ---- the one walking behind you: their own bars, their own pack ----
-  if (p.follower){
-    const fo = p.follower, fh = followerHunger(fo);
-    s.appendChild(U.make('div','sect', fo.name + ' — walks with you'));
-    s.appendChild(U.make('div','p',
-      `<b>HP</b> <span style="color:${fo.hp < fo.maxhp*0.35 ? '#c05070' : '#c9bfd6'}">${fo.hp}/${fo.maxhp}</span> · ` +
-      `<b>SP</b> ${fo.sp}/${fo.maxsp} · ` +
-      `<b>FOOD</b> <span style="color:${fh>=2?'#c05030':'#a87e34'}">${Math.round(fo.food)}/${FOLLOWER_FOOD_MAX}${fh?' — '+HUNGER_NAMES[fh]:''}</span>`));
-    s.appendChild(U.make('div','p dim','<i>If they die, your honor drops to the absolute floor and stays there.</i>'));
-
-    // their pack — separate from yours; they can only use what is in it
-    const packCounts = {};
-    for (const id of fo.inv) packCounts[id] = (packCounts[id]||0) + 1;
-    const packNames = Object.keys(packCounts).map(id => `${Data.CONSUMABLES[id].name} ×${packCounts[id]}`);
-    s.appendChild(U.make('div','p dim', '<b style="color:#8ea6d8">THEIR PACK</b>: ' + (packNames.length ? packNames.join(' · ') : '<i>empty</i>')));
-
-    const frow = U.make('div','row');
-    for (const id of Object.keys(packCounts)){
-      const it = Data.CONSUMABLES[id];
-      const useless = (it.heal && fo.hp >= fo.maxhp) || (it.sp && fo.sp >= fo.maxsp) || (it.food && fo.food >= FOLLOWER_FOOD_MAX);
-      const b = Btn(`${fo.name}: use ${it.name}`, ()=>followerConsume(id), 'btn good');
-      b.disabled = useless;
-      frow.appendChild(b);
-    }
-    // hand something over from your own pack
-    for (const id of ['potion_heal','potion_focus','ration','strange_meat']){
-      if (!p.inv.includes(id)) continue;
-      frow.appendChild(Btn(`Give ${Data.CONSUMABLES[id].name}`, ()=>handToFollower(id), 'btn'));
-    }
-    if (frow.children.length) s.appendChild(frow);
-  } else if (p.followerLost){
-    s.appendChild(U.make('div','sect','Someone used to walk with you'));
-    s.appendChild(U.make('div','p dim','<i>They followed you down. They did not come back up. Your name has not recovered and will not.</i>'));
-  }
-
   const focuses = p.inv.filter(x=>x==='potion_focus').length;
   const provParts = [];
   if (potions) provParts.push(`Draught of Mending ×${potions}`);

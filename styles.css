@@ -254,6 +254,10 @@ button{touch-action:manipulation}
 
 .scene-art{display:block;margin:0 auto 12px;image-rendering:pixelated;width:120px;height:120px;background:#0a0810;border:2px solid var(--edge);border-radius:4px}
 
+/* the ☰ Menu's option list */
+.menu-list{display:flex;flex-direction:column;gap:8px;margin:6px 0 12px}
+.menu-list .btn{width:100%;text-align:left}
+
 .row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:10px}
 .row .btn{width:auto;min-width:150px}
 
@@ -368,8 +372,10 @@ body.touch .touch-controls{display:flex}
   /* dock takes the rest; in exploration the log fills it, in combat the skills do */
   #dock{flex:1 1 auto;flex-direction:column;min-height:0;gap:5px}
   .actions{width:100%;flex:0 0 auto}
-  .log{flex:1 1 auto;min-height:52px;font-size:12px}
-  body.in-combat .log{flex:0 0 auto;height:56px}
+  /* the event log is the main readout in exploration: let it grow into the
+     whole dock (the desktop 120px cap must not apply here) */
+  .log{flex:1 1 auto;min-height:120px;max-height:none;font-size:12.5px}
+  body.in-combat .log{flex:0 0 auto;height:56px;min-height:0}
   body.in-combat .actions{flex:1 1 auto;min-height:0;overflow-y:auto}
   body.in-combat #actions::-webkit-scrollbar{width:6px}
   body.in-combat #actions::-webkit-scrollbar-thumb{background:var(--edge);border-radius:3px}
