@@ -1,7 +1,7 @@
 // ================= GRAVEBORNE — main engine =================
 // shown on the title screen; keep in step with CACHE in sw.js — the game is
 // served from that cache, so the number you see is the build you're running
-const GAME_VERSION = 11;
+const GAME_VERSION = 12;
 const VW = 21, VH = 13, TS = 16;      // viewport tiles + tile size
 const FINAL_DEPTH = 5;
 const FOV_R = 5;
@@ -246,6 +246,7 @@ function onKey(e){
     else if (k === 'i'){ showInventory(); }
     else if (k === 'c'){ showCodex(true); }
     else if (k === 'f'){ showFollowers(); }
+    else if (k === 'l'){ showChronicle(); }
     else if (k === 'm' || k === 'escape'){ showMenu(); }
   } else if (G.state === 'COMBAT' && !G.busy && G.combat && G.combat.turn === 'player'){
     const n = parseInt(k, 10);
@@ -1916,6 +1917,7 @@ function showMenu(){
     ()=>{ hideModal(); showInventory(); }, 'btn' + (canLevel ? ' good' : ''), 'I'));
   list.appendChild(Btn(p.follower ? `Followers — ${p.follower.name}` : 'Followers',
     ()=>{ hideModal(); showFollowers(); }, 'btn', 'F'));
+  list.appendChild(Btn('Chronicle — what has happened', ()=>{ hideModal(); showChronicle(); }, 'btn', 'L'));
   list.appendChild(Btn('Codex of Encounters', ()=>{ hideModal(); showCodex(true); }, 'btn', 'C'));
   list.appendChild(Btn('Abandon Run', confirmAbandon, 'btn danger'));
   s.appendChild(list);
@@ -1926,6 +1928,22 @@ function showMenu(){
   row.appendChild(Btn('Close', hideModal, 'btn center'));
   s.appendChild(row);
   setModal(s);
+}
+
+// the running event log, read at your leisure instead of eating the screen
+function showChronicle(){
+  if (!G.player) return;
+  const s = U.make('div','sheet');
+  s.appendChild(U.make('div','sect','Chronicle — Depth ' + G.depth));
+  const box = U.make('div','chronicle');
+  box.innerHTML = U.el('log').innerHTML || '<div class="line dim"><i>Nothing has happened yet.</i></div>';
+  s.appendChild(box);
+  const row = U.make('div','row');
+  row.appendChild(Btn('Back to Menu', ()=>{ hideModal(); showMenu(); }, 'btn center'));
+  row.appendChild(Btn('Close', hideModal, 'btn center'));
+  s.appendChild(row);
+  setModal(s);
+  box.scrollTop = box.scrollHeight;      // newest at the bottom, like the old strip
 }
 
 // the one walking behind you: their bars and their own pack, on their own screen

@@ -258,6 +258,21 @@ button{touch-action:manipulation}
 .menu-list{display:flex;flex-direction:column;gap:8px;margin:6px 0 12px}
 .menu-list .btn{width:100%;text-align:left}
 
+/* the Chronicle: the full event log, read on demand */
+.chronicle{
+  max-height:56vh;overflow-y:auto;background:var(--bg2);
+  border:1px solid var(--edge);border-radius:4px;padding:8px 10px;
+  font-size:12px;line-height:1.55;box-shadow:inset 0 0 12px rgba(0,0,0,.6);
+}
+.chronicle .line{margin:1px 0;color:var(--ink-dim)}
+.chronicle .line.hi{color:var(--ink)}
+.chronicle .line.good{color:var(--good)}
+.chronicle .line.bad{color:var(--bad)}
+.chronicle .line.gold{color:var(--gold)}
+.chronicle .line.mag{color:var(--mag)}
+.chronicle::-webkit-scrollbar{width:8px}
+.chronicle::-webkit-scrollbar-thumb{background:var(--edge);border-radius:4px}
+
 .row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:10px}
 .row .btn{width:auto;min-width:150px}
 
@@ -365,9 +380,13 @@ body.touch .touch-controls{display:flex}
   .bars{max-width:100%;gap:3px}
   .hint{display:none}
 
-  /* stage: fixed share of the screen, shrinks further in combat to free room for skills */
-  #stage{flex:0 0 auto;aspect-ratio:auto;height:30vh}
-  body.in-combat #stage{height:21vh}
+  /* stage: in exploration the dungeon takes everything the log used to eat
+     (the log now lives in the ☰ Menu as the Chronicle); in combat it shrinks
+     back to make room for the skill list */
+  #stage{aspect-ratio:auto}
+  body:not(.in-combat) #stage{flex:1 1 auto;height:auto;min-height:0}
+  body:not(.in-combat) #dock{display:none}
+  body.in-combat #stage{flex:0 0 auto;height:21vh}
 
   /* dock takes the rest; in exploration the log fills it, in combat the skills do */
   #dock{flex:1 1 auto;flex-direction:column;min-height:0;gap:5px}

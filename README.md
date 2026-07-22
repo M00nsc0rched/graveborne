@@ -31,16 +31,19 @@ differently across runs, and a **Codex** tracks which variants you've uncovered.
 never scrolls:
 
 - **☰ Menu** sits on the dungeon view (top-right) and holds everything — *Inventory &
-  Skills* (flagged when a Level Up is affordable), *Followers*, *Codex*, *Abandon Run*.
-- The **event log** takes the whole middle of the screen, so you can actually read what
-  just happened.
-- The **D-pad lives at the bottom**, under the log, where your thumb rests — tap to step,
-  hold to keep stepping, centre **●** waits a turn.
+  Skills* (flagged when a Level Up is affordable), *Followers*, the **Chronicle** (the
+  full event log, read on demand), *Codex*, *Abandon Run*.
+- With the log tucked into the Menu, the **dungeon view takes the whole screen** — 641px
+  tall on a 430×932 phone, more than double what it was.
+- The **D-pad lives at the bottom**, where your thumb rests — tap to step, hold to keep
+  stepping, centre **●** waits a turn.
+- In combat the live log strip returns above your skills, so you still see each blow as
+  it lands.
 - In combat the D-pad gives way to your skills, the stage shrinks to make room, and a
   dedicated **Flee** button takes the Menu's corner.
 
 Keyboard still works throughout: **M**/**Esc** menu, **I** inventory, **F** followers,
-**C** codex, **1–4** combat skills.
+**L** chronicle, **C** codex, **1–4** combat skills.
 
 ### Install as a Home Screen app
 
