@@ -1,7 +1,7 @@
 // ================= GRAVEBORNE — main engine =================
 // shown on the title screen; keep in step with CACHE in sw.js — the game is
 // served from that cache, so the number you see is the build you're running
-const GAME_VERSION = 9;
+const GAME_VERSION = 10;
 const VW = 21, VH = 13, TS = 16;      // viewport tiles + tile size
 const FINAL_DEPTH = 5;
 const FOV_R = 5;
@@ -28,6 +28,121 @@ const LEVEL_STATS = [
   { key:'mag', base:'baseMag', amt:2, label:'MAG' },
   { key:'spd', base:'baseSpd', amt:2, label:'SPD' },
 ];
+// ---- Followers: someone walks behind you, and their death is on your name ----
+// They eat, they bleed, they burn focus — out of their OWN pack, which you must
+// stock. If one dies, your honor is slammed to the absolute floor and stays
+// there. Taking a follower is a promise, not a perk.
+const FOLLOWER_FOOD_MAX = 100, FOLLOWER_FOOD_DRAIN = 0.28;
+
+function makeFollower(id){
+  const d = Data.FOLLOWERS[id];
+  return {
+    id, name:d.name, sprite:d.sprite, skill:d.skill,
+    maxhp:d.base.hp, hp:d.base.hp, maxsp:d.base.sp, sp:d.base.sp,
+    atk:d.base.atk, def:d.base.def, mag:d.base.mag, spd:d.base.spd,
+    food:FOLLOWER_FOOD_MAX, statuses:{}, shield:0,
+    inv:['ration','potion_heal'],          // they arrive with a thin pack of their own
+  };
+}
+function recruitFollower(id){
+  const p = G.player;
+  p.follower = makeFollower(id || U.choice(Object.keys(Data.FOLLOWERS)));
+  log(`${p.follower.name} falls in half a step behind your shoulder.`, 'mag');
+  log('They carry their own pack, and it is not deep. Keep them fed. Keep them standing.', 'dim');
+  return p.follower;
+}
+function followerAlive(){ const p = G.player; return !!(p && p.follower && p.follower.hp > 0); }
+function followerHunger(fo){ return fo.food <= 0 ? 3 : fo.food <= 20 ? 2 : fo.food <= 45 ? 1 : 0; }
+
+// the worst thing that can happen to your name down here
+function followerDies(reason){
+  const p = G.player, fo = p.follower;
+  if (!fo) return;
+  log(`${fo.name} goes down${reason ? ' — ' + reason : ''}.`, 'bad');
+  log('They followed you here because you let them. Whatever your name was worth, it is worth nothing now.', 'bad');
+  p.honor = -100;                          // the absolute floor, no argument, no climb-back discount
+  p.followerLost = true;
+  discoverCodex('follower_lost');
+  p.follower = null;
+  updateHUD(); renderActions();
+}
+
+// upkeep as you walk: they get hungry too, and starving costs them blood
+function updateFollowerUpkeep(){
+  const fo = G.player.follower;
+  if (!fo || fo.hp <= 0) return;
+  fo.food = Math.max(0, fo.food - FOLLOWER_FOOD_DRAIN);
+  if (fo.food <= 0){
+    fo.hp -= 2;
+    if (fo.hp <= 0){ followerDies('starved walking behind you'); return; }
+  }
+}
+
+// they answer before the foe does
+function followerAct(){
+  const fo = G.player.follower, en = G.combat && G.combat.enemy;
+  if (!en || !followerAlive()) return;
+  const sk = Data.SKILLS[fo.skill] || Data.SKILLS.strike;
+  let action = sk, starving = followerHunger(fo) >= 2;
+  if (sk.cost > fo.sp || starving) action = { name:'a desperate swing', type:'attack', power:8 };
+  else fo.sp -= sk.cost;
+  let dmg = (action.type === 'magic')
+    ? action.power * fo.mag/10 - en.def*0.25
+    : action.power * fo.atk/10 - en.def*0.5;
+  if (starving) dmg *= 0.6;
+  dmg *= U.rand(0.9, 1.1);
+  dmg = Math.max(1, Math.round(dmg));
+  if (en.shield > 0){ const ab = Math.min(en.shield, dmg); en.shield -= ab; dmg -= ab;
+    if (ab > 0) log(`${en.name}'s shield absorbs ${ab}.`, 'dim'); }
+  if (dmg > 0){
+    en.hp -= dmg;
+    log(`${fo.name} strikes with ${action.name} for ${dmg}.`, 'hi');
+    floatOn(false, `-${dmg}`, '#7fd0c2');
+  }
+}
+
+// the foe can turn on them instead of you — which is exactly the risk you took
+function enemyTurnsOnFollower(move){
+  const fo = G.player.follower, en = G.combat.enemy;
+  if (!followerAlive()) return false;
+  if (move.type !== 'attack' && move.type !== 'magic') return false;
+  let dmg = (move.type === 'magic') ? move.power*en.mag/10 - fo.def*0.25 : move.power*effAtk(en)/10 - fo.def*0.5;
+  dmg *= U.rand(0.9, 1.1);
+  dmg = Math.max(1, Math.round(dmg));
+  fo.hp -= dmg;
+  log(`${en.name} turns on ${fo.name} — ${move.name} for ${dmg}.`, 'bad');
+  floatOn(true, `-${dmg}`, '#c05070');
+  if (fo.hp <= 0) followerDies('cut down in front of you');
+  return true;
+}
+
+// give a provision from your pack into theirs, or spend one from theirs on them
+function handToFollower(id){
+  const p = G.player, fo = p.follower;
+  const i = p.inv.indexOf(id);
+  if (i < 0 || !fo) return;
+  p.inv.splice(i,1); fo.inv.push(id);
+  log(`You hand ${Data.CONSUMABLES[id].name} to ${fo.name}.`, 'dim');
+  showInventory();
+}
+function followerConsume(id){
+  const fo = G.player.follower;
+  if (!fo) return;
+  const i = fo.inv.indexOf(id);
+  if (i < 0) return;
+  const it = Data.CONSUMABLES[id];
+  fo.inv.splice(i,1);
+  if (it.heal){ const b = fo.hp; fo.hp = Math.min(fo.maxhp, fo.hp + it.heal); log(`${fo.name} drinks ${it.name} (+${fo.hp-b} HP).`, 'good'); }
+  if (it.sp){ const b = fo.sp; fo.sp = Math.min(fo.maxsp, fo.sp + it.sp); log(`${fo.name} drinks ${it.name} (+${fo.sp-b} SP).`, 'hi'); }
+  if (it.food){
+    const b = fo.food; fo.food = Math.min(FOLLOWER_FOOD_MAX, fo.food + it.food);
+    log(`${fo.name} eats ${it.name} (+${Math.round(fo.food-b)} FOOD).`, 'good');
+    if (it.risky && U.chance(0.3)){ fo.hp = Math.max(1, fo.hp - 6); log(`It disagrees with ${fo.name} — 6 HP.`, 'bad'); }
+  }
+  updateHUD();
+  showInventory();
+}
+
 // escalating: 12, 18, 27, 41, 61, 91, 137, …  (×1.5 per level reached)
 function levelUpCost(p){ return Math.round(12 * Math.pow(1.5, (p.level || 1) - 1)); }
 // each new skill you buy makes the next one pricier
@@ -147,6 +262,7 @@ function newPlayer(classId){
     statuses:{}, shield:0, x:0, y:0, dir:1, allies:[],
     heat:0, reinforceCd:null, pocketCoin:false,
     level:1, skillsBought:0,
+    follower:null, followerLost:false,
   };
   applySanctum(p);
   recomputeStats(p);
@@ -366,9 +482,10 @@ function move(dx, dy){
     if (e.type === 'enemy'){ startCombat(e); return; }
     if (e.type === 'guardian'){ guardianConfront(e); return; }
     if (e.type === 'event'){ triggerEvent(e.eventId, e); return; }
-    if (e.type === 'torch'){ return; }
     if (e.type === 'chest'){ openChest(e); return; }   // stays in place; open then removed
     if (e.type === 'stairs'){ descend(); return; }
+    // torches and props are scenery: you walk straight past them, so dressing
+    // can never wall off a route
   }
   p.x = tx; p.y = ty;
   if (f.tileAt(tx, ty) === TILE.HAZARD){
@@ -500,6 +617,7 @@ function worldTurn(){
   updateHeat();
   maybeWhisper();
   if (!updateHunger()) return;   // starvation killed you
+  updateFollowerUpkeep();        // they walk the same miles and eat the same way
   // poison ticks with every step taken in the world
   if (p.statuses.poison){
     const d = p.statuses.poison.dmg;
@@ -511,10 +629,35 @@ function worldTurn(){
   }
   for (const e of f.entities.slice()){
     if (e.type !== 'enemy') continue;
+
+    // you slipped away — it stands rooted for a couple of steps
+    if (e.frozen > 0){ e.frozen--; continue; }
+
     const d = U.dist(e.x, e.y, p.x, p.y);
-    const sight = e.sight || 6;
+    // once the stair's guardian falls, the floor's lesser things lose their nerve
+    const cowed = f.guardianSlain && !e.hunter && !e.elite;
+    const sight = Math.max(2, Math.round((e.sight || 6) * (cowed ? 0.5 : 1)));
+    const spotted = d <= sight;
+
+    // right on top of you: it finds the trail again no matter how long it lost it
+    if (d <= 2){ e.chase = 0; e.gaveUp = false; }
+
+    let chasing = (e.hunter || spotted) && !e.gaveUp;
+    if (chasing){
+      e.chase = (e.chase || 0) + 1;
+      if (e.chase > pursuitLimit(e)){
+        e.gaveUp = true; chasing = false;
+        if (f.visible[f.idx(e.x, e.y)] || spotted)
+          log(`${Data.ENEMIES[e.enemyId].name} loses your trail.`, 'hi');
+      }
+    } else {
+      e.chase = Math.max(0, (e.chase || 0) - 1);
+      // far enough away for long enough and it forgets you entirely
+      if (e.gaveUp && e.chase === 0 && d > sight + 4) e.gaveUp = false;
+    }
+
     let nx = e.x, ny = e.y;
-    if (e.hunter || d <= sight){
+    if (chasing){
       // greedy step toward player
       const sx = Math.sign(p.x - e.x), sy = Math.sign(p.y - e.y);
       const opts = [];
@@ -522,17 +665,35 @@ function worldTurn(){
       else { if (sy) opts.push([0,sy]); if (sx) opts.push([sx,0]); }
       for (const [ox,oy] of opts){ const cx=e.x+ox, cy=e.y+oy;
         if (cx===p.x && cy===p.y){ startCombat(e, true); return; }
-        if (f.isWalkable(cx,cy) && f.tileAt(cx,cy)!==TILE.HAZARD && !f.entityAt(cx,cy)){ nx=cx; ny=cy; break; }
+        if (f.isWalkable(cx,cy) && f.tileAt(cx,cy)!==TILE.HAZARD && !blockedAt(f,cx,cy)){ nx=cx; ny=cy; break; }
       }
     } else if (U.chance(0.35)){
       const dirs = U.shuffle([[1,0],[-1,0],[0,1],[0,-1]]);
       for (const [ox,oy] of dirs){ const cx=e.x+ox, cy=e.y+oy;
         if (cx===p.x&&cy===p.y) continue;
-        if (f.isWalkable(cx,cy) && f.tileAt(cx,cy)!==TILE.HAZARD && !f.entityAt(cx,cy)){ nx=cx; ny=cy; break; }
+        if (f.isWalkable(cx,cy) && f.tileAt(cx,cy)!==TILE.HAZARD && !blockedAt(f,cx,cy)){ nx=cx; ny=cy; break; }
       }
     }
     e.x = nx; e.y = ny;
   }
+}
+
+// scenery (torches, props) is walked past, not around — only real obstacles block
+function isBlockingEntity(e){
+  return !!e && e.type !== 'torch' && e.type !== 'prop';
+}
+function blockedAt(f, x, y){
+  return f.entities.some(e => e.x === x && e.y === y && !e.dead && isBlockingEntity(e));
+}
+// how many turns a foe will keep hunting you before losing the trail —
+// tougher, higher-tier things are far more dogged
+function pursuitLimit(e){
+  const def = Data.ENEMIES[e.enemyId] || {};
+  const tier = U.clamp(def.tier || 1, 1, 3);
+  let n = 5 + tier * 3;                  // tier 1 → 8, tier 2 → 11, tier 3 → 14
+  if (e.elite) n = Math.round(n * 1.6);
+  if (e.hunter) n = Math.round(n * 3);   // the Inquisition is dogged, but not tireless
+  return n;
 }
 
 function revealFOV(){
@@ -554,13 +715,16 @@ function makeEnemyInstance(id){
   const e = Data.ENEMIES[id];
   let f = e.boss ? 1 : (1 + (G.depth - 1) * 0.12);
   if (e.hunter) f *= heatScale();   // the hunt grows stronger with your bounty
+  // the stair's keeper is dead and they know it — lesser things fight cowed
+  const cowed = !!(G.floor && G.floor.guardianSlain) && !e.boss && !e.guardian && !e.hunter;
+  if (cowed) f *= 0.7;
   const maxhp = Math.round(e.hp*f);
   const inst = {
     id, name:e.name, sprite:e.sprite,
     maxhp, hp:maxhp,
     atk:Math.round(e.atk*(e.boss?1:f)), def:e.def, mag:Math.round(e.mag*(e.boss?1:f)), spd:e.spd,
     moves:e.moves.map(m => ({ ...m })),   // instance-local: severing may disable moves
-    tags:e.tags||[], gold:e.gold, boss:!!e.boss, hunter:!!e.hunter, elite:!!e.elite, guardian:!!e.guardian, drop:e.drop, dialogue:e.dialogue, isEnemy:true,
+    tags:e.tags||[], gold:e.gold, boss:!!e.boss, hunter:!!e.hunter, elite:!!e.elite, guardian:!!e.guardian, cowed, drop:e.drop, dialogue:e.dialogue, isEnemy:true,
     shield:0, statuses:{},
   };
   // anatomy — spirits are smoke and grudge; everything else can be taken apart
@@ -585,6 +749,7 @@ function startCombat(entity, ambush){
   G.combat = { enemy, origin:entity, turn:'player', boss:enemy.boss, target:'body' };
   G.state = 'COMBAT';
   log(`— ${enemy.name}${enemy.boss?' (BOSS)':''} blocks your path! ${ambress(ambush)}—`, 'bad');
+  if (enemy.cowed) log('It fights shrunken and wary — it knows what happened to the keeper of the stair.', 'good');
   if (!enemy.parts) log('It has no body to unmake — only the whole of it can be broken.', 'dim');
   if (hungerStage(p) >= 2) log('You fight starving. Your blows land soft, and no focus will return to you.', 'bad');
   beginPlayerTurn();
@@ -744,6 +909,7 @@ function beginPlayerTurn(){
   if (p.statuses.stun){ delete p.statuses.stun; log('You are stunned and lose your turn!', 'bad');
     G.combat.turn='enemy'; renderActions(); setTimeout(beginEnemyTurn, 650); return; }
   if (hungerStage(p) < 2) p.sp = Math.min(p.maxsp, p.sp + 1);   // the starving recover no focus
+  G.combat.followerActed = false;   // they get one action per round, after yours
   G.combat.turn = 'player'; G.busy = false;
   updateHUD(); renderActions();
   // spent, empty-handed and cornered — the foe simply presses on rather than
@@ -879,18 +1045,29 @@ function eatFood(id){
 
 function flee(){
   if (G.busy || G.combat.boss || G.combat.enemy.guardian) return;
+  // slipping away leaves it flat-footed for a couple of steps — enough to actually break away
+  const rootIt = () => { const o = G.combat && G.combat.origin; if (o){ o.frozen = 2; o.chase = 0; } };
   if (G.combat.enemy.parts && G.combat.enemy.parts.legs.cut){
     log('It cannot follow on ruined legs. You walk away from it — slowly, to make the point.', 'hi');
-    endCombatReturn(); return;
+    rootIt(); endCombatReturn(); return;
   }
   const p = G.player, en = G.combat.enemy;
   const chance = U.clamp(0.45 + (p.spd - en.spd)*0.03, 0.15, 0.85);
-  if (U.chance(chance)){ log('You break away into the dark.', 'hi'); endCombatReturn(); }
+  if (U.chance(chance)){ log('You break away into the dark — it loses a moment finding its feet.', 'hi'); rootIt(); endCombatReturn(); }
   else { log('You fail to escape!', 'bad'); G.busy=true; G.combat.turn='enemy'; renderActions(); setTimeout(beginEnemyTurn, 500); }
 }
 
 function beginEnemyTurn(){
   const c = G.combat; if (!c) return;
+  // your follower answers before the foe does
+  if (followerAlive() && !c.followerActed){
+    c.followerActed = true;
+    followerAct();
+    updateHUD();
+    if (c.enemy.hp <= 0){ setTimeout(win, 550); return; }
+    setTimeout(beginEnemyTurn, 520);
+    return;
+  }
   const en = c.enemy, p = G.player;
   startOfTurn(en, false); updateHUD();
   if (en.hp <= 0){ win(); return; }
@@ -901,6 +1078,12 @@ function beginEnemyTurn(){
   }
   const usable = en.moves.filter(m => !m.disabled);
   const move = usable.length ? U.weighted(usable) : { name:'Desperate Flail', type:'attack', power:6 };
+  // it may go for the one walking behind you instead — that was the wager
+  if (followerAlive() && U.chance(0.3) && enemyTurnsOnFollower(move)){
+    updateHUD();
+    setTimeout(beginPlayerTurn, 600);
+    return;
+  }
   resolveAction(en, p, move, false);
   updateHUD();
   if (p.hp <= 0){ lose(); return; }
@@ -929,6 +1112,11 @@ function win(){
     grantItem(Data.rollItemId(3));
     p.inv.push('potion_heal'); log("The guardian's hoard yields a Draught of Mending.", 'good');
     log(`A legend falls. +${earnedSouls} Souls — and the stair below stands unbarred.`, 'gold');
+    // word travels: everything lesser on this floor saw what you did to its keeper
+    if (G.floor && !G.floor.guardianSlain){
+      G.floor.guardianSlain = true;
+      log('The floor knows. What still crawls here has seen what you did to its keeper — it comes at you smaller now.', 'mag');
+    }
   } else if (en.elite){
     grantItem(en.drop || Data.rollItemId(3));
     p.inv.push('potion_heal'); log('The elite\'s cache holds a Draught of Mending.', 'good');
@@ -1051,6 +1239,11 @@ function applyEffects(eff){
   if (eff.food){ const before = Math.round(p.food); p.food = eff.food >= 99 ? FOOD_MAX : Math.min(FOOD_MAX, p.food + eff.food);
     out.push([`+${Math.round(p.food) - before} FOOD`, 'good']); }
   if (eff.pocketCoin){ p.pocketCoin = true; out.push(['The coin rides in your pocket — flip it when steel fails', 'mag']); }
+  if (eff.follower){
+    if (p.follower){ out.push(['Someone already walks behind you', 'dim']); }
+    else { const fo = recruitFollower(typeof eff.follower === 'string' ? eff.follower : null);
+      out.push([`${fo.name} follows you now — their death would damn your name`, 'mag']); }
+  }
   if (eff.fovBoost){ G.floorFov = (G.floorFov || 0) + eff.fovBoost; revealFOV(); out.push([`+${eff.fovBoost} sight this floor`, 'good']); }
   if (eff.clearHunters){ const n = G.floor.entities.filter(e=>e.hunter).length; G.floor.entities = G.floor.entities.filter(e=>!e.hunter); if (n) out.push(['The hunters withdraw', 'good']); }
   if (eff.heatDown){ p.heat = Math.max(0, (p.heat||0) - eff.heatDown); out.push(['The hunt cools', 'good']); }
@@ -1172,6 +1365,7 @@ function renderExplore(){
     else if (e.type === 'event'){ if (!seen) continue; drawMarker(sx, sy, '!', '#c8a24a'); }
     else if (e.type === 'chest'){ if (!seen) continue; Sprites.draw(ctx, 'obj_chest', sx+2, sy+2, 1); }
     else if (e.type === 'stairs'){ if (!seen) continue; Sprites.draw(ctx, 'obj_stairs', sx+2, sy+2, 1); }
+    else if (e.type === 'prop'){ if (!seen) continue; Sprites.draw(ctx, e.sprite, sx+2, sy+2, 1); }
     else if (e.type === 'torch'){ if (!vis) continue; const fl = Math.sin(G.time/120 + e.x)*0.5+0.5; Sprites.draw(ctx, 'obj_torch', sx+2, sy+2 - (fl>0.6?1:0), 1); }
   }
   // player
@@ -1294,6 +1488,21 @@ function updateHUD(){
     U.el('bounty-tier').textContent = HEAT_TIER_NAMES[tier];
   } else {
     bounty.className = 'bounty hidden';
+  }
+  // the one walking behind you
+  const strip = U.el('follower-strip');
+  if (strip){
+    if (p.follower){
+      const fo = p.follower, fh = followerHunger(fo);
+      strip.classList.remove('hidden');
+      U.el('fo-name').textContent = fo.name;
+      U.el('fo-stats').innerHTML =
+        `<span class="${fo.hp < fo.maxhp*0.35 ? 'hurt' : ''}">HP ${fo.hp}/${fo.maxhp}</span> · ` +
+        `SP ${fo.sp}/${fo.maxsp} · ` +
+        `<span class="${fh>=2 ? 'starve' : ''}">FOOD ${Math.round(fo.food)}</span>`;
+    } else {
+      strip.classList.add('hidden');
+    }
   }
   updateEnemyPanel();
 }
@@ -1749,6 +1958,41 @@ function showInventory(){
   const breads = p.inv.filter(x=>x==='ration').length;
   const meats = p.inv.filter(x=>x==='strange_meat').length;
   s.appendChild(U.make('div','sect','Provisions'));
+  // ---- the one walking behind you: their own bars, their own pack ----
+  if (p.follower){
+    const fo = p.follower, fh = followerHunger(fo);
+    s.appendChild(U.make('div','sect', fo.name + ' — walks with you'));
+    s.appendChild(U.make('div','p',
+      `<b>HP</b> <span style="color:${fo.hp < fo.maxhp*0.35 ? '#c05070' : '#c9bfd6'}">${fo.hp}/${fo.maxhp}</span> · ` +
+      `<b>SP</b> ${fo.sp}/${fo.maxsp} · ` +
+      `<b>FOOD</b> <span style="color:${fh>=2?'#c05030':'#a87e34'}">${Math.round(fo.food)}/${FOLLOWER_FOOD_MAX}${fh?' — '+HUNGER_NAMES[fh]:''}</span>`));
+    s.appendChild(U.make('div','p dim','<i>If they die, your honor drops to the absolute floor and stays there.</i>'));
+
+    // their pack — separate from yours; they can only use what is in it
+    const packCounts = {};
+    for (const id of fo.inv) packCounts[id] = (packCounts[id]||0) + 1;
+    const packNames = Object.keys(packCounts).map(id => `${Data.CONSUMABLES[id].name} ×${packCounts[id]}`);
+    s.appendChild(U.make('div','p dim', '<b style="color:#8ea6d8">THEIR PACK</b>: ' + (packNames.length ? packNames.join(' · ') : '<i>empty</i>')));
+
+    const frow = U.make('div','row');
+    for (const id of Object.keys(packCounts)){
+      const it = Data.CONSUMABLES[id];
+      const useless = (it.heal && fo.hp >= fo.maxhp) || (it.sp && fo.sp >= fo.maxsp) || (it.food && fo.food >= FOLLOWER_FOOD_MAX);
+      const b = Btn(`${fo.name}: use ${it.name}`, ()=>followerConsume(id), 'btn good');
+      b.disabled = useless;
+      frow.appendChild(b);
+    }
+    // hand something over from your own pack
+    for (const id of ['potion_heal','potion_focus','ration','strange_meat']){
+      if (!p.inv.includes(id)) continue;
+      frow.appendChild(Btn(`Give ${Data.CONSUMABLES[id].name}`, ()=>handToFollower(id), 'btn'));
+    }
+    if (frow.children.length) s.appendChild(frow);
+  } else if (p.followerLost){
+    s.appendChild(U.make('div','sect','Someone used to walk with you'));
+    s.appendChild(U.make('div','p dim','<i>They followed you down. They did not come back up. Your name has not recovered and will not.</i>'));
+  }
+
   const focuses = p.inv.filter(x=>x==='potion_focus').length;
   const provParts = [];
   if (potions) provParts.push(`Draught of Mending ×${potions}`);

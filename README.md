@@ -137,6 +137,45 @@ current descent** (they reset on a new run); the Souls you spent do not come bac
 live in `levelUpCost` / `skillLearnCost` and `LEVEL_STATS` in `js/game.js`; learnable skills
 are the `learnable:true` entries in `SKILLS` (`js/data.js`).
 
+## Followers: a promise, not a perk
+
+The **Oathless** encounter offers you someone who wants to walk behind you. Taking them
+is the heaviest decision in the game:
+
+- They **fight beside you**, acting every round after your own action.
+- They have their **own HP, SP and FOOD**, and their **own pack** — separate from yours.
+  You hand provisions across; they can only use what is actually in *their* pack.
+- They get hungry as you walk. Starving, they hit soft and bleed 2 HP a step.
+- Enemies **can turn on them** (~30% of attacks) instead of you.
+- **If they die, your honor is slammed to −100 — the absolute floor — permanently.** That
+  is instant MARKED status with the Inquisition on your heels for the rest of the run.
+
+So the game asks the question plainly: do you want the extra blade badly enough to be
+responsible for a life? Once you say yes, backing out is not an option — only keeping
+them alive is. Follower definitions live in `FOLLOWERS` (`js/data.js`); the upkeep,
+combat turn and death penalty are `updateFollowerUpkeep` / `followerAct` /
+`followerDies` in `js/game.js`.
+
+## Prowling, pursuit and fear
+
+- **You can be shaken off.** A foe chasing you spends a pursuit budget scaled to its
+  tier — roughly 8 turns for the weakest, 14 for tier 3, ×1.6 for elites and ×3 for the
+  Inquisition's hunters. Spend it and it *loses your trail* and goes back to wandering.
+  Walk right into its face, though, and it finds you again.
+- **Fleeing actually works.** Escaping a fight leaves that enemy **rooted for 2 turns**,
+  so you get real distance instead of being re-engaged on the next step.
+- **Killing the stair's guardian cows the floor.** Every lesser thing still alive there
+  fights at **×0.7 HP and damage** and hunts with half its usual sight. Hunters and
+  bosses are unmoved — they don't scare.
+
+## Scenery that never blocks you
+
+Rooms are dressed with biome-appropriate props — **bookshelves, statues, tables, chairs,
+urns, sarcophagi and braziers** in the Catacombs, mushrooms and stumps in the Fungal
+Deep, barrels in the Drowned Halls, bone piles in the Whitemarrow, and so on. All of it
+is **purely decorative and walked straight through**: no torch, no shelf, no statue can
+ever wall off a route, so you never have to re-plan a path around the furniture.
+
 ## Alignment: the low-vs-high tradeoff
 
 Your honor total pushes you into one of three alignments (shown as a HUD badge), each a

@@ -53,6 +53,31 @@ const CLASSES = {
   },
 };
 
+// ---------- Followers ----------
+// A follower fights beside you and must be kept alive the same way you are:
+// fed, healed, and given focus — out of its OWN pack. If one dies, your honor
+// is slammed to the absolute floor. Taking one is a promise, not a perk.
+const FOLLOWERS = {
+  waif: {
+    id:'waif', name:'The Waif', sprite:'npc_child',
+    base:{ hp:34, sp:6, atk:9, def:4, mag:3, spd:11 },
+    skill:'backstab',
+    flavor:'Small, quick, and far too willing. She has decided you are worth following.',
+  },
+  penitent: {
+    id:'penitent', name:'The Unchained', sprite:'npc_beggar',
+    base:{ hp:52, sp:4, atk:12, def:8, mag:0, spd:5 },
+    skill:'cleave',
+    flavor:'You took him off the hook. He has not put the chain down; he swings it now for you.',
+  },
+  acolyte: {
+    id:'acolyte', name:'The Grey Acolyte', sprite:'npc_woman',
+    base:{ hp:30, sp:11, atk:5, def:4, mag:13, spd:8 },
+    skill:'firebolt',
+    flavor:'She reads the dark like a page. She will spend herself lighting it for you.',
+  },
+};
+
 // ---------- Enemies ----------
 // moves: inline actions with weights (w). type: attack|magic|defend|heal|buff
 const ENEMIES = {
@@ -162,6 +187,17 @@ Object.assign(ENEMIES, {
 
 // which named terror may prowl each biome's floors
 const BIOME_ELITES = { catacombs:'gravemaw', fungal:'sporetyrant', drowned:'undertow', ember:'cinderprophet', ossuary:'marrowcantor', umbral:'rootwolf' };
+
+// ---- Decorative props: dressing that fits each biome. Purely visual — they
+// never block a route (see the decorative-entity rule in game.js/dungeon.js).
+const BIOME_PROPS = {
+  catacombs: ['obj_shelf','obj_statue','obj_table','obj_chair','obj_urn','obj_sarcophagus','obj_brazier'],
+  fungal:    ['obj_mushroom','obj_stump','obj_barrel','obj_urn'],
+  drowned:   ['obj_barrel','obj_urn','obj_statue','obj_table'],
+  ember:     ['obj_brazier','obj_barrel','obj_statue','obj_bones'],
+  ossuary:   ['obj_bones','obj_sarcophagus','obj_statue','obj_urn','obj_shelf'],
+  umbral:    ['obj_stump','obj_mushroom','obj_bones','obj_urn'],
+};
 
 // ---- Legendary Guardians: one bars the stair on every floor; slay them to descend ----
 // dialogue.lines: intro always; class[job] always; marked/hallowed by alignment; items by equipped weapon.
@@ -661,6 +697,33 @@ const EVENTS = {
     }
   },
 
+  oathless: {
+    name:'The Oathless',
+    perceive: clearIfHonored,
+    variants:{
+      clear:{ art:'npc_fallen',
+        text:"Someone is sitting with their back to a pillar, alive, and looking at you the way the drowning look at a rope. “I can carry. I can fight, a little. I won't slow you.” A pause. “I would rather die walking behind someone than sitting here alone.”",
+        choices:[
+          { label:'Take them with you', to:'oath_take', kind:'danger' },
+          { label:'Give them provisions and point them up', to:'oath_send' },
+          { label:'Say nothing and walk on', to:'oath_leave' },
+        ] },
+      warped:{ art:'npc_fallen',
+        text:"Something sits with its back to a pillar, watching you. It might be a person. It says it can carry, that it can fight a little, that it won't slow you — and every word arrives a half-beat after its mouth moves.",
+        choices:[
+          { label:'Take it with you anyway', to:'oath_take', kind:'danger' },
+          { label:'Look at it properly first', to:'oath_look' },
+          { label:'Walk on', to:'oath_leave' },
+        ] },
+    },
+    outcomes:{
+      oath_take: { text:"They fall in a half-step behind your shoulder and stay there. They will need feeding. They will need mending. They carry their own pack and it is not deep.\n\nUnderstand what you have just done: if they die down here, you will have led them to it, and you will never again be able to tell yourself otherwise.", effects:{ follower:true, codex:'oath_taken' } },
+      oath_send: { text:"You press bread and a little coin into their hands and turn them toward the stairs you came down. They go. Whether the stair is kinder than the dark, you will never find out — which is its own mercy, for you.", effects:{ gold:-8, honor:9, codex:'oath_sent' } },
+      oath_look: { text:"You look, properly, the way you should have looked at everything down here. Just a person: filthy, scared, and breathing. Shame goes through you like cold water. They flinch at whatever your face is doing, and follow you anyway.", effects:{ follower:true, honor:5, codex:'oath_seen', reveal:'Fear nearly made a monster of someone who only needed to not be alone.' } },
+      oath_leave: { text:"You walk on. The sound they make is not a word. It follows you further than they could have.", effects:{ honor:-5 } },
+    }
+  },
+
   hollowprince: {
     name:'The Hollow Prince',
     perceive: clearIfHonored,
@@ -1139,6 +1202,10 @@ const CODEX = [
   { id:'meat_price',   title:'Hunger: The Meat\'s Price',  tag:'bad',  hint:'It was filling. It was warm. It was not free.' },
   { id:'coin_war_heads', title:'The Coin, Drawn in Battle: Heads', tag:'mag', hint:'Mid-fight, someone asked an old god to decide. It said yes.' },
   { id:'coin_war_tails', title:'The Coin, Drawn in Battle: Tails', tag:'bad', hint:'Mid-fight, someone asked an old god to decide. It decided against them.' },
+  { id:'oath_taken',   title:'The Oathless: Taken On',    tag:'mag',  hint:'Someone chose to walk behind you. That is a debt, not a gift.' },
+  { id:'oath_sent',    title:'The Oathless: Sent Up',     tag:'good', hint:'Bread, a little coin, and a direction that was not down.' },
+  { id:'oath_seen',    title:'The Oathless: Looked At',   tag:'mag',  hint:'You looked properly, and the monster turned out to be a person.' },
+  { id:'follower_lost',title:'The Oathless: Led To It',   tag:'bad',  hint:'They followed you all the way down. You are what happened to them.' },
 ];
 
 // ---------- Whispers: the deep talks to the damned (flavor lines, no mechanics) ----------
@@ -1229,7 +1296,7 @@ const SANCTUM = [
   { id:'favor',     name:"Merchant's Favor",   desc:'Shop Gold prices −10%, per rank.',           max:2, base:30, growth:20 },
 ];
 
-const Data = { SKILLS, CLASSES, ENEMIES, ITEMS, CONSUMABLES, ITEM_POOL, HUNTER_POOL, BIOME_ELITES, BIOME_GUARDIANS, HONOR_TIERS, EVENTS, CODEX, SANCTUM, BIOMES, WHISPERS,
+const Data = { SKILLS, CLASSES, FOLLOWERS, ENEMIES, ITEMS, CONSUMABLES, ITEM_POOL, HUNTER_POOL, BIOME_ELITES, BIOME_GUARDIANS, BIOME_PROPS, HONOR_TIERS, EVENTS, CODEX, SANCTUM, BIOMES, WHISPERS,
   honorTier(h){ for (const t of HONOR_TIERS){ if (h >= t.min) return t; } return HONOR_TIERS[HONOR_TIERS.length-1]; },
   enemyPool(depth){
     const ids = [];

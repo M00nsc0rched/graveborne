@@ -144,13 +144,42 @@ function makeDungeon(depth, opts){
     }
   }
 
-  // --- torches (decorative, near room corners) ---
+  // --- decorative dressing: torches + biome props, lined along room walls ---
+  // Nothing here blocks movement (see isBlockingEntity in game.js), so a route
+  // can never be walled off by scenery — props only sit against the walls.
+  const props = (Data.BIOME_PROPS && Data.BIOME_PROPS[opts.biome]) || Data.BIOME_PROPS.catacombs;
+  // perimeter tiles of a room: the ring just inside its boundary
+  const edgeTiles = (room) => {
+    const out = [];
+    for (let x = room.x; x < room.x + room.w; x++){
+      out.push({ x, y: room.y }, { x, y: room.y + room.h - 1 });
+    }
+    for (let y = room.y + 1; y < room.y + room.h - 1; y++){
+      out.push({ x: room.x, y }, { x: room.x + room.w - 1, y });
+    }
+    return U.shuffle(out);
+  };
+  const freeForDressing = (x, y) =>
+    d.tileAt(x, y) === TILE.FLOOR && !d.entityAt(x, y) && !(x === first.cx && y === first.cy);
+
   for (const room of rooms){
+    const ring = edgeTiles(room);
+    let placed = 0;
+    const want = U.randInt(1, 3);                      // a little furniture per room
+    for (const t of ring){
+      if (placed >= want) break;
+      if (!freeForDressing(t.x, t.y)) continue;
+      d.entities.push({ type:'prop', sprite:U.choice(props), x:t.x, y:t.y, blocking:false });
+      placed++;
+    }
+    // a torch on the wall for light
     if (U.chance(0.6)){
-      const cx = U.chance(0.5) ? room.x : room.x + room.w - 1;
-      const cy = U.chance(0.5) ? room.y : room.y + room.h - 1;
-      if (d.tileAt(cx, cy) === TILE.FLOOR && !d.entityAt(cx, cy) && !(cx===first.cx&&cy===first.cy))
-        d.entities.push({ type:'torch', x:cx, y:cy, blocking:false });
+      for (const t of ring){
+        if (freeForDressing(t.x, t.y)){
+          d.entities.push({ type:'torch', x:t.x, y:t.y, blocking:false });
+          break;
+        }
+      }
     }
   }
 

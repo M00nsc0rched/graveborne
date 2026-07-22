@@ -70,6 +70,15 @@ button{touch-action:manipulation}
 @keyframes fd-pulse{0%,100%{opacity:1}50%{opacity:.55}}
 .bar-txt{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;text-shadow:0 1px 0 #000,0 0 3px #000}
 
+/* the one walking behind you */
+.follower-strip{display:flex;align-items:center;gap:8px;margin-top:5px;font-size:10px;
+  border-left:2px solid var(--mag);padding-left:6px}
+.follower-strip.hidden{display:none}
+.fo-name{color:var(--mag);letter-spacing:1px;text-transform:uppercase;white-space:nowrap}
+.fo-stats{color:var(--ink-dim);white-space:nowrap}
+.fo-stats .hurt{color:var(--bad)}
+.fo-stats .starve{color:#c05030}
+
 .hud-right{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
 .honor{display:flex;align-items:center;gap:6px}
 .honor .lbl{font-size:9px;color:var(--ink-dim);letter-spacing:1px}
