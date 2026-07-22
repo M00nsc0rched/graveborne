@@ -150,6 +150,38 @@ current descent** (they reset on a new run); the Souls you spent do not come bac
 live in `levelUpCost` / `skillLearnCost` and `LEVEL_STATS` in `js/game.js`; learnable skills
 are the `learnable:true` entries in `SKILLS` (`js/data.js`).
 
+## Skills: 80 of them, three tiers, and the price of borrowing
+
+Each class owns **20 skills** (80 in total), plus **Strike**, which belongs to everyone.
+Every skill has **three tiers** with hand-written effects at each step — Guard goes
+DEF×2 → ×5 → ×10, Execute gains a 10% then 20% instant-kill threshold, Zeal goes from 5
+swings to 14.
+
+- **Nothing is permanently out of reach.** Any class can end up wielding any skill.
+- **But borrowed steel is blunt.** A skill that isn't your class's answers at **40%
+  strength (60% weaker)** — damage, healing, shields, poison, buffs, lifesteal, all of it
+  — and it is **frozen at tier 1 forever**. Only what your own class was built for grows.
+- **Sharpening costs Souls** (25 → 48 → …) and is done from Inventory & Skills.
+- **Every descent offers a different random handful** of skills to unlock with Souls, so
+  no two runs give you the same options. A class's *signature* skills (Guard, Aelanwyr,
+  Convince) never appear for anyone else.
+
+Skills draw on the Diablo lineage: Whirlwind, Seismic Slam and Ignore Pain for the Knight;
+Fan of Knives, Caltrops and Death Blossom for the Gravethief; Frozen Orb, Chain Lightning,
+Bone Spear, Amplify Damage and Iron Maiden for the Witch; Blessed Hammer, Fist of the
+Heavens, Conviction and Salvation for the Oathwarden.
+
+## Class passives
+
+One signature rule each, always on:
+
+| Class | Passive | What it does |
+|---|---|---|
+| **Hollow Witch** | Wellspring | **+5 SP every step** out of combat — but she burns food **twice as fast** |
+| **Ashen Knight** | Oathbound | Against **undead**, every fight opens with a shield *and* his fury already up |
+| **Oathwarden** | Last Vigil | **Once per descent** a killing blow leaves him on 1 HP — then **2 turns** to finish the foe. Kill it and he keeps that life; fail and it is over |
+| **Gravethief** | Cutthroat's Luck | Each fight a coin picks one: **every strike bleeds** (ATK×2+5 a turn), or **critical hits bite 10% deeper** |
+
 ## Followers: a promise, not a perk
 
 The **Oathless** encounter offers you someone who wants to walk behind you. Taking them

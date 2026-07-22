@@ -1,7 +1,7 @@
 // ================= GRAVEBORNE — main engine =================
 // shown on the title screen; keep in step with CACHE in sw.js — the game is
 // served from that cache, so the number you see is the build you're running
-const GAME_VERSION = 13;
+const GAME_VERSION = 14;
 let VW = 21, VH = 13;                 // viewport in tiles — reshaped to the stage on phones
 const TS = 16;                        // tile size in canvas pixels
 const FINAL_DEPTH = 5;
@@ -84,9 +84,12 @@ function followerAct(){
   const fo = G.player.follower, en = G.combat && G.combat.enemy;
   if (!en || !followerAlive()) return;
   const sk = Data.SKILLS[fo.skill] || Data.SKILLS.strike;
-  let action = sk, starving = followerHunger(fo) >= 2;
+  // followers wield their skill at its first tier
+  const base = Object.assign({ name:sk.name, type:sk.type }, (sk.lv && sk.lv[0]) || {});
+  let action = base, starving = followerHunger(fo) >= 2;
   if (sk.cost > fo.sp || starving) action = { name:'a desperate swing', type:'attack', power:8 };
   else fo.sp -= sk.cost;
+  if (!action.power) action = Object.assign({}, action, { power: 8 });   // buffs/heals become a plain swing
   let dmg = (action.type === 'magic')
     ? action.power * fo.mag/10 - en.def*0.25
     : action.power * fo.atk/10 - en.def*0.5;
@@ -142,6 +145,80 @@ function followerConsume(id){
   }
   updateHUD();
   showFollowers();
+}
+
+// ---- Skills: three tiers, class ownership, and the price of borrowing ----
+// Nothing is locked away forever — any class can end up wielding any skill. But a
+// borrowed skill answers at 40% strength (60% weaker) and can never be sharpened
+// past its first tier. Only what your own class was built for grows.
+const OFF_CLASS_SCALE = 0.4;
+
+function skillOwned(p, id){
+  const sk = Data.SKILLS[id];
+  return !!sk && (sk.cls === 'common' || sk.cls === p.classId);
+}
+function skillLevel(p, id){
+  if (!skillOwned(p, id)) return 1;                       // borrowed steel never sharpens
+  return U.clamp((p.skillLv && p.skillLv[id]) || 1, 1, 3);
+}
+function scaleShieldSpec(spec, s){
+  const m = /^def(\d*)$/.exec(String(spec));
+  if (!m) return spec;
+  const n = m[1] ? parseInt(m[1], 10) : 1;
+  const k = Math.max(1, Math.round(n * s));
+  return 'def' + (k === 1 ? '' : k);
+}
+// the action this skill performs right now: at its tier, in these hands
+function skillAction(p, id){
+  const sk = Data.SKILLS[id];
+  const lv = skillLevel(p, id);
+  const a = Object.assign({ name:sk.name, type:sk.type, _id:id, _lv:lv }, (sk.lv && sk.lv[lv-1]) || {});
+  if (skillOwned(p, id)) return a;
+  a.borrowed = true;
+  const s = OFF_CLASS_SCALE;
+  if (a.power)    a.power    = Math.max(1, Math.round(a.power * s));
+  if (a.healBase) a.healBase = Math.max(1, Math.round(a.healBase * s));
+  if (a.spGain)   a.spGain   = Math.max(1, Math.round(a.spGain * s));
+  if (a.charm)    a.charm    = a.charm * s;
+  if (a.execute)  a.execute  = a.execute * s;
+  if (a.shield != null) a.shield = (typeof a.shield === 'string')
+    ? scaleShieldSpec(a.shield, s) : Math.max(1, Math.round(a.shield * s));
+  if (a.effect){
+    const e = a.effect = Object.assign({}, a.effect);
+    if (e.poison)  e.poison  = Object.assign({}, e.poison,  { dmg: Math.max(1, Math.round(e.poison.dmg  * s)) });
+    if (e.weaken)  e.weaken  = Object.assign({}, e.weaken,  { amt: Math.max(1, Math.round(e.weaken.amt  * s)) });
+    if (e.regen)   e.regen   = Object.assign({}, e.regen,   { amt: Math.max(1, Math.round(e.regen.amt   * s)) });
+    if (e.atkbuff) e.atkbuff = Object.assign({}, e.atkbuff, { amt: Math.max(1, Math.round(e.atkbuff.amt * s)) });
+    if (e.lifesteal) e.lifesteal = e.lifesteal * s;
+    if (e.shield != null) e.shield = (typeof e.shield === 'string')
+      ? scaleShieldSpec(e.shield, s) : Math.max(1, Math.round(e.shield * s));
+  }
+  return a;
+}
+// sharpening your own skills costs Souls and rises steeply
+function skillUpgradeCost(p, id){ return Math.round(25 * Math.pow(1.9, skillLevel(p, id) - 1)); }
+function upgradeSkill(id){
+  const p = G.player;
+  if (!skillOwned(p, id)) return;
+  const lv = skillLevel(p, id);
+  if (lv >= 3) return;
+  const cost = skillUpgradeCost(p, id);
+  if (Save.souls() < cost || !Save.spendSouls(cost)) return;
+  p.skillLv = p.skillLv || {};
+  p.skillLv[id] = lv + 1;
+  log(`${Data.SKILLS[id].name} sharpens to tier ${lv + 1} for ◈ ${cost} Souls.`, 'mag');
+  updateHUD();
+  showInventory();
+}
+// each descent offers a different, random handful of skills to buy with Souls
+function rollUnlockPool(p){
+  const ids = Object.keys(Data.SKILLS).filter(id => {
+    const sk = Data.SKILLS[id];
+    if (sk.cls === 'common' || p.skills.includes(id)) return false;
+    if (!sk.open && sk.cls !== p.classId) return false;    // signatures stay with their class
+    return true;
+  });
+  return U.shuffle(ids).slice(0, 8);
 }
 
 // escalating: 12, 18, 27, 41, 61, 91, 137, …  (×1.5 per level reached)
@@ -266,11 +343,14 @@ function newPlayer(classId){
     statuses:{}, shield:0, x:0, y:0, dir:1, allies:[],
     heat:0, reinforceCd:null, pocketCoin:false,
     level:1, skillsBought:0,
+    skillLv:{}, unlockPool:[],          // per-skill tiers, and this run's Soul offers
+    vigilUsed:false, vigilTurns:0,      // the Warden's one refusal of death
     follower:null, followerLost:false,
   };
   applySanctum(p);
   recomputeStats(p);
   p.hp = p.maxhp; p.sp = p.maxsp;
+  p.unlockPool = rollUnlockPool(p);     // a different offer of skills every descent
   return p;
 }
 
@@ -540,9 +620,14 @@ function openChest(e){
   p.gold += gold;
   log(`You pry open a chest — ${gold} gold.`, 'gold');
   if (U.chance(U.clamp(0.55 + mods.dropBonus, 0.1, 0.95))) grantItem(Data.rollItemId(tier));
-  else if (U.chance(0.38)){ p.inv.push('potion_heal'); log('Inside rests a Draught of Mending.', 'good'); }
-  else if (U.chance(0.5)){ p.inv.push('potion_focus'); log('Inside rests a Draught of Focus — cold, blue and still thinking.', 'hi'); }
-  else { p.inv.push('ration'); log('Inside, wrapped in wax cloth: Grave-Bread. Down here, that is treasure.', 'good'); }
+  else {
+    // food is the scarcest thing in the dark now — roughly one chest in six, not one in three
+    const roll = Math.random();
+    if (roll < 0.42){ p.inv.push('potion_heal'); log('Inside rests a Draught of Mending.', 'good'); }
+    else if (roll < 0.72){ p.inv.push('potion_focus'); log('Inside rests a Draught of Focus — cold, blue and still thinking.', 'hi'); }
+    else if (roll < 0.90){ p.inv.push('ration'); log('Inside, wrapped in wax cloth: Grave-Bread. Down here, that is treasure.', 'good'); }
+    else log('Nothing but dust and a smell you will not place.', 'dim');
+  }
   G.floor.removeEntity(e);
   updateHUD();
 }
@@ -592,7 +677,13 @@ function maybeWhisper(){
 function updateHunger(){
   const p = G.player;
   const before = hungerStage(p);
-  p.food = Math.max(0, p.food - FOOD_DRAIN);
+  // Hollow Witch — Wellspring: the walking itself refills her, and burns her twice as fast
+  let drain = FOOD_DRAIN;
+  if (p.classId === 'mage'){
+    drain *= 2;
+    if (p.sp < p.maxsp){ p.sp = Math.min(p.maxsp, p.sp + 5); }
+  }
+  p.food = Math.max(0, p.food - drain);
   const now = hungerStage(p);
   if (now !== before && now > 0){
     if (now === 1) log('Your stomach tightens. You should eat soon.', 'dim');
@@ -753,6 +844,20 @@ function startCombat(entity, ambush){
   G.combat = { enemy, origin:entity, turn:'player', boss:enemy.boss, target:'body' };
   G.state = 'COMBAT';
   log(`— ${enemy.name}${enemy.boss?' (BOSS)':''} blocks your path! ${ambress(ambush)}—`, 'bad');
+
+  // ---- class passives that fire as steel is drawn ----
+  if (p.classId === 'knight' && enemy.tags.includes('undead')){
+    const v = shieldValue('def2', p, true);
+    p.shield += v;
+    p.statuses.atkbuff = { amt:5, turns:3 };
+    log(`Oathbound: the dead are your old business. You open braced — shield ${v}, and your fury already up.`, 'good');
+  }
+  if (p.classId === 'rogue'){
+    G.combat.luck = U.chance(0.5) ? 'bleed' : 'crit';
+    log(G.combat.luck === 'bleed'
+      ? "Cutthroat's Luck: the coin says blood. Every cut you land this fight will keep bleeding."
+      : "Cutthroat's Luck: the coin says precision. Your critical blows bite deeper this fight.", 'mag');
+  }
   if (enemy.cowed) log('It fights shrunken and wary — it knows what happened to the keeper of the stair.', 'good');
   if (!enemy.parts) log('It has no body to unmake — only the whole of it can be broken.', 'dim');
   if (hungerStage(p) >= 2) log('You fight starving. Your blows land soft, and no focus will return to you.', 'bad');
@@ -764,8 +869,8 @@ function effAtk(c){ let a=c.atk + (c.statuses.atkbuff?c.statuses.atkbuff.amt:0) 
 
 function shieldValue(spec, c, isPlayer){
   const hb = isPlayer ? Math.max(0, Math.floor(G.player.honor/6)) : 0;
-  if (spec === 'def2') return c.def*2 + hb;
-  if (spec === 'def')  return c.def + hb;
+  const m = /^def(\d*)$/.exec(String(spec));
+  if (m) return c.def * (m[1] ? parseInt(m[1], 10) : 1) + hb;
   return (spec|0) + hb;
 }
 
@@ -796,13 +901,36 @@ function resolveAction(src, dst, action, srcIsPlayer){
     floatOn(srcIsPlayer, `+${v}⛊`, '#8ab0e0'); return;
   }
   if (type === 'heal'){
-    const amt = srcIsPlayer ? (src.mag*2 + (action.healBase||0)) : (action.healFlat||8);
+    const amt = srcIsPlayer ? (src.mag*(action.magMult||2) + (action.healBase||0)) : (action.healFlat||8);
     src.hp = Math.min(maxHp(src,srcIsPlayer), src.hp + amt);
     log(`${srcIsPlayer?'You mend':src.name+' mends'} ${amt} HP.`, 'good');
     floatOn(srcIsPlayer, `+${amt}`, '#6fbf6a'); return;
   }
+  // Meditate and its like: blood traded for focus
+  if (action.selfDmg || action.spGain){
+    if (action.selfDmg){
+      src.hp -= action.selfDmg;
+      log(`${srcIsPlayer?'You open a vein':src.name+' bleeds itself'} — ${action.selfDmg} HP.`, 'bad');
+      floatOn(srcIsPlayer, `-${action.selfDmg}`, '#c03636');
+    }
+    if (action.spGain && srcIsPlayer){
+      const b = src.sp; src.sp = Math.min(src.maxsp, src.sp + action.spGain);
+      log(`The focus floods back (+${src.sp - b} SP).`, 'mag');
+      floatOn(true, `+${src.sp - b} SP`, '#4a74c0');
+    }
+    updateHUD();
+    if (srcIsPlayer && src.hp <= 0) lose();
+    return;
+  }
+  // Convince: ask, in the old way
+  if (action.charm && !dstIsPlayer){
+    if (U.chance(action.charm)){ charmEnemy(); return; }
+    log(`${dst.name} hears the offer and refuses it.`, 'dim');
+    return;
+  }
   if (type === 'buff'){
     const ef = action.effect || {};
+    if (action.cleanse && src.statuses.poison){ delete src.statuses.poison; log('The rot is drawn back out of you.', 'good'); }
     if (ef.regen)   src.statuses.regen   = { ...ef.regen };
     if (ef.atkbuff) src.statuses.atkbuff = { ...ef.atkbuff };
     if (ef.shield){ const v = shieldValue(ef.shield, src, srcIsPlayer); src.shield += v; }
@@ -812,13 +940,37 @@ function resolveAction(src, dst, action, srcIsPlayer){
 
   // attack / magic
   let dmg;
+  // a flurry: several small blows, each with its own chance to land
+  if (action.hits && action.hits > 1){
+    let landed = 0, total = 0;
+    for (let i = 0; i < action.hits; i++){
+      if (action.acc != null && !U.chance(action.acc)) continue;
+      let d = (type === 'magic') ? action.power * src.mag/10 - dst.def*0.25
+                                 : action.power * effAtk(src)/10 - dst.def*0.5;
+      if (action.holy && dst.tags && dst.tags.includes('undead')) d *= 1.5;
+      if (srcIsPlayer && hungerStage(src) >= 2) d *= 0.7;
+      d = Math.max(1, Math.round(d * U.rand(0.9, 1.1)));
+      if (dst.shield > 0){ const ab = Math.min(dst.shield, d); dst.shield -= ab; d -= ab; }
+      if (d > 0){ dst.hp -= d; total += d; }
+      landed++;
+    }
+    log(`${srcIsPlayer?'You loose':src.name+' looses'} ${action.name} — ${landed} of ${action.hits} land for ${total}.`, srcIsPlayer?'hi':'bad');
+    floatOn(dstIsPlayer, `-${total}`, '#c03636');
+    rogueBleed(src, dst, srcIsPlayer);
+    return;
+  }
+
   if (type === 'magic') dmg = action.power * src.mag/10 - dst.def*0.25;
   else                  dmg = action.power * effAtk(src)/10 - dst.def*0.5;
   if (action.holy && dst.tags && dst.tags.includes('undead')){ dmg *= 1.5; }
   if (srcIsPlayer && hungerStage(src) >= 2) dmg *= 0.7;   // a starving arm swings soft
   dmg *= U.rand(0.9, 1.1);
   let crit = false;
-  if (action.effect && action.effect.crit && U.chance(action.effect.crit)){ dmg *= 1.8; crit = true; }
+  if (action.effect && action.effect.crit && U.chance(action.effect.crit)){
+    // the Gravethief's other coin: critical blows bite 10% deeper this fight
+    dmg *= 1.8 * (srcIsPlayer && G.combat && G.combat.luck === 'crit' ? 1.1 : 1);
+    crit = true;
+  }
   dmg = Math.max(1, Math.round(dmg));
 
   // ---- aimed blows: physical attacks may target a limb instead of the body ----
@@ -869,6 +1021,41 @@ function resolveAction(src, dst, action, srcIsPlayer){
   if (ef.poison){ dst.statuses.poison = { ...ef.poison }; log(`${dstIsPlayer?'You are':dst.name+' is'} afflicted!`, 'bad'); }
   if (ef.weaken){ dst.statuses.weaken = { ...ef.weaken }; log(`${dstIsPlayer?'Your':dst.name+"'s"} strength wanes.`, 'mag'); }
   if (ef.stun && U.chance(ef.stun)){ dst.statuses.stun = 1; log(`${dstIsPlayer?'You are':dst.name+' is'} stunned!`, 'hi'); }
+  rogueBleed(src, dst, srcIsPlayer);
+
+  // Execute: below the line, it simply ends
+  if (action.execute && !dstIsPlayer && dst.hp > 0 && dst.hp <= dst.maxhp * action.execute){
+    dst.hp = 0;
+    log(`${dst.name} is under the line — you finish it where it stands.`, 'gold');
+  }
+}
+
+// the Gravethief's coin, bleed side: every strike this fight opens a wound
+function rogueBleed(src, dst, srcIsPlayer){
+  if (!srcIsPlayer || !G.combat || G.combat.luck !== 'bleed' || dst === G.player) return;
+  const dmg = Math.max(1, Math.round(effAtk(src) * 2 + 5));
+  dst.statuses.poison = { dmg, turns: 3 };
+  log(`The wound will not close — ${dmg} a turn.`, 'mag');
+}
+
+// Convince: it stops, and turns, and falls in behind you
+function charmEnemy(){
+  const en = G.combat.enemy, p = G.player;
+  if (p.follower){
+    log(`${en.name} yields — but someone already walks with you, and it slinks back into the dark.`, 'dim');
+  } else {
+    p.follower = {
+      id:'charmed', name:en.name, sprite:en.sprite, skill:'strike',
+      maxhp:en.maxhp, hp:Math.max(1, en.hp), maxsp:6, sp:6,
+      atk:en.atk, def:en.def, mag:en.mag, spd:en.spd,
+      food:FOLLOWER_FOOD_MAX, statuses:{}, shield:0, inv:[],
+    };
+    log(`${en.name} stops. It turns. It falls in behind you, and the fight is simply over.`, 'mag');
+    log('It needs feeding like anything else that walks — and if it dies, that is on you.', 'dim');
+  }
+  if (G.combat.origin) G.floor.removeEntity(G.combat.origin);
+  G.combat = null; G.state = 'EXPLORE'; G.busy = false;
+  updateHUD(); renderActions();
 }
 
 // a limb gives out — what it took with it depends on which one
@@ -912,6 +1099,15 @@ function beginPlayerTurn(){
   if (p.hp <= 0){ lose(); return; }
   if (p.statuses.stun){ delete p.statuses.stun; log('You are stunned and lose your turn!', 'bad');
     G.combat.turn='enemy'; renderActions(); setTimeout(beginEnemyTurn, 650); return; }
+  // the Warden's borrowed time runs out on their own turn
+  if (p.vigilTurns > 0){
+    p.vigilTurns--;
+    if (p.vigilTurns <= 0){
+      log('The two turns are spent and it is still standing. The light withdraws, and takes you with it.', 'bad');
+      lose(true); return;
+    }
+    log(`Last Vigil — ${p.vigilTurns} turn${p.vigilTurns > 1 ? 's' : ''} left to end it.`, 'gold');
+  }
   if (hungerStage(p) < 2) p.sp = Math.min(p.maxsp, p.sp + 1);   // the starving recover no focus
   G.combat.followerActed = false;   // they get one action per round, after yours
   G.combat.turn = 'player'; G.busy = false;
@@ -931,7 +1127,7 @@ function doPlayer(skillId){
   if (sk.cost > p.sp) return;
   p.sp -= sk.cost;
   G.busy = true; G.combat.turn = 'enemy'; renderActions();
-  resolveAction(p, G.combat.enemy, { ...sk }, true);
+  resolveAction(p, G.combat.enemy, skillAction(p, skillId), true);
   updateHUD();
   if (G.combat.enemy.hp <= 0){ setTimeout(win, 550); return; }
   setTimeout(beginEnemyTurn, 620);
@@ -1097,6 +1293,10 @@ function beginEnemyTurn(){
 function win(){
   const c = G.combat; if (!c) return;
   const en = c.enemy, p = G.player;
+  if (p.vigilTurns > 0){
+    p.vigilTurns = 0;
+    log('You end it inside the vigil. The light lets go, and leaves you the life you are standing in.', 'gold');
+  }
   const mods = lootMods();
   let gold = U.randInt(en.gold[0], en.gold[1]);
   gold = Math.max(1, Math.round(gold * mods.goldMult * (en.hunter ? 1.4 : 1)));
@@ -1138,7 +1338,7 @@ function win(){
     else if (U.chance(0.25)){ p.inv.push('potion_heal'); log('It dropped a Draught of Mending.', 'good'); }
   }
   // the practical butchery of survival — beasts are made of meat
-  if (en.tags.includes('beast') && U.chance(0.3)){
+  if (en.tags.includes('beast') && U.chance(0.12)){
     p.inv.push('strange_meat');
     log('You carve what travels well. Down here, no one asks what the meat is.', 'dim');
   }
@@ -1148,7 +1348,18 @@ function win(){
 
 function endCombatReturn(){ G.combat=null; G.state='EXPLORE'; G.busy=false; updateHUD(); renderActions(); }
 
-function lose(){
+function lose(force){
+  const p = G.player;
+  // Oathwarden — Last Vigil: once a descent, the light refuses to let go. You are
+  // left standing on 1 HP with two turns to finish the thing that felled you.
+  if (!force && p && p.classId === 'warden' && !p.vigilUsed && G.state === 'COMBAT' && G.combat){
+    p.vigilUsed = true; p.vigilTurns = 2; p.hp = 1;
+    p.statuses.poison = null; delete p.statuses.poison;
+    log('LAST VIGIL — the blow lands, and the light will not let you go.', 'gold');
+    log('Two turns to end the thing that felled you. Kill it and you keep the life you are standing in. Fail, and it is over.', 'bad');
+    updateHUD(); renderActions();
+    return;
+  }
   G.busy = true; G.state = 'GAMEOVER';
   Save.recordDeath();
   // gold scatters, but Souls cling to you (stable currency survives death)
@@ -1592,7 +1803,10 @@ function renderActions(){
     p.skills.forEach((id, idx) => {
       const sk = Data.SKILLS[id];
       const b = Btn('', ()=>doPlayer(id), 'btn '+(sk.type==='defend'||sk.type==='heal'||sk.type==='buff'?'good':''), String(idx+1));
-      b.innerHTML = `<span class="k">${idx+1}</span>${sk.name}${sk.cost?`<span class="cost">${sk.cost} SP</span>`:''}<span class="sub">${sk.desc}</span>`;
+      const lv = skillLevel(p, id), mine = skillOwned(p, id);
+      const pips = '◆'.repeat(lv) + '◇'.repeat(3-lv);
+      b.innerHTML = `<span class="k">${idx+1}</span>${sk.name} <span style="font-size:10px;color:${mine?'#c8a24a':'#c05070'}">${pips}${mine?'':' borrowed'}</span>` +
+        `${sk.cost?`<span class="cost">${sk.cost} SP</span>`:''}<span class="sub">${sk.desc}</span>`;
       b.disabled = !myTurn || sk.cost > p.sp;
       box.appendChild(b);
     });
@@ -1686,6 +1900,7 @@ function showCharSelect(){
     info.appendChild(U.make('div','stats',
       `<b>HP</b> ${b.hp} · <b>SP</b> ${b.sp} · <b>ATK</b> ${b.atk} · <b>DEF</b> ${b.def} · <b>MAG</b> ${b.mag} · <b>SPD</b> ${b.spd}<br>` +
       `Honor start: <span style="color:${Data.honorTier(c.honor).color}">${c.honor} (${Data.honorTier(c.honor).name})</span><br>` +
+      (Data.PASSIVES[id] ? `<span style="color:#9a5cc0">◈ ${Data.PASSIVES[id].name}</span> — <span style="color:#8a7f9e">${Data.PASSIVES[id].desc}</span><br>` : '') +
       `<span style="color:#8a7f9e">${c.flavor}</span>`));
     card.appendChild(info);
     card.onclick = ()=>{ G.selClass=id; for(const k in cards) cards[k].classList.toggle('sel', k===id); };
@@ -1798,7 +2013,8 @@ function renderShop(){
 
   s.appendChild(U.make('div','sect','Services · Gold'));
   const restCost=goldPrice(12+G.depth*6), medCost=goldPrice(8+G.depth*3), potCost=goldPrice(16+G.depth*2), absCost=goldPrice(20+G.depth*4);
-  const mealCost=goldPrice(6+G.depth*3), breadCost=goldPrice(10+G.depth), focusCost=goldPrice(18+G.depth*2);
+  // food is the scarcest thing down here, and the merchant knows it
+  const mealCost=goldPrice(22+G.depth*9), breadCost=goldPrice(34+G.depth*5), focusCost=goldPrice(18+G.depth*2);
   s.appendChild(shopLine('A hot meal','Eat well — FOOD restored to full',`<span class="price g">✦ ${mealCost}</span>`,
     p.gold<mealCost||p.food>=FOOD_MAX, ()=>{ p.gold-=mealCost; p.food=FOOD_MAX; log('The merchant ladles out something hot. You do not ask. It is wonderful.','good'); updateHUD(); renderShop(); }));
   s.appendChild(shopLine('Grave-Bread','A loaf for the road (+35 FOOD when eaten)',`<span class="price g">✦ ${breadCost}</span>`,
@@ -1884,18 +2100,23 @@ function buyLevel(statKey){
 // choose a new skill to learn (paid in Souls); then pick which one it replaces
 function showLearnSkill(){
   const p = G.player, cost = skillLearnCost(p), souls = Save.souls();
-  const pool = Object.keys(Data.SKILLS).filter(id => Data.SKILLS[id].learnable && !p.skills.includes(id));
+  const pool = (p.unlockPool || []).filter(id => !p.skills.includes(id));
   const s = U.make('div','sheet');
   s.appendChild(U.make('div','sect','Bind a New Skill'));
   s.appendChild(U.make('div','p dim',
-    `Burn Souls to carve a new skill into your soul for this descent — then give up one you already carry. ` +
+    `The deep offers a different handful every descent. Burn Souls to carve one into your soul — then give up one you already carry. ` +
     `Cost: <span style="color:#7fb0d0">◈ ${cost} Souls</span> · you hold <span style="color:#7fb0d0">◈ ${souls}</span>.`));
+  s.appendChild(U.make('div','p dim',
+    `<i>Anything here can be taken. But a skill that is not your class's answers at <b>40% strength</b> and never sharpens past tier 1.</i>`));
   if (!pool.length){
-    s.appendChild(U.make('div','p dim','<i>You have already learned every skill on offer.</i>'));
+    s.appendChild(U.make('div','p dim','<i>You have taken everything this descent had to offer.</i>'));
   } else {
     for (const id of pool){
       const sk = Data.SKILLS[id];
-      s.appendChild(shopLine(sk.name, `${sk.cost?sk.cost+' SP':'free'} — ${sk.desc}`,
+      const mine = skillOwned(p, id);
+      const tag = mine ? '<span style="color:#63b7a6">yours</span>' : '<span style="color:#c05070">borrowed · 40%</span>';
+      s.appendChild(shopLine(`${sk.name} <span style="font-size:10px">${tag}</span>`,
+        `${sk.cost?sk.cost+' SP':'free'} — ${sk.desc}`,
         `<span class="price s">◈ ${cost}</span>`, souls < cost, () => showSwapSkill(id)));
     }
   }
@@ -2080,8 +2301,21 @@ function showInventory(){
   }
 
   s.appendChild(U.make('div','sect','Skills'));
-  for (const id of p.skills){ const sk=Data.SKILLS[id];
-    s.appendChild(U.make('div','p dim',`<span style="color:#c8a24a">${sk.name}</span> ${sk.cost?`(${sk.cost} SP)`:'(free)'} — ${sk.desc}`)); }
+  for (const id of p.skills){
+    const sk = Data.SKILLS[id], mine = skillOwned(p, id), lv = skillLevel(p, id);
+    const pips = '<span style="color:#c8a24a">' + '◆'.repeat(lv) + '</span><span style="color:#3a3350">' + '◇'.repeat(3-lv) + '</span>';
+    const tag = mine ? '' : ' <span style="color:#c05070">· borrowed, 40% strength, cannot sharpen</span>';
+    s.appendChild(U.make('div','p dim',
+      `<span style="color:#c8a24a">${sk.name}</span> ${pips} ${sk.cost?`(${sk.cost} SP)`:'(free)'} — ${sk.desc}${tag}`));
+    if (mine && lv < 3){
+      const cost = skillUpgradeCost(p, id);
+      const b = Btn(`Sharpen ${sk.name} → tier ${lv+1}`, ()=>upgradeSkill(id), 'btn');
+      b.disabled = Save.souls() < cost;
+      b.innerHTML = `<span class="k">◈</span>Sharpen ${sk.name} → tier ${lv+1}<span class="cost">◈ ${cost}</span>`;
+      b.style.marginBottom = '6px';
+      s.appendChild(b);
+    }
+  }
 
   const potions = p.inv.filter(x=>x==='potion_heal').length;
   const breads = p.inv.filter(x=>x==='ration').length;
