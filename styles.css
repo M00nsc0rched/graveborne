@@ -20,9 +20,16 @@
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 html,body{height:100%}
+/* iOS paints the area outside the document — the home-indicator strip, and the
+   band the URL bar leaves behind — with the CANVAS background. If only <body>
+   carries one, a home-screen launch can flash and then keep a white bar down
+   there. Naming the colour on <html> as well means there is nothing white left
+   anywhere for it to fall through to. */
+html{background:#050409}
 body{
   background:
     radial-gradient(120% 80% at 50% -10%, #1a1226 0%, #0a0810 55%, #050409 100%);
+  background-color:#050409;
   color:var(--ink);
   font-family:"Consolas","Courier New",monospace;
   font-size:13px;
@@ -218,8 +225,11 @@ button{touch-action:manipulation}
   backdrop-filter:blur(1px);
 }
 .modal.hidden{display:none}
+/* Sized against the modal's own box rather than vw/vh: when the frame is turned
+   sideways for landscape play, vh still measures the upright screen, and a sheet
+   limited by it grew taller than the rotated frame and hung off both edges. */
 .sheet{
-  width:min(720px,94vw);max-height:92vh;overflow-y:auto;
+  width:min(720px,100%);max-height:100%;overflow-y:auto;
   background:linear-gradient(180deg,#17121f,#100c17);
   border:2px solid var(--edge2);border-radius:6px;padding:20px 22px;
   box-shadow:0 0 0 1px #000, 0 0 40px rgba(0,0,0,.8), inset 0 0 30px rgba(0,0,0,.5);
@@ -272,6 +282,8 @@ button{touch-action:manipulation}
 }
 @keyframes blackfade{from{opacity:0}to{opacity:1}}
 @keyframes blackline{0%{opacity:0}60%{opacity:0}100%{opacity:1}}
+/* the veil hangs off <body>, outside the rotated frame — turn its line to match */
+body.force-landscape .blackout span{transform:rotate(90deg)}
 
 .scene-art{display:block;margin:0 auto 12px;image-rendering:pixelated;width:120px;height:120px;background:#0a0810;border:2px solid var(--edge);border-radius:4px}
 
@@ -368,6 +380,29 @@ button{touch-action:manipulation}
 .touch-controls.combat{display:none !important}   /* in combat the skill buttons take the stage */
 .touch-hint{font-size:10px;color:var(--ink-dim)}
 
+/* ---------- Forced landscape ----------
+   Safari gives web apps no orientation lock, so asking the OS is not an option.
+   Instead we turn the frame ourselves: hold the phone sideways with rotation
+   lock on and the game reads the right way up. JS sets --vw/--vh to the real
+   viewport in px and only adds the class while the device is actually upright. */
+body.force-landscape #frame{
+  position:fixed;
+  top:50%;
+  left:50%;
+  width:calc(var(--vh, 100dvh) * var(--fill, 1));
+  height:calc(var(--vw, 100vw) * var(--fill, 1));
+  margin:0;
+  transform:translate(-50%,-50%) rotate(90deg);
+  transform-origin:center center;
+}
+/* rotated, the notch and home indicator are on the long edges instead */
+body.force-landscape #frame{
+  padding-left:calc(6px + env(safe-area-inset-bottom));
+  padding-right:calc(6px + env(safe-area-inset-top));
+  padding-top:calc(4px + env(safe-area-inset-left));
+  padding-bottom:calc(5px + env(safe-area-inset-right));
+}
+
 /* show touch controls on coarse-pointer devices or when JS detects touch */
 @media (hover:none) and (pointer:coarse){
   .touch-controls{display:flex}
@@ -376,15 +411,24 @@ body.touch .touch-controls{display:flex}
 
 /* ---------- Small screens (phones): everything on one screen, no page scroll ---------- */
 @media (max-width:700px){
-  body{
-    align-items:stretch;
+  /* Pinned rather than laid out: a fixed body can never end up shorter than the
+     viewport, so there is no strip below the document for iOS to paint white
+     while the toolbars settle. */
+  html,body{
+    position:fixed;
+    inset:0;
+    width:100%;
+    height:100%;
     overflow:hidden;                 /* the page never scrolls */
     overscroll-behavior:none;
   }
-  /* the frame is exactly the visible viewport; inner regions flex to fit */
+  body{align-items:stretch}
+  /* the frame is exactly the visible viewport; inner regions flex to fit.
+     --fill lets the player pull it in from the edges (Settings → Screen fill) */
   #frame{
-    width:100vw;
-    height:100dvh;
+    width:calc(100vw * var(--fill, 1));
+    height:calc(100dvh * var(--fill, 1));
+    margin:auto;
     overflow:hidden;
     padding:5px 6px;
     padding-left:calc(6px + env(safe-area-inset-left));
@@ -426,7 +470,7 @@ body.touch .touch-controls{display:flex}
   .target-row{gap:4px;margin-bottom:5px}
   .stage-btn{font-size:13px;padding:8px 12px}
 
-  .sheet{padding:14px 12px;max-height:88vh}
+  .sheet{padding:14px 12px}
   .title-big{font-size:26px;letter-spacing:5px}
   .cards{grid-template-columns:1fr}
   .codex-grid{grid-template-columns:1fr}

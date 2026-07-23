@@ -1,7 +1,7 @@
 // ================= GRAVEBORNE — main engine =================
 // shown on the title screen; keep in step with CACHE in sw.js — the game is
 // served from that cache, so the number you see is the build you're running
-const GAME_VERSION = 20;
+const GAME_VERSION = 21;
 let VW = 21, VH = 13;                 // viewport in tiles — reshaped to the stage on phones
 const TS = 16;                        // tile size in canvas pixels
 const FINAL_DEPTH = 5;
@@ -337,8 +337,68 @@ function init(){
   window.addEventListener('keydown', onKey);
   initTouchControls();
   initTuner();
+  applyDisplayOpts();
+  // the rotated layout is sized in real pixels, so it has to be re-measured
+  // whenever the viewport moves — rotation, toolbars sliding, keyboard, all of it
+  window.addEventListener('resize', applyDisplayOpts);
+  window.addEventListener('orientationchange', () => setTimeout(applyDisplayOpts, 120));
   requestAnimationFrame(loop);
   showTitle();
+}
+
+// ---- Display: how much screen the game takes, and which way up ----
+const FILL_STEPS = [
+  { v:1.00, label:'Full screen',  sub:'Edge to edge. What the game was drawn for.' },
+  { v:0.95, label:'95%',          sub:'A hair of margin, in case the edges are being eaten.' },
+  { v:0.90, label:'90%',          sub:'Comfortable inset — everything clears the corners.' },
+  { v:0.85, label:'85%',          sub:'Well clear of the notch and the home bar.' },
+  { v:0.80, label:'80%',          sub:'Smallest. Nothing can reach the screen edge.' },
+];
+function applyDisplayOpts(){
+  const o = Save.opts();
+  const root = document.documentElement, body = document.body;
+  root.style.setProperty('--fill', String(o.fill || 1));
+  // real viewport in px — the rotated frame swaps these two
+  root.style.setProperty('--vw', window.innerWidth + 'px');
+  root.style.setProperty('--vh', window.innerHeight + 'px');
+  // only turn the frame while the device is genuinely upright; if the player has
+  // already tilted the phone, rotating again would put the game on its head
+  const upright = window.innerHeight >= window.innerWidth;
+  body.classList.toggle('force-landscape', o.orient === 'landscape' && upright);
+  if (typeof fitViewport === 'function') fitViewport();
+}
+
+function showSettings(back){
+  const o = Save.opts();
+  const s = U.make('div','sheet');
+  s.appendChild(U.make('div','sect','Settings'));
+
+  s.appendChild(U.make('div','sect','Screen fill'));
+  s.appendChild(U.make('div','p dim','How much of the phone the game is allowed to take. Pull it in if the edges of your screen are cutting anything off.'));
+  for (const st of FILL_STEPS){
+    const on = Math.abs((o.fill || 1) - st.v) < 0.001;
+    s.appendChild(shopLine(`${on ? '◈ ' : ''}${st.label}`, st.sub, '', false,
+      ()=>{ Save.setOpt('fill', st.v); applyDisplayOpts(); showSettings(back); }));
+  }
+
+  s.appendChild(U.make('div','sect','Orientation'));
+  s.appendChild(U.make('div','p dim','Phones give web apps no way to ask the system for landscape, so the game turns itself instead. Pick landscape, lock your phone\'s rotation, and hold it sideways.'));
+  for (const [key, label, sub] of [
+    ['auto','Upright','Follow the phone. Portrait when the phone is portrait.'],
+    ['landscape','Landscape','Turn the game on its side. Hold the phone sideways to play.'],
+  ]){
+    const on = (o.orient || 'auto') === key;
+    s.appendChild(shopLine(`${on ? '◈ ' : ''}${label}`, sub, '', false,
+      ()=>{ Save.setOpt('orient', key); applyDisplayOpts(); showSettings(back); }));
+  }
+
+  const row = U.make('div','row');
+  row.appendChild(Btn('Reset to full & upright', ()=>{
+    Save.setOpt('fill', 1); Save.setOpt('orient', 'auto'); applyDisplayOpts(); showSettings(back);
+  }, 'btn center'));
+  row.appendChild(Btn('Back', ()=>{ hideModal(); (back || showTitle)(); }, 'btn center'));
+  s.appendChild(row);
+  setModal(s);
 }
 
 // ---------------- touch controls (phones/tablets) ----------------
@@ -2221,6 +2281,7 @@ function showTitle(){
   row.appendChild(Btn('Begin Descent', showCharSelect, 'btn center'));
   row.appendChild(Btn('Sanctum ◈', showSanctum, 'btn center'));
   row.appendChild(Btn('Codex', ()=>showCodex(false), 'btn center'));
+  row.appendChild(Btn('Settings', ()=>showSettings(showTitle), 'btn center'));
   s.appendChild(row);
   s.appendChild(U.make('div','p center dim', 'v' + GAME_VERSION));
   setModal(s);
@@ -2745,6 +2806,7 @@ function showMenu(){
     hideModal(); renderActions();
   }, 'btn'));
   list.appendChild(Btn('Codex of Encounters', ()=>{ hideModal(); showCodex(true); }, 'btn', 'C'));
+  list.appendChild(Btn('Settings — screen & orientation', ()=>showSettings(showMenu), 'btn'));
   list.appendChild(Btn('Abandon Run', confirmAbandon, 'btn danger'));
   s.appendChild(list);
 
