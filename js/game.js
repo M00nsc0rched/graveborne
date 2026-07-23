@@ -1,7 +1,7 @@
 // ================= GRAVEBORNE — main engine =================
 // shown on the title screen; keep in step with CACHE in sw.js — the game is
 // served from that cache, so the number you see is the build you're running
-const GAME_VERSION = 23;
+const GAME_VERSION = 24;
 let VW = 21, VH = 13;                 // viewport in tiles — reshaped to the stage on phones
 const TS = 16;                        // tile size in canvas pixels
 const FINAL_DEPTH = 5;
@@ -826,6 +826,8 @@ function move(dx, dy){
     if (e.type === 'enemy'){ startCombat(e); return; }
     if (e.type === 'guardian'){ guardianConfront(e); return; }
     if (e.type === 'event'){ triggerEvent(e.eventId, e); return; }
+    if (e.type === 'npc'){ if (e.npc === 'potionmaker') potionMaker(e); return; }   // stays put
+    if (e.type === 'plant'){ collectPlant(e); return; }   // gathered where it grows
     if (e.type === 'chest'){ openChest(e); return; }   // stays in place; open then removed
     if (e.type === 'stairs'){ descend(); return; }
     // torches and props are scenery: you walk straight past them, so dressing
@@ -890,6 +892,127 @@ function openChest(e){
   }
   G.floor.removeEntity(e);
   updateHUD();
+}
+
+// ---- The Potion-Maker: "One drink and the pain goes away." ----
+// A persistent NPC who asks for three herbs found on this floor — two scattered
+// about, one that only grows where the floor's keeper falls. Bring all three
+// back for 15 Souls.
+function randomFloorSpot(f){
+  for (const r of U.shuffle((f.rooms || []).slice())){
+    for (let t = 0; t < 12; t++){
+      const x = U.randInt(r.x, r.x + r.w - 1), y = U.randInt(r.y, r.y + r.h - 1);
+      if (f.tileAt(x,y) === TILE.FLOOR && !f.entityAt(x,y) && !(x===G.player.x && y===G.player.y)) return { x, y };
+    }
+  }
+  for (let t = 0; t < 200; t++){ const x = U.randInt(1,f.w-2), y = U.randInt(1,f.h-2);
+    if (f.tileAt(x,y) === TILE.FLOOR && !f.entityAt(x,y)) return { x, y }; }
+  return null;
+}
+function freeNearby(x, y){
+  const f = G.floor;
+  for (const [dx,dy] of [[0,0],[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,-1],[1,-1],[-1,1]]){
+    if (f.tileAt(x+dx,y+dy) === TILE.FLOOR && !f.entityAt(x+dx,y+dy)) return { x:x+dx, y:y+dy };
+  }
+  return null;
+}
+function activePotionQuest(){
+  return G.floor && G.floor.entities.find(e => e.type==='npc' && e.quest && e.quest.stage==='active');
+}
+function collectPlant(e){
+  const npc = activePotionQuest(), nm = Data.PLANTS[e.plant].name;
+  if (npc && npc.quest.plants.includes(e.plant) && !npc.quest.have.includes(e.plant)){
+    npc.quest.have.push(e.plant);
+    log(`You gather ${nm}. (${npc.quest.have.length}/3 for the potion-maker)`, 'good');
+  } else {
+    log(`You gather a sprig of ${nm}.`, 'dim');
+  }
+  floatOn(true, Data.PLANTS[e.plant].glyph, Data.PLANTS[e.plant].color);
+  G.floor.removeEntity(e);
+  updateHUD();
+}
+// the keeper's herb pushes up where it fell — called when a guardian is slain
+function dropGuardianPlant(x, y, keeperName){
+  const npc = activePotionQuest();
+  if (!npc || npc.quest.guardianDropped) return;
+  const gp = npc.quest.guardianPlant;
+  if (!gp || npc.quest.have.includes(gp)) return;
+  npc.quest.guardianDropped = true;
+  const spot = freeNearby(x, y) || { x, y };
+  G.floor.entities.push({ type:'plant', plant:gp, x:spot.x, y:spot.y, fromGuardian:true });
+  log(`Where ${keeperName} fell, something pale roots into the wet stone — ${Data.PLANTS[gp].name}. The potion-maker wanted that one.`, 'mag');
+}
+function acceptPotionQuest(e){
+  const q = e.quest, f = G.floor;
+  q.stage = 'active'; q.have = q.have || [];
+  const guardianAlive = f.entities.some(en => en.type === 'guardian');
+  // scatter every requested plant except the keeper's — unless the keeper is
+  // already dead, in which case its herb has grown too, so scatter that as well
+  for (const pl of q.plants){
+    if (pl === q.guardianPlant && guardianAlive) continue;
+    const spot = randomFloorSpot(f);
+    if (spot) f.entities.push({ type:'plant', plant:pl, x:spot.x, y:spot.y });
+  }
+  if (!guardianAlive) q.guardianDropped = true;
+  log('The potion-maker marks three sprigs on a scrap of vellum and presses it into your hand.', 'mag');
+  log(guardianAlive
+    ? 'Two grow somewhere on this floor. The third waits where the keeper falls.'
+    : 'All three grow somewhere on this floor — the keeper is already down.', 'dim');
+  renderActions();
+}
+function potionMaker(e){
+  const q = e.quest;
+  G.state = 'EVENT';
+  const close = () => { hideModal(); G.state = 'EXPLORE'; G.busy = false; renderActions(); };
+  const s = U.make('div','sheet');
+  const art = U.make('canvas'); art.width = 120; art.height = 120; art.className = 'scene-art';
+  s.appendChild(art); Sprites.toCanvas(art, 'npc_alchemist', 9);
+  s.appendChild(U.make('div','sect','The Potion-Maker'));
+
+  if (q.stage === 'done'){
+    s.appendChild(U.make('div','p','“One drink, and the pain goes away. You look better for it already. Mind how you go, down there.”'));
+    const row = U.make('div','row'); row.appendChild(Btn('Leave', close, 'btn center')); s.appendChild(row);
+    setModal(s); return;
+  }
+
+  if (q.stage === 'active'){
+    if (q.plants.every(pl => q.have.includes(pl))){
+      Save.addSouls(15); q.stage = 'done'; updateHUD();
+      s.appendChild(U.make('div','p','You empty your gatherings onto the bench. Quick, sure fingers sort them, and something in the mortar starts to glow.'));
+      s.appendChild(U.make('div','p','“That\'s the three. One drink, and the pain goes away — for a while. Here. You earned it.”'));
+      const tag = U.make('div'); tag.style.margin = '6px 0';
+      tag.appendChild(U.make('span','tag mag','✦ 15 Souls'));
+      s.appendChild(tag);
+      const row = U.make('div','row'); row.appendChild(Btn('Take the Souls', close, 'btn center good')); s.appendChild(row);
+      setModal(s); return;
+    }
+    s.appendChild(U.make('div','p','“Still short. I can\'t brew with a bare bench.”'));
+    s.appendChild(U.make('div','p', q.plants.map(pl => {
+      const got = q.have.includes(pl);
+      const where = pl === q.guardianPlant ? ' <span class="dim">(where the keeper falls)</span>' : '';
+      return `${got ? '<span style="color:#6fbf6a">✔</span>' : '<span style="color:#c05070">✗</span>'} ` +
+             `<span style="color:${Data.PLANTS[pl].color}">${Data.PLANTS[pl].glyph}</span> ${Data.PLANTS[pl].name}${where}`;
+    }).join('<br>')));
+    const row = U.make('div','row'); row.appendChild(Btn('Keep looking', close, 'btn center')); s.appendChild(row);
+    setModal(s); return;
+  }
+
+  // stage 'offer' — settle on the three herbs the first time we ask
+  if (!q.plants){
+    const keys = U.shuffle(Object.keys(Data.PLANTS)).slice(0, 3);
+    q.plants = keys; q.guardianPlant = keys[2]; q.have = [];
+  }
+  s.appendChild(U.make('div','p','A figure hunched over a portable bench of bottles and burners looks up. “You\'ve the look of someone in pain. I can fix that — one drink, and it goes away. But I\'m out of what it takes.”'));
+  s.appendChild(U.make('div','p','“Bring me three things that grow on this floor:”'));
+  s.appendChild(U.make('div','p', q.plants.map(pl => {
+    const where = pl === q.guardianPlant ? ' <span class="dim">— that one only pushes up where the floor\'s keeper falls</span>' : '';
+    return `<span style="color:${Data.PLANTS[pl].color}">${Data.PLANTS[pl].glyph}</span> ${Data.PLANTS[pl].name}${where}`;
+  }).join('<br>')));
+  const row = U.make('div','row');
+  row.appendChild(Btn('“I\'ll bring them.”', () => { acceptPotionQuest(e); close(); }, 'btn center good'));
+  row.appendChild(Btn('Not now', close, 'btn center'));
+  s.appendChild(row);
+  setModal(s);
 }
 
 // heat climbs while Marked (faster the deeper your dishonor), decays otherwise
@@ -1659,6 +1782,8 @@ function win(){
       G.floor.guardianSlain = true;
       log('The floor knows. What still crawls here has seen what you did to its keeper — it comes at you smaller now.', 'mag');
     }
+    // the potion-maker's keeper-herb grows where the guardian fell
+    dropGuardianPlant(c.origin.x, c.origin.y, en.name);
   } else if (en.elite){
     grantItem(en.drop || Data.rollItemId(3));
     p.inv.push('potion_heal'); log('The elite\'s cache holds a Draught of Mending.', 'good');
@@ -2080,6 +2205,14 @@ function renderExplore(){
       const ic = Data.EVENT_ICONS[e.eventId] || { g:'!', c:'#c8a24a' };
       drawMarker(sx, sy, ic.g, ic.c); }
     else if (e.type === 'chest'){ if (!seen) continue; Sprites.draw(ctx, 'obj_chest', sx+2, sy+2, 1); }
+    else if (e.type === 'npc'){ if (!seen) continue; Sprites.draw(ctx, 'npc_alchemist', sx+2, sy+2, 1);
+      // a quest glyph floats over the potion-maker: ? to offer, … while you gather
+      if (e.quest && e.quest.stage !== 'done'){
+        const g = e.quest.stage === 'active' ? '…' : '?';
+        drawMarker(sx, sy-7, g, e.quest.stage === 'active' ? '#7fae3a' : '#c8a24a'); } }
+    else if (e.type === 'plant'){ if (!seen) continue;
+      const bob = Math.sin(G.time/260 + e.x*2) > 0.4 ? 1 : 0;
+      Sprites.draw(ctx, 'obj_herb', sx+2, sy+2 - bob, 1); }
     else if (e.type === 'stairs'){ if (!seen) continue; Sprites.draw(ctx, 'obj_stairs', sx+2, sy+2, 1); }
     else if (e.type === 'prop'){ if (!seen) continue; Sprites.draw(ctx, e.sprite, sx+2, sy+2, 1); }
     else if (e.type === 'torch'){ if (!vis) continue; const fl = Math.sin(G.time/120 + e.x)*0.5+0.5; Sprites.draw(ctx, 'obj_torch', sx+2, sy+2 - (fl>0.6?1:0), 1); }
@@ -2107,6 +2240,10 @@ function renderExplore(){
   for (const e of f.entities){ if (e.type==='prop' && e.ritual && f.visible[f.idx(e.x,e.y)]){
     const fl = Math.sin(G.time/300)*0.15+0.85;
     radial((e.x-camX)*TS+8, (e.y-camY)*TS+8, 52, `rgba(154,92,192,${0.22*fl})`); } }
+  // a quest herb glows faintly so a needed sprig can be spotted across a lit room
+  for (const e of f.entities){ if (e.type==='plant' && f.visible[f.idx(e.x,e.y)]){
+    const fl = Math.sin(G.time/220 + e.x)*0.2+0.8;
+    radial((e.x-camX)*TS+8, (e.y-camY)*TS+8, 26, `rgba(120,200,120,${0.26*fl})`); } }
   ctx.globalCompositeOperation = 'source-over';
   vignette();
 }

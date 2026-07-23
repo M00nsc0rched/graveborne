@@ -196,6 +196,16 @@ function makeDungeon(depth, opts){
     if (p) d.entities.push({ type:'chest', x:p.x, y:p.y, tier:U.clamp(Math.ceil(depth/2), 1, 3) });
   }
 
+  // --- the potion-maker sets up on some non-final floors, with a herb quest ---
+  // (final floors end at the boss, so there is no coming back to hand plants in)
+  if (!isFinal && Data.PLANTS && U.chance(0.5)){
+    const cand = U.shuffle(rooms.filter((r,i) => i !== FEATURE && i !== startIdx));
+    for (const room of cand){
+      const p = randInRoom(room);
+      if (p){ d.entities.push({ type:'npc', npc:'potionmaker', x:p.x, y:p.y, quest:{ stage:'offer' } }); break; }
+    }
+  }
+
   // --- hazards: biome-scarred tiles in small clusters (visible, walkable, dangerous) ---
   const hazardClusters = U.clamp(3 + depth, 4, 9);
   for (let c = 0; c < hazardClusters; c++){

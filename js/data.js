@@ -600,6 +600,19 @@ const CONSUMABLES = {
   strange_meat:{ id:'strange_meat', name:'Strange Meat', food:60, risky:true, desc:'Unlabeled, generous, still faintly warm. Restores 60 FOOD. Ask nothing.' },
 };
 
+// ---------- Quest herbs: what the potion-maker sends you gathering ----------
+// Each floor's request draws three of these; the last is the one that only
+// pushes up where the floor's keeper (its guardian) falls.
+const PLANTS = {
+  bloodroot:  { name:'Bloodroot',      glyph:'✿', color:'#c05070' },
+  gravemoss:  { name:'Gravemoss',      glyph:'❧', color:'#7fae3a' },
+  wickthorn:  { name:'Wickthorn',      glyph:'✤', color:'#c8a24a' },
+  nightcap:   { name:'Nightcap',       glyph:'❀', color:'#9a5cc0' },
+  ashen_lily: { name:'Ashen Lily',     glyph:'✽', color:'#c9bfd6' },
+  weepwort:   { name:'Weepwort',       glyph:'❦', color:'#7fb0d0' },
+  gallowvine: { name:'Gallowvine',     glyph:'☙', color:'#6fbf6a' },
+};
+
 // ---------- Item sets ----------
 // Each piece is deliberately the feeblest thing in its slot. Wear all three and
 // the set outclasses any legendary — the whole point is the commitment.
@@ -1651,7 +1664,7 @@ const SANCTUM = [
   { id:'favor',     name:"Merchant's Favor",   desc:'Shop Gold prices −10%, per rank.',           max:2, base:30, growth:20 },
 ];
 
-const Data = { SKILLS, PASSIVES, CLASSES, FOLLOWERS, ENEMIES, EVENT_ICONS, SETS, RARITY, ITEMS, CONSUMABLES, ITEM_POOL, HUNTER_POOL, BIOME_ELITES, BIOME_GUARDIANS, BIOME_PROPS, HONOR_TIERS, EVENTS, CODEX, SANCTUM, BIOMES, WHISPERS, DISCOURAGEMENTS, DESERTIONS,
+const Data = { SKILLS, PASSIVES, CLASSES, FOLLOWERS, ENEMIES, EVENT_ICONS, SETS, RARITY, ITEMS, CONSUMABLES, PLANTS, ITEM_POOL, HUNTER_POOL, BIOME_ELITES, BIOME_GUARDIANS, BIOME_PROPS, HONOR_TIERS, EVENTS, CODEX, SANCTUM, BIOMES, WHISPERS, DISCOURAGEMENTS, DESERTIONS,
   honorTier(h){ for (const t of HONOR_TIERS){ if (h >= t.min) return t; } return HONOR_TIERS[HONOR_TIERS.length-1]; },
   enemyPool(depth){
     const ids = [];

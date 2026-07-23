@@ -949,6 +949,36 @@ const SPR = {
     "  KKKKKKKK  ",
     "            ",
   ],
+  // the potion-maker: a hooded figure hunched over a glowing vial
+  npc_alchemist: [
+    "    KKKK    ",
+    "   KppppK   ",
+    "  KpMllMpK  ",
+    "  KpllllpK  ",
+    "  KppllppK  ",
+    "  KppppppK  ",
+    "  KpGCCGpK  ",
+    " BKpGCCGpK  ",
+    " CKppppppK  ",
+    "  Kpp  ppK  ",
+    "  KK    KK  ",
+    "            ",
+  ],
+  // a quest herb — a little sprig you gather off the floor
+  obj_herb: [
+    "            ",
+    "     e      ",
+    "    eEe     ",
+    "   eEvEe    ",
+    "  eEvyvEe   ",
+    "   evEve    ",
+    "    vEv     ",
+    "     v      ",
+    "     v      ",
+    "    nvn     ",
+    "   KnnnK    ",
+    "            ",
+  ],
   // a standing column — used to ring the larger halls and arenas
   obj_pillar: [
     "    KKKK    ",
