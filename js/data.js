@@ -211,10 +211,13 @@ const SKILLS = {
 // ---------- Class passives ----------
 // One signature rule per class, always on, no button to press.
 const PASSIVES = {
-  mage:   { name:'Wellspring',  desc:'+5 SP every step out of combat — but the burning leaves you hungry twice as fast.' },
-  knight: { name:'Oathbound',   desc:'Against the undead you open every fight already braced: a shield and your fury up.' },
-  warden: { name:'Last Vigil',  desc:'Once per descent a killing blow leaves you at 1 HP — then you have 2 turns to finish the foe, or it finishes you.' },
-  rogue:  { name:"Cutthroat's Luck", desc:'Each fight the coin picks one: every strike bleeds, or your critical hits land far harder.' },
+  mage: [
+    { name:'Wellspring', desc:'+5 SP every step out of combat — but the burning leaves you hungry twice as fast.' },
+    { name:'Accretion',  desc:'Every fight you win teaches her something: +5 to one random stat and +5 power to one random skill, for the rest of the descent.' },
+  ],
+  knight: [ { name:'Oathbound', desc:'Against the undead you open every fight already braced: a shield and your fury up.' } ],
+  warden: [ { name:'Last Vigil', desc:'Once per descent a killing blow leaves you at 1 HP — then you have 2 turns to finish the foe, or it finishes you.' } ],
+  rogue:  [ { name:"Cutthroat's Luck", desc:'Each fight the coin picks one: every strike bleeds, or your critical hits land far harder.' } ],
 };
 
 const CLASSES = {

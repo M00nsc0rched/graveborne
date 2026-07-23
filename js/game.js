@@ -1,7 +1,7 @@
 // ================= GRAVEBORNE — main engine =================
 // shown on the title screen; keep in step with CACHE in sw.js — the game is
 // served from that cache, so the number you see is the build you're running
-const GAME_VERSION = 15;
+const GAME_VERSION = 16;
 let VW = 21, VH = 13;                 // viewport in tiles — reshaped to the stage on phones
 const TS = 16;                        // tile size in canvas pixels
 const FINAL_DEPTH = 5;
@@ -173,7 +173,12 @@ function skillAction(p, id){
   const sk = Data.SKILLS[id];
   const lv = skillLevel(p, id);
   const a = Object.assign({ name:sk.name, type:sk.type, _id:id, _lv:lv }, (sk.lv && sk.lv[lv-1]) || {});
-  if (skillOwned(p, id)) return a;
+  // power earned in the field (the Witch's Accretion) sits on top of the tier
+  const earned = (p.skillBonus && p.skillBonus[id]) || 0;
+  if (skillOwned(p, id)){
+    if (earned && a.power) a.power += earned;
+    return a;
+  }
   a.borrowed = true;
   const s = OFF_CLASS_SCALE;
   if (a.power)    a.power    = Math.max(1, Math.round(a.power * s));
@@ -183,6 +188,7 @@ function skillAction(p, id){
   if (a.execute)  a.execute  = a.execute * s;
   if (a.shield != null) a.shield = (typeof a.shield === 'string')
     ? scaleShieldSpec(a.shield, s) : Math.max(1, Math.round(a.shield * s));
+  if (earned && a.power) a.power += earned;   // power earned in the field survives the penalty
   if (a.effect){
     const e = a.effect = Object.assign({}, a.effect);
     if (e.poison)  e.poison  = Object.assign({}, e.poison,  { dmg: Math.max(1, Math.round(e.poison.dmg  * s)) });
@@ -404,7 +410,7 @@ function newPlayer(classId){
     statuses:{}, shield:0, x:0, y:0, dir:1, allies:[],
     heat:0, reinforceCd:null, pocketCoin:false,
     level:1, skillsBought:0,
-    skillLv:{}, unlockPool:[],          // per-skill tiers, and this run's Soul offers
+    skillLv:{}, unlockPool:[], skillBonus:{},   // per-skill tiers, run offers, earned power
     vigilUsed:false, vigilTurns:0,      // the Warden's one refusal of death
     follower:null, followerLost:false,
   };
@@ -1139,6 +1145,33 @@ function resolveAction(src, dst, action, srcIsPlayer){
   }
 }
 
+// Hollow Witch — Accretion: she takes something from everything she kills.
+// One random stat and one random skill grow, and both last the whole descent.
+function witchAccretion(){
+  const p = G.player;
+  const [key, label] = U.choice([
+    ['baseHp','Max HP'], ['baseSp','Max SP'], ['baseAtk','ATK'],
+    ['baseDef','DEF'], ['baseMag','MAG'], ['baseSpd','SPD'],
+  ]);
+  p[key] += 5;
+  recomputeStats(p);
+  if (key === 'baseHp') p.hp = Math.min(p.maxhp, p.hp + 5);
+  if (key === 'baseSp') p.sp = Math.min(p.maxsp, p.sp + 5);
+
+  // prefer a skill that can actually carry the extra weight
+  const usable = p.skills.filter(sid => {
+    const sk = Data.SKILLS[sid];
+    return sk && sk.lv && sk.lv.some(l => l.power);
+  });
+  const id = U.choice(usable.length ? usable : p.skills);
+  p.skillBonus = p.skillBonus || {};
+  p.skillBonus[id] = (p.skillBonus[id] || 0) + 5;
+
+  log(`Accretion — the kill leaves something behind: +5 ${label}, and ${Data.SKILLS[id].name} strikes 5 heavier.`, 'mag');
+  floatOn(true, `+5 ${label}`, '#9a5cc0');
+  updateHUD();
+}
+
 // the Gravethief's coin, bleed side: every strike this fight opens a wound
 function rogueBleed(src, dst, srcIsPlayer){
   if (!srcIsPlayer || !G.combat || G.combat.luck !== 'bleed' || dst === G.player) return;
@@ -1406,6 +1439,7 @@ function win(){
     p.vigilTurns = 0;
     log('You end it inside the vigil. The light lets go, and leaves you the life you are standing in.', 'gold');
   }
+  if (p.classId === 'mage') witchAccretion();   // every victory teaches her something
   const mods = lootMods();
   let gold = U.randInt(en.gold[0], en.gold[1]);
   gold = Math.max(1, Math.round(gold * mods.goldMult * (en.hunter ? 1.4 : 1)));
@@ -2022,7 +2056,8 @@ function showCharSelect(){
     info.appendChild(U.make('div','stats',
       `<b>HP</b> ${b.hp} · <b>SP</b> ${b.sp} · <b>ATK</b> ${b.atk} · <b>DEF</b> ${b.def} · <b>MAG</b> ${b.mag} · <b>SPD</b> ${b.spd}<br>` +
       `Honor start: <span style="color:${Data.honorTier(c.honor).color}">${c.honor} (${Data.honorTier(c.honor).name})</span><br>` +
-      (Data.PASSIVES[id] ? `<span style="color:#9a5cc0">◈ ${Data.PASSIVES[id].name}</span> — <span style="color:#8a7f9e">${Data.PASSIVES[id].desc}</span><br>` : '') +
+      ((Data.PASSIVES[id] || []).map(pv =>
+        `<span style="color:#9a5cc0">◈ ${pv.name}</span> — <span style="color:#8a7f9e">${pv.desc}</span><br>`).join('')) +
       `<span style="color:#8a7f9e">${c.flavor}</span>`));
     card.appendChild(info);
     card.onclick = ()=>{ G.selClass=id; for(const k in cards) cards[k].classList.toggle('sel', k===id); };
@@ -2596,8 +2631,10 @@ function showInventory(){
     const sk = Data.SKILLS[id], mine = skillOwned(p, id), lv = skillLevel(p, id);
     const pips = '<span style="color:#c8a24a">' + '◆'.repeat(lv) + '</span><span style="color:#3a3350">' + '◇'.repeat(3-lv) + '</span>';
     const tag = mine ? '' : ' <span style="color:#c05070">· borrowed, 40% strength, cannot sharpen</span>';
+    const earned = (p.skillBonus && p.skillBonus[id]) || 0;
+    const earnedTag = earned ? ` <span style="color:#9a5cc0">+${earned} earned</span>` : '';
     s.appendChild(U.make('div','p dim',
-      `<span style="color:#c8a24a">${sk.name}</span> ${pips} ${sk.cost?`(${sk.cost} SP)`:'(free)'} — ${sk.desc}${tag}`));
+      `<span style="color:#c8a24a">${sk.name}</span> ${pips}${earnedTag} ${sk.cost?`(${sk.cost} SP)`:'(free)'} — ${sk.desc}${tag}`));
     if (mine && lv < 3){
       const cost = skillUpgradeCost(p, id);
       const b = Btn(`Sharpen ${sk.name} → tier ${lv+1}`, ()=>upgradeSkill(id), 'btn');

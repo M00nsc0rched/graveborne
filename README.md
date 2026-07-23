@@ -178,6 +178,7 @@ One signature rule each, always on:
 | Class | Passive | What it does |
 |---|---|---|
 | **Hollow Witch** | Wellspring | **+5 SP every step** out of combat — but she burns food **twice as fast** |
+| **Hollow Witch** | Accretion | Every fight she wins leaves something behind: **+5 to one random stat and +5 power to one random skill**, kept for the rest of the descent |
 | **Ashen Knight** | Oathbound | Against **undead**, every fight opens with a shield *and* his fury already up |
 | **Oathwarden** | Last Vigil | **Once per descent** a killing blow leaves him on 1 HP — then **2 turns** to finish the foe. Kill it and he keeps that life; fail and it is over |
 | **Gravethief** | Cutthroat's Luck | Each fight a coin picks one: **every strike bleeds** (ATK×2+5 a turn), or **critical hits bite 10% deeper** |
