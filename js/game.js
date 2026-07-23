@@ -1,7 +1,7 @@
 // ================= GRAVEBORNE — main engine =================
 // shown on the title screen; keep in step with CACHE in sw.js — the game is
 // served from that cache, so the number you see is the build you're running
-const GAME_VERSION = 17;
+const GAME_VERSION = 18;
 let VW = 21, VH = 13;                 // viewport in tiles — reshaped to the stage on phones
 const TS = 16;                        // tile size in canvas pixels
 const FINAL_DEPTH = 5;
@@ -37,8 +37,10 @@ const FOLLOWER_FOOD_MAX = 100, FOLLOWER_FOOD_DRAIN = 0.28;
 
 function makeFollower(id){
   const d = Data.FOLLOWERS[id];
+  const skills = d.skills || [d.skill];    // most know one trick; some know three
   return {
-    id, name:d.name, sprite:d.sprite, skill:d.skill,
+    id, name:d.name, sprite:d.sprite, skill:skills[0], skills,
+    flees:!!d.flees,                       // she leaves instead of dying, and your name survives it
     maxhp:d.base.hp, hp:d.base.hp, maxsp:d.base.sp, sp:d.base.sp,
     atk:d.base.atk, def:d.base.def, mag:d.base.mag, spd:d.base.spd,
     food:FOLLOWER_FOOD_MAX, statuses:{}, shield:0,
@@ -47,9 +49,13 @@ function makeFollower(id){
 }
 function recruitFollower(id){
   const p = G.player;
-  p.follower = makeFollower(id || U.choice(Object.keys(Data.FOLLOWERS)));
+  // the random draw never turns up someone who only walks with one kind of person
+  const open = Object.keys(Data.FOLLOWERS).filter(k => !Data.FOLLOWERS[k].only);
+  p.follower = makeFollower(id || U.choice(open));
   log(`${p.follower.name} falls in half a step behind your shoulder.`, 'mag');
-  log('They carry their own pack, and it is not deep. Keep them fed. Keep them standing.', 'dim');
+  log(p.follower.flees
+    ? 'She carries her own pack and her own way out. Keep her fed — but she will not die for you, and you should not ask her to.'
+    : 'They carry their own pack, and it is not deep. Keep them fed. Keep them standing.', 'dim');
   return p.follower;
 }
 function followerAlive(){ const p = G.player; return !!(p && p.follower && p.follower.hp > 0); }
@@ -59,12 +65,27 @@ function followerHunger(fo){ return fo.food <= 0 ? 3 : fo.food <= 20 ? 2 : fo.fo
 function followerDies(reason){
   const p = G.player, fo = p.follower;
   if (!fo) return;
+  if (fo.flees){ followerFlees(); return; }   // some of them were never going to die for you
   log(`${fo.name} goes down${reason ? ' — ' + reason : ''}.`, 'bad');
   log('They followed you here because you let them. Whatever your name was worth, it is worth nothing now.', 'bad');
   p.honor = -100;                          // the absolute floor, no argument, no climb-back discount
   p.followerLost = true;
   discoverCodex('follower_lost');
   p.follower = null;
+  updateHUD(); renderActions();
+}
+
+// Eliza's arrangement: when it goes badly enough she is simply gone, out through
+// whatever crack she found on the way in. No body, no honor owed — and no coming
+// back this descent, either.
+function followerFlees(){
+  const p = G.player, fo = p.follower;
+  if (!fo) return;
+  log(`${fo.name} is not where she was standing.`, 'mag');
+  log('No body, no blood, no sound of it happening — only a draught from a crack in the wall you had not noticed. She got out. She always does.', 'dim');
+  p.follower = null;
+  p.followerFled = true;                   // she does not turn up again this descent
+  discoverCodex('eliza_gone');
   updateHUD(); renderActions();
 }
 
@@ -79,15 +100,53 @@ function updateFollowerUpkeep(){
   }
 }
 
+// which of their tricks they reach for this round
+function followerPick(fo, en){
+  const ids = (fo.skills && fo.skills.length ? fo.skills : [fo.skill]).filter(id => Data.SKILLS[id]);
+  const afford = ids.filter(id => Data.SKILLS[id].cost <= fo.sp);
+  if (!afford.length) return null;
+  // charm first, but only while the hold is not already on it — repeating it is waste
+  const charm = afford.find(id => Data.SKILLS[id].type === 'steal');
+  if (charm && !en.statuses.charmed) return charm;
+  const rest = afford.filter(id => Data.SKILLS[id].type !== 'steal');
+  return rest.length ? U.choice(rest) : null;
+}
+
+// she asks it for what it is swinging with, and it hands the stuff over
+function followerCharm(fo, en, spec){
+  const great = !!(en.boss || en.guardian);
+  const pct = great ? spec.bossPct : spec.stealPct;
+  const atk = Math.max(1, Math.round(en.atk * pct));
+  const mag = Math.max(0, Math.round(en.mag * pct));
+  en.statuses.charmed = { atk, mag, turns:spec.turns };
+  G.player.statuses.charmGain = { atk, mag, turns:spec.turns };
+  log(`${fo.name} says something to ${en.name} that you do not catch, and smiles.`, 'mag');
+  log(great
+    ? `It is far too old to be flattered — but it gives up ${atk} ATK${mag?` and ${mag} MAG`:''} to you anyway, for ${spec.turns} turns.`
+    : `It forgets what it came here to do. ${atk} ATK${mag?` and ${mag} MAG`:''} passes from it to you for ${spec.turns} turns.`, 'good');
+  floatOn(false, 'charmed', '#d59cf0');
+  floatOn(true, `+${atk} ATK`, '#d59cf0');
+}
+
 // they answer before the foe does
 function followerAct(){
   const fo = G.player.follower, en = G.combat && G.combat.enemy;
   if (!en || !followerAlive()) return;
-  const sk = Data.SKILLS[fo.skill] || Data.SKILLS.strike;
+  const starving = followerHunger(fo) >= 2;
+  const pick = starving ? null : followerPick(fo, en);
+  const sk = Data.SKILLS[pick] || Data.SKILLS[fo.skill] || Data.SKILLS.strike;
+
+  // Charm is not a blow — it moves the fight without landing on anyone
+  if (pick && sk.type === 'steal'){
+    fo.sp -= sk.cost;
+    followerCharm(fo, en, (sk.lv && sk.lv[0]) || { stealPct:0.5, bossPct:0.05, turns:3 });
+    return;
+  }
+
   // followers wield their skill at its first tier
   const base = Object.assign({ name:sk.name, type:sk.type }, (sk.lv && sk.lv[0]) || {});
-  let action = base, starving = followerHunger(fo) >= 2;
-  if (sk.cost > fo.sp || starving) action = { name:'a desperate swing', type:'attack', power:8 };
+  let action = base;
+  if (!pick) action = { name:'a desperate swing', type:'attack', power:8 };
   else fo.sp -= sk.cost;
   if (!action.power) action = Object.assign({}, action, { power: 8 });   // buffs/heals become a plain swing
   let dmg = (action.type === 'magic')
@@ -110,7 +169,7 @@ function enemyTurnsOnFollower(move){
   const fo = G.player.follower, en = G.combat.enemy;
   if (!followerAlive()) return false;
   if (move.type !== 'attack' && move.type !== 'magic') return false;
-  let dmg = (move.type === 'magic') ? move.power*en.mag/10 - fo.def*0.25 : move.power*effAtk(en)/10 - fo.def*0.5;
+  let dmg = (move.type === 'magic') ? move.power*effMag(en)/10 - fo.def*0.25 : move.power*effAtk(en)/10 - fo.def*0.5;
   dmg *= U.rand(0.9, 1.1);
   dmg = Math.max(1, Math.round(dmg));
   fo.hp -= dmg;
@@ -412,7 +471,8 @@ function newPlayer(classId){
     level:1, skillsBought:0,
     skillLv:{}, unlockPool:[], skillBonus:{},   // per-skill tiers, run offers, earned power
     vigilUsed:false, vigilTurns:0,      // the Warden's one refusal of death
-    follower:null, followerLost:false,
+    follower:null, followerLost:false, followerFled:false,
+    eventsUsed:{},                      // encounters you only get one of per descent
   };
   applySanctum(p);
   recomputeStats(p);
@@ -552,6 +612,7 @@ function enterFloor(){
     const ev = Data.EVENTS[k];
     if (ev.require && ev.require !== align) return false;
     if (ev.biome && ev.biome !== G.biome) return false;
+    if (ev.once && G.player.eventsUsed && G.player.eventsUsed[k]) return false;   // met once, and once only
     return true;
   });
   const eventKeys = [
@@ -977,7 +1038,10 @@ function startCombat(entity, ambush){
 }
 function ambress(a){ return a ? 'It ambushes you! ' : ''; }
 
-function effAtk(c){ let a=c.atk + (c.statuses.atkbuff?c.statuses.atkbuff.amt:0) - (c.statuses.weaken?c.statuses.weaken.amt:0); return Math.max(1,a); }
+// charmed: what Eliza took off it. charmGain: the same stuff, in your hands.
+function effAtk(c){ let a=c.atk + (c.statuses.atkbuff?c.statuses.atkbuff.amt:0) - (c.statuses.weaken?c.statuses.weaken.amt:0)
+  + (c.statuses.charmGain?c.statuses.charmGain.atk:0) - (c.statuses.charmed?c.statuses.charmed.atk:0); return Math.max(1,a); }
+function effMag(c){ let m=c.mag + (c.statuses.charmGain?c.statuses.charmGain.mag:0) - (c.statuses.charmed?c.statuses.charmed.mag:0); return Math.max(0,m); }
 
 function shieldValue(spec, c, isPlayer){
   const hb = isPlayer ? Math.max(0, Math.floor(G.player.honor/6)) : 0;
@@ -999,7 +1063,7 @@ function startOfTurn(c, isPlayer){
     floatOn(isPlayer, `+${amt}`, '#6fbf6a');
     if (--c.statuses.regen.turns <= 0) delete c.statuses.regen;
   }
-  for (const s of ['atkbuff','weaken']){ if (c.statuses[s] && --c.statuses[s].turns <= 0) delete c.statuses[s]; }
+  for (const s of ['atkbuff','weaken','charmed','charmGain']){ if (c.statuses[s] && --c.statuses[s].turns <= 0) delete c.statuses[s]; }
 }
 function maxHp(c,isPlayer){ return isPlayer ? G.player.maxhp : c.maxhp; }
 
@@ -1057,7 +1121,7 @@ function resolveAction(src, dst, action, srcIsPlayer){
     let landed = 0, total = 0;
     for (let i = 0; i < action.hits; i++){
       if (action.acc != null && !U.chance(action.acc)) continue;
-      let d = (type === 'magic') ? action.power * src.mag/10 - dst.def*0.25
+      let d = (type === 'magic') ? action.power * effMag(src)/10 - dst.def*0.25
                                  : action.power * effAtk(src)/10 - dst.def*0.5;
       if (action.holy && dst.tags && dst.tags.includes('undead')) d *= 1.5;
       if (srcIsPlayer && hungerStage(src) >= 2) d *= 0.7;
@@ -1073,7 +1137,7 @@ function resolveAction(src, dst, action, srcIsPlayer){
     return;
   }
 
-  if (type === 'magic') dmg = action.power * src.mag/10 - dst.def*0.25;
+  if (type === 'magic') dmg = action.power * effMag(src)/10 - dst.def*0.25;
   else                  dmg = action.power * effAtk(src)/10 - dst.def*0.5;
   if (action.holy && dst.tags && dst.tags.includes('undead')){ dmg *= 1.5; }
   if (srcIsPlayer && hungerStage(src) >= 2) dmg *= 0.7;   // a starving arm swings soft
@@ -1525,6 +1589,7 @@ function triggerEvent(eventId, entity){
   const ev = Data.EVENTS[eventId];
   const variantKey = ev.perceive(G.player.honor);
   const v = ev.variants[variantKey] || ev.variants.clear;
+  if (ev.once){ G.player.eventsUsed = G.player.eventsUsed || {}; G.player.eventsUsed[eventId] = true; }
   G.state = 'EVENT';
   G.pendingEvent = { eventId, entity };
 
@@ -1572,10 +1637,61 @@ function chooseOutcome(eventId, outId, entity){
     else { text = "The reflection wavers, half-lit, undecided — as you are. It offers only a moment's clarity before the fog returns."; eff = { sp:99, heal:12, codex:'mir_gray' }; }
   }
 
+  // ----- special: Eliza keeps a stall rather than a conversation -----
+  if (out.special === 'eliza_stall'){
+    if (entity) G.floor.removeEntity(entity);
+    discoverCodex('eliza_stall');
+    updateHUD();
+    elizaStall();
+    return;
+  }
+
   const summary = applyEffects(eff);
   if (entity) G.floor.removeEntity(entity);
   updateHUD();
   showOutcome(ev.name, text, summary, eff.reveal, eff.combat);
+}
+
+// Her whole stock: bread, and not much of it. She undercuts the Hollow Merchant
+// because she stole all of it and owes nothing to anyone.
+function elizaStall(){
+  const p = G.player;
+  if (!p.elizaStock) p.elizaStock = { ration:2, meat:1 };
+  const st = p.elizaStock;
+  const breadCost = goldPrice(24 + G.depth*4);
+  const meatCost  = goldPrice(30 + G.depth*5);
+
+  const s = U.make('div','sheet');
+  const art = U.make('canvas'); art.width=64; art.height=64; art.className='merchant-art';
+  s.appendChild(art); Sprites.toCanvas(art, 'npc_eliza', 5);
+  s.appendChild(U.make('div','sect','Eliza Sinclair'));
+  s.appendChild(U.make('div','p dim center','“Bread and a little else. I said that already.”'));
+  s.appendChild(U.make('div','balance',`<span class="g">✦ ${p.gold} Gold</span>`));
+
+  s.appendChild(shopLine(`Grave-Bread${st.ration ? ` ×${st.ration}` : ''}`,
+    st.ration ? 'A loaf off the crate (+35 FOOD when eaten)' : 'She is out of bread.',
+    `<span class="price g">✦ ${breadCost}</span>`, !st.ration || p.gold < breadCost,
+    ()=>{ p.gold -= breadCost; st.ration--; p.inv.push('ration');
+      log('Eliza wraps a loaf and takes your coin without counting it.','gold'); updateHUD(); elizaStall(); }));
+  s.appendChild(shopLine(`Strange Meat${st.meat ? ` ×${st.meat}` : ''}`,
+    st.meat ? 'Still faintly warm (+60 FOOD). She does not say where from.' : 'Gone.',
+    `<span class="price g">✦ ${meatCost}</span>`, !st.meat || p.gold < meatCost,
+    ()=>{ p.gold -= meatCost; st.meat--; p.inv.push('strange_meat');
+      log('“Don\'t ask,” she says, and does not smile this time.','gold'); updateHUD(); elizaStall(); }));
+
+  const row = U.make('div','row');
+  // her husband can still stop haggling and ask her to come along
+  if (p.classId === 'rogue' && !p.follower && !p.followerFled){
+    row.appendChild(Btn('Enough trading — take her hand', ()=>{
+      hideModal();
+      recruitFollower('eliza');
+      discoverCodex('eliza_taken');
+      G.state='EXPLORE'; G.busy=false; updateHUD(); renderActions();
+    }, 'btn center good'));
+  }
+  row.appendChild(Btn('Leave her to it', ()=>{ hideModal(); G.state='EXPLORE'; G.busy=false; renderActions(); }, 'btn center'));
+  s.appendChild(row);
+  setModal(s);
 }
 
 function applyEffects(eff){
@@ -1837,6 +1953,7 @@ function bar(x,y,w,h,frac,c1,c2){
 function drawStatusIcons(c, x, y){
   const s=[]; if(c.statuses.poison)s.push(['☠','#7fae3a']); if(c.statuses.weaken)s.push(['▼','#a85cc8']);
   if(c.statuses.regen)s.push(['+','#6fbf6a']); if(c.statuses.atkbuff)s.push(['▲','#d0a84e']); if(c.statuses.stun)s.push(['✦','#e0e0f0']);
+  if(c.statuses.charmed)s.push(['♥','#d59cf0']); if(c.statuses.charmGain)s.push(['♥','#d59cf0']);
   ctx.font='8px monospace'; ctx.textAlign='left';
   s.forEach((it,i)=>{ ctx.fillStyle=it[1]; ctx.fillText(it[0], x+i*10, y); });
 }
@@ -2512,6 +2629,9 @@ function showFollowers(){
     if (p.followerLost){
       s.appendChild(U.make('div','p','Someone used to walk with you.'));
       s.appendChild(U.make('div','p dim','<i>They followed you down. They did not come back up. Your name has not recovered, and it will not.</i>'));
+    } else if (p.followerFled){
+      s.appendChild(U.make('div','p','Eliza was here, and then she was not.'));
+      s.appendChild(U.make('div','p dim','<i>She got out through a crack you never found, the way she always does. She is not coming back down this descent — and your name is exactly as clean as it was before.</i>'));
     } else {
       s.appendChild(U.make('div','p dim','<i>No one walks with you. The deep is not generous with company — but it offers, sometimes, to those who go looking.</i>'));
       s.appendChild(U.make('div','p dim','Taking someone on means feeding them, mending them and keeping them standing out of their own pack. If they die, your honor falls to the absolute floor and stays there.'));
@@ -2526,7 +2646,12 @@ function showFollowers(){
       `<b>SP</b> ${fo.sp}/${fo.maxsp} · ` +
       `<b>FOOD</b> <span style="color:${fh>=2?'#c05030':'#a87e34'}">${Math.round(fo.food)}/${FOLLOWER_FOOD_MAX}${fh?' — '+HUNGER_NAMES[fh]:''}</span><br>` +
       `<b>ATK</b> ${fo.atk} · <b>DEF</b> ${fo.def} · <b>MAG</b> ${fo.mag} · <b>SPD</b> ${fo.spd}`));
-    s.appendChild(U.make('div','p dim','<i>They act each round after you. If they die, your honor drops to the absolute floor — permanently.</i>'));
+    s.appendChild(U.make('div','p dim', fo.flees
+      ? '<i>She acts each round after you. She cannot be killed down here — when it goes badly she leaves, for good, and no part of that lands on your name.</i>'
+      : '<i>They act each round after you. If they die, your honor drops to the absolute floor — permanently.</i>'));
+    const kn = (fo.skills || [fo.skill]).filter(id => Data.SKILLS[id])
+      .map(id => `<b>${Data.SKILLS[id].name}</b> <span class="dim">(${Data.SKILLS[id].cost} SP)</span>`);
+    if (kn.length > 1) s.appendChild(U.make('div','p', 'Knows: ' + kn.join(' · ')));
 
     const packCounts = {};
     for (const id of fo.inv) packCounts[id] = (packCounts[id]||0) + 1;

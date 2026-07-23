@@ -58,6 +58,12 @@ const SKILLS = {
     lv:[{power:12,effect:{stun:0.20}},{power:16,effect:{stun:0.30}},{power:22,effect:{stun:0.35}}] },
 
   // ================= ROGUE — shadow & steel =================
+  // Eliza's own. cls 'none' keeps it out of every pool, shop and steal — no one
+  // else in the dark knows how to ask for something and be given it.
+  charm: { name:'Charm', type:'steal', cost:5, cls:'none', open:false, hidden:true,
+    desc:"She smiles at it, and for three turns it would rather please her than kill you. Takes half of what it hits with — a twentieth, from the great ones.",
+    lv:[{ stealPct:0.50, bossPct:0.05, turns:3 }] },
+
   backstab: { name:'Backstab', type:'attack', cost:5, cls:'rogue', open:true, desc:'Vicious strike, often critical.',
     lv:[{power:20,effect:{crit:0.25}},{power:20,effect:{crit:0.50}},{power:30,effect:{crit:0.50}}] },
   poisonblade: { name:'Poison Blade', type:'attack', cost:2, cls:'rogue', open:true, desc:'Venom-coated cut.',
@@ -268,6 +274,16 @@ const FOLLOWERS = {
     base:{ hp:30, sp:11, atk:5, def:4, mag:13, spd:8 },
     skill:'firebolt',
     flavor:'She reads the dark like a page. She will spend herself lighting it for you.',
+  },
+  // The Gravethief's wife. She walks behind no one else, and she does not die
+  // down here — when it goes badly she is simply gone, and does not come back.
+  eliza: {
+    id:'eliza', name:'Eliza Sinclair', sprite:'npc_eliza',
+    base:{ hp:44, sp:14, atk:14, def:6, mag:4, spd:15 },
+    skills:['backstab','bleed','charm'],
+    only:'rogue',
+    flees:true,
+    flavor:'Your wife, and a better thief than you. She did not follow you down here — she got here first.',
   },
 };
 
@@ -637,6 +653,7 @@ const EVENT_ICONS = {
   lightbearer:  { g:'✦', c:'#7fd0c2' },   envoy:       { g:'⚖', c:'#c05070' },
   butcherdoor:  { g:'⚑', c:'#c03636' },   namelesscoin:{ g:'¤', c:'#d0a84e' },
   larder:       { g:'⌂', c:'#c08a5a' },   oathless:    { g:'◈', c:'#9a5cc0' },
+  sinclair:     { g:'♥', c:'#c05070' },
   hollowprince: { g:'♛', c:'#9a5cc0' },   seamparlor:  { g:'✂', c:'#c05070' },
   banquet:      { g:'♨', c:'#d0a84e' },   velvetchapel:{ g:'☾', c:'#9a5cc0' },
   sporewife:    { g:'❀', c:'#7fae3a' },   ferryman:    { g:'≈', c:'#7fb0d0' },
@@ -649,6 +666,8 @@ const EVENT_ICONS = {
 // ---------- Events (honor-driven encounters) ----------
 // perceive(honor) => which variant to show. Default: honor>=0 ? 'clear' : 'warped'
 const clearIfHonored = (h) => h >= 0 ? 'clear' : 'warped';
+// a few encounters answer to who you are rather than what you've done
+const byClass = (cls) => () => (typeof G !== 'undefined' && G.player && G.player.classId === cls) ? 'clear' : 'stranger';
 
 const EVENTS = {
   well: {
@@ -995,6 +1014,35 @@ const EVENTS = {
       oath_send: { text:"You press bread and a little coin into their hands and turn them toward the stairs you came down. They go. Whether the stair is kinder than the dark, you will never find out — which is its own mercy, for you.", effects:{ gold:-8, honor:9, codex:'oath_sent' } },
       oath_look: { text:"You look, properly, the way you should have looked at everything down here. Just a person: filthy, scared, and breathing. Shame goes through you like cold water. They flinch at whatever your face is doing, and follow you anyway.", effects:{ follower:true, honor:5, codex:'oath_seen', reveal:'Fear nearly made a monster of someone who only needed to not be alone.' } },
       oath_leave: { text:"You walk on. The sound they make is not a word. It follows you further than they could have.", effects:{ honor:-5 } },
+    }
+  },
+
+  // Eliza Sinclair — once a descent, and only once. To the Gravethief she is his
+  // wife; to everyone else she is a woman with a stall and no interest in them.
+  sinclair: {
+    name:'Eliza Sinclair',
+    once:true,
+    perceive: byClass('rogue'),
+    variants:{
+      clear:{ art:'npc_eliza',
+        text:"She is crouched over a strongbox with her picks already in it, and she does not startle when your light finds her — she just looks up, and there is that mouth of hers doing the thing it does.\n\n“You took your time.” The lock gives with a click she does not look down for. “I got here two days ago. I have been robbing the dead of this place blind and I have not once needed rescuing, so wipe that off your face.”\n\nShe stands, and holds out a hand, palm up, the way she does when she means: <i>are we working, or are we talking?</i>",
+        choices:[
+          { label:'Take her hand — work the dark together', to:'sin_take' },
+          { label:'Tell her to go back up while she still can', to:'sin_send' },
+          { label:'Trade for what she has spare', to:'sin_trade' },
+        ] },
+      stranger:{ art:'npc_eliza',
+        text:"A woman has made a stall out of an upturned crate and a folded cloak, and she is sitting behind it as calmly as a fishwife at market. She is beautiful in a way that has clearly been useful to her. Two knives lie within reach and she does not pretend otherwise.\n\n“I'm not for hire, I'm not for fighting, and I'm not lost,” she says. “I've bread and a little else, and I'll take coin for it. That's the whole of what's on offer.”",
+        choices:[
+          { label:'Trade with her', to:'sin_trade' },
+          { label:'Leave her to her stall', to:'sin_pass' },
+        ] },
+    },
+    outcomes:{
+      sin_take: { text:"“Right then,” she says, and falls in at your shoulder — not behind it, at it, which is a distinction she has made loudly before.\n\nShe eats from her own pack, mends her own cuts, and picks her own fights. And when a fight turns bad enough, she will be gone before you can turn around: out through whatever crack she has already found, because Eliza Sinclair does not die in holes like this one. That is the arrangement. It always was.", effects:{ follower:'eliza', codex:'eliza_taken' } },
+      sin_send: { text:"She hears you out with her head tilted, all the way to the end, which is more courtesy than the argument deserved.\n\n“No,” she says pleasantly, and kisses you, and goes back down the corridor you have not walked yet. You find her purse in your hand a minute later, because she is who she is.", effects:{ gold:26, honor:4, codex:'eliza_sent' } },
+      sin_trade: { special:'eliza_stall', text:'' },
+      sin_pass: { text:"You walk on. Behind you she is already re-folding the cloak, unbothered, a woman entirely unsurprised to be left alone with two knives.", effects:{} },
     }
   },
 
@@ -1480,6 +1528,10 @@ const CODEX = [
   { id:'oath_sent',    title:'The Oathless: Sent Up',     tag:'good', hint:'Bread, a little coin, and a direction that was not down.' },
   { id:'oath_seen',    title:'The Oathless: Looked At',   tag:'mag',  hint:'You looked properly, and the monster turned out to be a person.' },
   { id:'follower_lost',title:'The Oathless: Led To It',   tag:'bad',  hint:'They followed you all the way down. You are what happened to them.' },
+  { id:'eliza_taken',  title:'Sinclair: At Your Shoulder', tag:'mag',  hint:'Not behind it. She has made that distinction loudly before.' },
+  { id:'eliza_sent',   title:'Sinclair: Sent Away',        tag:'good', hint:'She said no pleasantly, kissed you, and left you her purse.' },
+  { id:'eliza_gone',   title:'Sinclair: Out The Crack',    tag:'mag',  hint:'She does not die in holes like this one. That was the arrangement.' },
+  { id:'eliza_stall',  title:'Sinclair: The Stall',        tag:'good', hint:'A crate, a folded cloak, bread for coin, and two knives within reach.' },
 ];
 
 // ---------- Whispers: the deep talks to the damned (flavor lines, no mechanics) ----------

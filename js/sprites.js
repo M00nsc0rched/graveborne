@@ -185,6 +185,20 @@ const SPR = {
     "  KsSSSSsK  ",
     "  KK    KK  ",
   ],
+  npc_eliza: [
+    "   KRRRK    ",
+    "  KRRRRRK   ",
+    " KRRlllRRK  ",
+    " KRlLLLlRK  ",
+    " KRlhLhlRK  ",  // she looks straight back at you
+    " KRRlLlRRK  ",
+    "  KRgggRK   ",
+    " KRgGGGgRK  ",
+    " KgGGGGGgK  ",
+    " KgGRRRGgK  ",  // a looter's red sash
+    "  KgGGGgK   ",
+    "  KK   KK   ",
+  ],
   npc_silhouette: [
     "    xxx     ",
     "   xxxxx    ",
