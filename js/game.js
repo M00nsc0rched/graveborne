@@ -1,7 +1,7 @@
 // ================= GRAVEBORNE — main engine =================
 // shown on the title screen; keep in step with CACHE in sw.js — the game is
 // served from that cache, so the number you see is the build you're running
-const GAME_VERSION = 16;
+const GAME_VERSION = 17;
 let VW = 21, VH = 13;                 // viewport in tiles — reshaped to the stage on phones
 const TS = 16;                        // tile size in canvas pixels
 const FINAL_DEPTH = 5;
@@ -449,7 +449,8 @@ function sanctumSummary(){
 
 function recomputeStats(p){
   let hp=p.baseHp, sp=p.baseSp, atk=p.baseAtk, def=p.baseDef, mag=p.baseMag, spd=p.baseSpd;
-  const flags = { honorMul:1, lifesteal:0, crit:0, dmg:1, regen:0, foodSlow:1, soulMult:1, openShield:0 };
+  // foodMult multiplies hunger drain: below 1 stretches a meal, above 1 burns you out
+  const flags = { honorMul:1, lifesteal:0, crit:0, dmg:1, regen:0, foodMult:1, soulMult:1, openShield:0, spRegen:0 };
   const addPassive = (pa) => {
     if (!pa) return;
     if (pa.honorMul)   flags.honorMul   *= pa.honorMul;
@@ -457,7 +458,8 @@ function recomputeStats(p){
     if (pa.crit)       flags.crit       += pa.crit;
     if (pa.dmg)        flags.dmg        *= pa.dmg;
     if (pa.regen)      flags.regen      += pa.regen;
-    if (pa.foodSlow)   flags.foodSlow   *= pa.foodSlow;
+    if (pa.foodMult)   flags.foodMult   *= pa.foodMult;
+    if (pa.spRegen)    flags.spRegen    += pa.spRegen;
     if (pa.soulMult)   flags.soulMult   *= pa.soulMult;
     if (pa.openShield) flags.openShield += pa.openShield;
   };
@@ -776,13 +778,11 @@ function maybeWhisper(){
 function updateHunger(){
   const p = G.player;
   const before = hungerStage(p);
-  // Hollow Witch — Wellspring: the walking itself refills her, and burns her twice as fast
-  let drain = FOOD_DRAIN;
-  if (p.classId === 'mage'){
-    drain *= 2;
-    if (p.sp < p.maxsp){ p.sp = Math.min(p.maxsp, p.sp + 5); }
+  let drain = FOOD_DRAIN * ((p.flags && p.flags.foodMult) || 1);
+  // gear that refills your focus as you walk (and usually charges you for it)
+  if (p.flags && p.flags.spRegen > 0 && p.sp < p.maxsp){
+    p.sp = Math.min(p.maxsp, p.sp + p.flags.spRegen);
   }
-  drain *= (p.flags && p.flags.foodSlow) || 1;      // relics that stretch a meal
   p.food = Math.max(0, p.food - drain);
   // relics that mend you as you walk
   if (p.flags && p.flags.regen > 0 && p.hp < p.maxhp){
@@ -2126,7 +2126,8 @@ function guardianConfront(entity){
 }
 
 // ================= SHOP (between floors) =================
-const SHOP_RELICS = ['soul_edge','marrow_maul','stormbrand','gravewarden','plate','bloodstone','witch_eye','saints_knuckle','nights_eye','hexed_scythe','ring_of_honor','chainmail','war_pick'];
+const SHOP_RELICS = ['soul_edge','marrow_maul','stormbrand','gravewarden','plate','bloodstone','witch_eye','saints_knuckle','nights_eye','hexed_scythe','ring_of_honor','chainmail','war_pick',
+  'wellspring_stave','widowmaker','gluttons_girdle','reapers_tithe','pilgrims_mercy','dread_aegis','ruin_brand'];
 
 function goldPrice(base){ const favor = Save.sanctumLevel('favor'); return Math.max(1, Math.round(base * (1 - 0.1*favor))); }
 function gearPriceGold(id){ const it=Data.ITEMS[id]; return goldPrice(14 + statSum(it.mods)*5 + (it.flag?20:0)); }
@@ -2386,7 +2387,10 @@ function passiveText(pa){
   if (pa.crit)       bits.push(`+${Math.round(pa.crit*100)}% crit chance`);
   if (pa.dmg && pa.dmg !== 1) bits.push(`+${Math.round((pa.dmg-1)*100)}% damage`);
   if (pa.regen)      bits.push(`mends ${pa.regen} HP per step`);
-  if (pa.foodSlow && pa.foodSlow !== 1) bits.push(`hunger ${Math.round((1-pa.foodSlow)*100)}% slower`);
+  if (pa.spRegen)    bits.push(`+${pa.spRegen} SP every step out of combat`);
+  if (pa.foodMult && pa.foodMult !== 1) bits.push(pa.foodMult < 1
+    ? `hunger ${Math.round((1-pa.foodMult)*100)}% slower`
+    : `hunger ${Math.round((pa.foodMult-1)*100)}% faster`);
   if (pa.soulMult && pa.soulMult !== 1) bits.push(`+${Math.round((pa.soulMult-1)*100)}% Souls`);
   if (pa.openShield) bits.push(`opens fights shielded (DEF×${pa.openShield})`);
   if (pa.honorMul && pa.honorMul !== 1) bits.push(`honor gains ×${pa.honorMul}`);

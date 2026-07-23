@@ -212,7 +212,6 @@ const SKILLS = {
 // One signature rule per class, always on, no button to press.
 const PASSIVES = {
   mage: [
-    { name:'Wellspring', desc:'+5 SP every step out of combat — but the burning leaves you hungry twice as fast.' },
     { name:'Accretion',  desc:'Every fight you win teaches her something: +5 to one random stat and +5 power to one random skill, for the rest of the descent.' },
   ],
   knight: [ { name:'Oathbound', desc:'Against the undead you open every fight already braced: a shield and your fury up.' } ],
@@ -528,7 +527,7 @@ const ITEMS = {
   widowmaker:     { id:'widowmaker', name:'Widowmaker', slot:'weapon', mods:{atk:7,spd:2}, tier:3, rarity:'unique',
     passive:{ crit:0.18 }, desc:'Notched once for every name it took. Passive: every blow finds the gap — +18% critical chance.' },
   gluttons_girdle:{ id:'gluttons_girdle', name:"Glutton's Girdle", slot:'armor', mods:{def:5,hp:14}, tier:3, rarity:'unique',
-    passive:{ foodSlow:0.5 }, desc:'Someone was very hungry, once, and stopped being. Passive: you burn food half as fast.' },
+    passive:{ foodMult:0.5 }, desc:'Someone was very hungry, once, and stopped being. Passive: you burn food half as fast.' },
   reapers_tithe:  { id:'reapers_tithe', name:"Reaper's Tithe", slot:'trinket', mods:{mag:4}, tier:3, rarity:'unique',
     passive:{ soulMult:1.5 }, desc:'It counts what dies near you. Passive: every deed pays 50% more Souls.' },
   pilgrims_mercy: { id:'pilgrims_mercy', name:"Pilgrim's Mercy", slot:'trinket', mods:{hp:10,def:2}, tier:3, rarity:'unique',
@@ -555,6 +554,11 @@ const ITEMS = {
     desc:'It rings when something nearby stops breathing. Worth little alone.' },
 
   // ---- Legendary relics: a passive gift, and a power you may call on once per battle ----
+  wellspring_stave:{ id:'wellspring_stave', name:'The Wellspring', slot:'weapon', mods:{mag:8,sp:3}, tier:3, rarity:'legendary',
+    passive:{ spRegen:5, foodMult:2 },
+    desc:'It gives and gives, and takes the price out of your belly. Passive: your focus refills as you walk — and the hunger comes twice as fast.',
+    active:{ name:'Overdraw', desc:'Tear the well open — your focus floods back, and it is paid for in blood.',
+      action:{ name:'Overdraw', type:'buff', selfDmg:12, spGain:99 } } },
   skinners_needle:{ id:'skinners_needle', name:'Skinner\'s Needle', slot:'weapon', mods:{atk:8}, flag:{lifesteal:0.1}, tier:3,
     desc:'It sews shut, and it sews open. Passive: drinks a little of every wound.',
     active:{ name:'Unstitch', desc:'Open every seam of the foe — weakness and deep bleeding.',
@@ -586,7 +590,7 @@ const CONSUMABLES = {
 const SETS = {
   pauper: { name:"The Pauper's Vigil", pieces:['pauper_rod','pauper_rags','pauper_bowl'],
     mods:{ atk:13, def:11, hp:34, mag:6, sp:3 },
-    passive:{ lifesteal:0.20, foodSlow:0.5 },
+    passive:{ lifesteal:0.20, foodMult:0.5 },
     desc:'Three worthless things that were never meant to be parted. Together: +13 ATK, +11 DEF, +34 HP, +6 MAG, +3 SP, blows drink 20%, and hunger comes half as fast.' },
   carrion: { name:'Carrion Communion', pieces:['carrion_hook','carrion_shroud','carrion_bell'],
     mods:{ atk:15, def:8, hp:22, spd:3 },
@@ -610,7 +614,7 @@ const ITEM_POOL = {
   2:['bone_cleaver','witch_wand','war_pick','hexed_scythe','chainmail','plate','shadow_cloak','bone_lamellar','witchweave','bloodstone','witch_eye','grave_idol','hunters_fang',
      'pauper_rod','pauper_rags','pauper_bowl','carrion_hook','carrion_shroud','carrion_bell'],
   3:['soul_edge','marrow_maul','stormbrand','gravewarden','plate','witch_eye','bloodstone','saints_knuckle','nights_eye',
-     'widowmaker','gluttons_girdle','reapers_tithe','pilgrims_mercy','dread_aegis','ruin_brand'],
+     'widowmaker','gluttons_girdle','reapers_tithe','pilgrims_mercy','dread_aegis','ruin_brand','wellspring_stave'],
 };
 
 // ---------- Honor tiers ----------
