@@ -1,7 +1,7 @@
 // ================= GRAVEBORNE — main engine =================
 // shown on the title screen; keep in step with CACHE in sw.js — the game is
 // served from that cache, so the number you see is the build you're running
-const GAME_VERSION = 22;
+const GAME_VERSION = 23;
 let VW = 21, VH = 13;                 // viewport in tiles — reshaped to the stage on phones
 const TS = 16;                        // tile size in canvas pixels
 const FINAL_DEPTH = 5;
@@ -1938,9 +1938,18 @@ function updateEnemyPanel(){
 function drawTile(t, sx, sy, x, y){
   const pal = curBiome().pal;
   if (t === TILE.WALL){
+    // coursed stone: a lit cap on top, a brick face, a shadowed base
     ctx.fillStyle = pal.wallFace; ctx.fillRect(sx, sy, TS, TS);
-    ctx.fillStyle = pal.wallTop; ctx.fillRect(sx, sy, TS, 4);
-    ctx.fillStyle = pal.wallDark; ctx.fillRect(sx, sy+TS-3, TS, 3);
+    ctx.fillStyle = pal.wallTop;  ctx.fillRect(sx, sy, TS, 4);
+    ctx.fillStyle = 'rgba(255,255,255,0.05)'; ctx.fillRect(sx, sy, TS, 1);       // catch-light on the cap
+    // mortar: a horizontal course and staggered vertical joints, so it reads as brick
+    ctx.fillStyle = pal.wallDark;
+    ctx.fillRect(sx, sy+9, TS, 1);
+    const stag = (y % 2) ? 0 : 8;
+    ctx.fillRect(sx + 4 + stag, sy+4, 1, 5);
+    ctx.fillRect(sx + (stag ? 4 : 12), sy+10, 1, 4);
+    // deep base shadow and hard block edges give the wall its thickness
+    ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fillRect(sx, sy+TS-2, TS, 2);
     ctx.fillStyle = '#0a0a0f'; ctx.fillRect(sx, sy, 1, TS); ctx.fillRect(sx+TS-1, sy, 1, TS);
   } else if (t === TILE.DOOR){
     // floor underfoot, then a stone frame and a wooden leaf standing ajar
@@ -1970,18 +1979,68 @@ function drawTile(t, sx, sy, x, y){
   } else {
     const alt = (x + y) % 2 === 0;
     ctx.fillStyle = alt ? pal.floorA : pal.floorB; ctx.fillRect(sx, sy, TS, TS);
-    ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(sx, sy, TS, 1); ctx.fillRect(sx, sy, 1, TS);
-    // deterministic speckle (spore-glow, water-glint, embers... per biome)
+    ctx.fillStyle = 'rgba(0,0,0,0.22)'; ctx.fillRect(sx, sy, TS, 1); ctx.fillRect(sx, sy, 1, TS);
+    // cobble edging where floor meets wall — lines the one-wide corridors and
+    // frames the rooms, without needing to know which is which
+    const f = G.floor;
+    if (f){
+      const wN = f.tileAt(x,y-1)===TILE.WALL, wS = f.tileAt(x,y+1)===TILE.WALL,
+            wW = f.tileAt(x-1,y)===TILE.WALL, wE = f.tileAt(x+1,y)===TILE.WALL;
+      if (wN || wS || wW || wE){
+        ctx.fillStyle = 'rgba(0,0,0,0.30)';
+        if (wN) ctx.fillRect(sx, sy, TS, 2);
+        if (wW) ctx.fillRect(sx, sy, 2, TS);
+        if (wS) ctx.fillRect(sx, sy+TS-2, TS, 2);
+        if (wE) ctx.fillRect(sx+TS-2, sy, 2, TS);
+        ctx.fillStyle = 'rgba(255,255,255,0.05)';           // a faint cobble highlight just inside the shadow
+        if (wN) ctx.fillRect(sx, sy+2, TS, 1);
+        if (wW) ctx.fillRect(sx+2, sy, 1, TS);
+        if (wS) ctx.fillRect(sx, sy+TS-3, TS, 1);
+        if (wE) ctx.fillRect(sx+TS-3, sy, 1, TS);
+      }
+    }
+    // deterministic detail: biome speckle, and the occasional cracked flagstone
     const seed = (x*928371 + y*1237) % 97;
-    if (seed < 8){ ctx.fillStyle = pal.speck; ctx.fillRect(sx + (seed%TS), sy + ((seed*3)%TS), 2, 2); }
+    if (seed < 7){ ctx.fillStyle = pal.speck; ctx.fillRect(sx + (seed%TS), sy + ((seed*3)%TS), 2, 2); }
+    else if (seed > 91){
+      ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(sx+3, sy+3); ctx.lineTo(sx+7, sy+8); ctx.lineTo(sx+6, sy+13); ctx.stroke();
+    }
+  }
+}
+
+// which room is the ritual sanctum — cached on the floor so the render can give
+// its floor a distinct warm tone and an ornamental border
+function ensureFloorMeta(f){
+  if (f._metaDone) return;
+  f._metaDone = true;
+  const altar = f.entities.find(e => e.type === 'prop' && e.ritual);
+  f._sanctum = altar ? (f.rooms.find(r =>
+    altar.x >= r.x && altar.x < r.x + r.w && altar.y >= r.y && altar.y < r.y + r.h) || null) : null;
+}
+// a double frame with corner keys, echoing the fret borders of a ritual floor
+function drawSanctumFret(f, camX, camY){
+  const r = f._sanctum; if (!r) return;
+  const x0 = (r.x - camX)*TS + 3,          y0 = (r.y - camY)*TS + 3;
+  const x1 = (r.x + r.w - camX)*TS - 3,     y1 = (r.y + r.h - camY)*TS - 3;
+  ctx.strokeStyle = 'rgba(208,168,78,0.20)'; ctx.lineWidth = 1;
+  ctx.strokeRect(x0, y0, x1-x0, y1-y0);
+  ctx.strokeRect(x0+3, y0+3, x1-x0-6, y1-y0-6);
+  // little inward keys at the corners
+  for (const [cx,cy,dx,dy] of [[x0,y0,1,1],[x1,y0,-1,1],[x0,y1,1,-1],[x1,y1,-1,-1]]){
+    ctx.beginPath();
+    ctx.moveTo(cx+dx*7, cy+dy*3); ctx.lineTo(cx+dx*7, cy+dy*7); ctx.lineTo(cx+dx*3, cy+dy*7);
+    ctx.stroke();
   }
 }
 
 function renderExplore(){
   const f = G.floor, p = G.player;
+  ensureFloorMeta(f);
   ctx.fillStyle = '#050409'; ctx.fillRect(0,0,canvas.width,canvas.height);
   const camX = U.clamp(p.x - (VW>>1), 0, Math.max(0, f.w - VW));
   const camY = U.clamp(p.y - (VH>>1), 0, Math.max(0, f.h - VH));
+  const sanc = f._sanctum;
 
   // tiles
   for (let vy = 0; vy < VH; vy++){
@@ -1990,8 +2049,14 @@ function renderExplore(){
       const i = f.idx(x,y); const sx = vx*TS, sy = vy*TS;
       if (!f.explored[i]) continue;
       drawTile(f.tileAt(x,y), sx, sy, x, y);
+      // the sanctum floor takes a warm, consecrated tone
+      if (sanc && x>=sanc.x && x<sanc.x+sanc.w && y>=sanc.y && y<sanc.y+sanc.h && f.tileAt(x,y)!==TILE.WALL){
+        ctx.fillStyle = 'rgba(150,120,70,0.12)'; ctx.fillRect(sx, sy, TS, TS);
+      }
     }
   }
+  // the fret border framing the sanctum (fog paints over the unexplored parts after)
+  drawSanctumFret(f, camX, camY);
   // ritual circle drawn onto the sanctum floor, under everything else
   for (const e of f.entities){
     if (!(e.type === 'prop' && e.ritual)) continue;
