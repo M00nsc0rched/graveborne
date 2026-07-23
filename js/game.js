@@ -1,7 +1,7 @@
 // ================= GRAVEBORNE — main engine =================
 // shown on the title screen; keep in step with CACHE in sw.js — the game is
 // served from that cache, so the number you see is the build you're running
-const GAME_VERSION = 19;
+const GAME_VERSION = 20;
 let VW = 21, VH = 13;                 // viewport in tiles — reshaped to the stage on phones
 const TS = 16;                        // tile size in canvas pixels
 const FINAL_DEPTH = 5;
@@ -500,7 +500,12 @@ const ALLOT_STATS = [
 ];
 function blankAllotment(){ const a = {}; for (const s of ALLOT_STATS) a[s.key] = 0; return a; }
 function allotSpent(a){ return ALLOT_STATS.reduce((n,s)=>n + (a[s.key]||0), 0); }
+// The Hollow Witch is the one who does not get to choose beforehand. Accretion
+// already hands her a stat every fight she wins — she grows into her build in
+// the dark instead of picking it in the light.
+function allotAllowed(classId){ return classId !== 'mage'; }
 function applyAllotment(p){
+  if (!allotAllowed(p.classId)){ p.allot = blankAllotment(); return; }
   const a = G.allot || blankAllotment();
   for (const s of ALLOT_STATS) p[s.base] += (a[s.key] || 0) * s.amt;
   p.allot = { ...a };                   // kept on the player so the sheet can show it
@@ -2259,13 +2264,19 @@ function showCharSelect(){
 // ---- Spend the twenty before the stair ----
 function showAllotment(){
   G.state = 'ALLOT';
+  const c = Data.CLASSES[G.selClass];
+  const allowed = allotAllowed(G.selClass);
+  // whoever we came from may have spent points; the Witch must not inherit them
+  if (!allowed) G.allot = blankAllotment();
   G.allot = G.allot || blankAllotment();
-  const a = G.allot, c = Data.CLASSES[G.selClass];
+  const a = G.allot;
   const left = ALLOT_POINTS - allotSpent(a);
 
   const s = U.make('div','sheet');
   s.appendChild(U.make('div','sect','What You Were Before'));
-  s.appendChild(U.make('div','p dim','Twenty points of whoever you used to be, and the dark gets everything after that. No more than ten into any one of them.'));
+  s.appendChild(U.make('div','p dim', allowed
+    ? 'Twenty points of whoever you used to be, and the dark gets everything after that. No more than ten into any one of them.'
+    : 'Nothing. There is no before — she traded it, and the terms were not favourable.'));
 
   const head = U.make('div','card sel');
   const cv = U.make('canvas'); cv.width=52; cv.height=52; head.appendChild(cv); Sprites.toCanvas(cv, c.sprite, 4);
@@ -2280,6 +2291,22 @@ function showAllotment(){
   }).join(' · ')));
   head.appendChild(info);
   s.appendChild(head);
+
+  // the Witch skips the whole ledger — her passive does this work in the dark
+  if (!allowed){
+    const pv = (Data.PASSIVES[G.selClass] || [])[0];
+    s.appendChild(U.make('div','p',
+      'The others walk in already shaped. She walks in owing, and takes the difference out of whatever she kills.'));
+    if (pv) s.appendChild(U.make('div','p',
+      `<span style="color:#9a5cc0">◈ ${pv.name}</span> — <span style="color:#8a7f9e">${pv.desc}</span>`));
+    s.appendChild(U.make('div','p dim','<i>No points to spend. Every fight you win gives her one instead — and she chooses no better than the dark does.</i>'));
+    const row0 = U.make('div','row');
+    row0.appendChild(Btn('Descend', startRun, 'btn center'));
+    row0.appendChild(Btn('Back', showCharSelect, 'btn center'));
+    s.appendChild(row0);
+    setModal(s);
+    return;
+  }
 
   s.appendChild(U.make('div','balance',
     `<span class="${left ? 'g' : 's'}">${left} point${left===1?'':'s'} left of twenty</span>`));
