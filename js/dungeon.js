@@ -196,6 +196,17 @@ function makeDungeon(depth, opts){
     if (p) d.entities.push({ type:'chest', x:p.x, y:p.y, tier:U.clamp(Math.ceil(depth/2), 1, 3) });
   }
 
+  // --- wild herbs: plenty grow on every floor, free for the gathering (the
+  // Alchemist brews with them; anyone can pick them up) ---
+  if (Data.PLANTS){
+    const herbIds = Object.keys(Data.PLANTS);
+    const herbCount = U.randInt(4, 7) + Math.floor(depth/2);
+    for (let i = 0; i < herbCount; i++){
+      const p = randInRoom(U.choice(rooms));
+      if (p) d.entities.push({ type:'plant', plant:U.choice(herbIds), x:p.x, y:p.y, wild:true });
+    }
+  }
+
   // --- the potion-maker sets up on some non-final floors, with a herb quest ---
   // (final floors end at the boss, so there is no coming back to hand plants in)
   if (!isFinal && Data.PLANTS && U.chance(0.5)){

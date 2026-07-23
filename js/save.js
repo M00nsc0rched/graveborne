@@ -40,6 +40,12 @@ const Save = {
   incSanctum(id){ const s = this.sanctum(); s[id] = (s[id]||0) + 1; this._write(this.KEY_SANCTUM, s); return s[id]; },
   resetSanctum(){ this._write(this.KEY_SANCTUM, {}); },
 
+  // ---- Achievements: permanent unlocks (e.g. the Alchemist class) ----
+  KEY_ACH: 'graveborne_ach_v1',
+  achievements(){ return this._read(this.KEY_ACH, {}); },
+  hasAchievement(id){ return !!this.achievements()[id]; },
+  earnAchievement(id){ const a = this.achievements(); if (a[id]) return false; a[id] = { at: Date.now() }; this._write(this.KEY_ACH, a); return true; },
+
   // ---- Display options: how much screen the game takes, and which way up ----
   // fill: 0.80–1.00 of the phone's viewport · orient: 'auto' | 'landscape'
   opts(){ return this._read(this.KEY_OPTS, { fill: 1, orient: 'auto' }); },
@@ -49,5 +55,6 @@ const Save = {
     localStorage.removeItem(this.KEY_CODEX);
     localStorage.removeItem(this.KEY_META);
     localStorage.removeItem(this.KEY_SANCTUM);
+    localStorage.removeItem(this.KEY_ACH);
   }
 };

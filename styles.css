@@ -256,6 +256,9 @@ button{touch-action:manipulation}
   transition:border-color .1s, transform .05s;
 }
 .card:hover{border-color:var(--gold-dim)}
+.card.locked{opacity:.55;cursor:not-allowed;filter:grayscale(.5)}
+.card.locked:hover{border-color:var(--edge)}
+.card.locked canvas{filter:brightness(.5)}
 .card.sel{border-color:var(--gold);box-shadow:0 0 14px rgba(208,168,78,.25)}
 .card canvas{image-rendering:pixelated;width:52px;height:52px;background:#0a0810;border:1px solid var(--edge);border-radius:3px;flex:none}
 .card h3{color:var(--gold);font-size:13px;letter-spacing:1px;margin-bottom:3px}

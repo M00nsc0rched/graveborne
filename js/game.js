@@ -1,7 +1,7 @@
 // ================= GRAVEBORNE — main engine =================
 // shown on the title screen; keep in step with CACHE in sw.js — the game is
 // served from that cache, so the number you see is the build you're running
-const GAME_VERSION = 24;
+const GAME_VERSION = 25;
 let VW = 21, VH = 13;                 // viewport in tiles — reshaped to the stage on phones
 const TS = 16;                        // tile size in canvas pixels
 const FINAL_DEPTH = 5;
@@ -277,6 +277,7 @@ function upgradeSkill(id){
 }
 // each descent offers a different, random handful of skills to buy with Souls
 function rollUnlockPool(p){
+  if (Data.CLASSES[p.classId] && Data.CLASSES[p.classId].craftOnly) return [];  // the Alchemist learns no skills, and teaches none
   const ids = Object.keys(Data.SKILLS).filter(id => {
     const sk = Data.SKILLS[id];
     if (sk.cls === 'common' || p.skills.includes(id)) return false;
@@ -450,6 +451,7 @@ function openTuner(){
   s.appendChild(U.make('div','sect','· · ·'));
   const fields = [
     ['maxhp','Max HP',p.maxhp], ['hp','HP',p.hp], ['maxsp','Max SP',p.maxsp], ['sp','SP',p.sp],
+    ['int','INT (→ max mana)',p.maxsp],
     ['atk','ATK',p.atk], ['def','DEF',p.def], ['mag','MAG',p.mag], ['spd','SPD',p.spd],
     ['food','FOOD',Math.round(p.food)], ['honor','Honor',p.honor], ['level','Level',p.level||1],
     ['gold','Gold',p.gold], ['souls','Souls',Save.souls()],
@@ -472,6 +474,9 @@ function openTuner(){
     const set = (k, f) => { const v = num(k); if (v !== null) f(v); };
     set('maxhp', v => { p.baseHp += v - p.maxhp; });
     set('maxsp', v => { p.baseSp += v - p.maxsp; });
+    // INT is the Alchemist's stat, but the cheat lets you grant it to anyone;
+    // on a class that runs on SP it simply adds to the max mana pool
+    set('int',   v => { p.baseSp += v - p.maxsp; });
     set('atk',   v => { p.baseAtk += v - p.atk; });
     set('def',   v => { p.baseDef += v - p.def; });
     set('mag',   v => { p.baseMag += v - p.mag; });
@@ -533,6 +538,7 @@ function newPlayer(classId){
     vigilUsed:false, vigilTurns:0,      // the Warden's one refusal of death
     follower:null, followerLost:false, followerFled:false,
     eventsUsed:{},                      // encounters you only get one of per descent
+    plants:{},                          // gathered herbs — the Alchemist's crafting stock
   };
   // Eliza is not left to the general shuffle: she turns up in half of the
   // Gravethief's descents and a third of everyone else's, on a floor picked now.
@@ -543,6 +549,11 @@ function newPlayer(classId){
   recomputeStats(p);
   p.hp = p.maxhp; p.sp = p.maxsp;
   p.unlockPool = rollUnlockPool(p);     // a different offer of skills every descent
+  // the Alchemist arrives with a few herbs so her first fight isn't bare-handed
+  if (classId === 'alchemist'){
+    const hk = Object.keys(Data.PLANTS);
+    for (let i = 0; i < 5; i++){ const h = U.choice(hk); p.plants[h] = (p.plants[h] || 0) + 1; }
+  }
   return p;
 }
 
@@ -855,7 +866,9 @@ function applyHazard(){
   switch (hz.kind){
     case 'phys':   dmg = Math.max(1, Math.round(4 + G.depth - p.def * 0.3));
       log(`${hz.name} bite at you for ${dmg}.`, 'bad'); break;
-    case 'poison': dmg = 2; p.statuses.poison = { dmg:3, turns:3 };
+    case 'poison':
+      if (immuneToRot(p)){ log('Spores fill your lungs — and find nothing that will take. Iron palate.', 'dim'); return true; }
+      dmg = 2; p.statuses.poison = { dmg:3, turns:3 };
       log('Spores fill your lungs — you are poisoned!', 'bad'); break;
     case 'chill':  dmg = 3; p.sp = Math.max(0, p.sp - 2);
       log(`Frigid water saps you — ${dmg} HP and 2 SP.`, 'bad'); break;
@@ -920,16 +933,32 @@ function activePotionQuest(){
   return G.floor && G.floor.entities.find(e => e.type==='npc' && e.quest && e.quest.stage==='active');
 }
 function collectPlant(e){
-  const npc = activePotionQuest(), nm = Data.PLANTS[e.plant].name;
+  const p = G.player, npc = activePotionQuest(), nm = Data.PLANTS[e.plant].name;
+  // every herb goes into your gathering pouch (the Alchemist brews from these)
+  p.plants = p.plants || {};
+  p.plants[e.plant] = (p.plants[e.plant] || 0) + 1;
   if (npc && npc.quest.plants.includes(e.plant) && !npc.quest.have.includes(e.plant)){
     npc.quest.have.push(e.plant);
     log(`You gather ${nm}. (${npc.quest.have.length}/3 for the potion-maker)`, 'good');
   } else {
-    log(`You gather a sprig of ${nm}.`, 'dim');
+    log(`You gather ${nm}.`, 'dim');
   }
   floatOn(true, Data.PLANTS[e.plant].glyph, Data.PLANTS[e.plant].color);
   G.floor.removeEntity(e);
   updateHUD();
+}
+function plantCount(p){ let n = 0; for (const k in (p.plants||{})) n += p.plants[k]; return n; }
+// spend `n` gathered herbs, any kinds, most-plentiful first
+function spendPlants(p, n){
+  if (plantCount(p) < n) return false;
+  let left = n;
+  const order = Object.keys(p.plants).sort((a,b) => p.plants[b] - p.plants[a]);
+  for (const k of order){
+    while (left > 0 && p.plants[k] > 0){ p.plants[k]--; left--; }
+    if (p.plants[k] === 0) delete p.plants[k];
+    if (left === 0) break;
+  }
+  return true;
 }
 // the keeper's herb pushes up where it fell — called when a guardian is slain
 function dropGuardianPlant(x, y, keeperName){
@@ -978,11 +1007,17 @@ function potionMaker(e){
   if (q.stage === 'active'){
     if (q.plants.every(pl => q.have.includes(pl))){
       Save.addSouls(15); q.stage = 'done'; updateHUD();
+      const firstTime = Save.earnAchievement('one_drink');
       s.appendChild(U.make('div','p','You empty your gatherings onto the bench. Quick, sure fingers sort them, and something in the mortar starts to glow.'));
       s.appendChild(U.make('div','p','“That\'s the three. One drink, and the pain goes away — for a while. Here. You earned it.”'));
       const tag = U.make('div'); tag.style.margin = '6px 0';
       tag.appendChild(U.make('span','tag mag','✦ 15 Souls'));
       s.appendChild(tag);
+      if (firstTime){
+        s.appendChild(U.make('div','p','<span style="color:#7fae3a">✦ Achievement — “One drink and the pain goes away.”</span>'));
+        s.appendChild(U.make('div','p dim','You have earned the potion-maker\'s trade. <b>The Alchemist</b> is now yours to play from the character select.'));
+        log('✦ Achievement unlocked — The Alchemist is now a playable class.', 'mag');
+      }
       const row = U.make('div','row'); row.appendChild(Btn('Take the Souls', close, 'btn center good')); s.appendChild(row);
       setModal(s); return;
     }
@@ -1287,6 +1322,12 @@ function effAtk(c){ let a=c.atk + (c.statuses.atkbuff?c.statuses.atkbuff.amt:0) 
   + (c.statuses.charmGain?c.statuses.charmGain.atk:0) - (c.statuses.charmed?c.statuses.charmed.atk:0); return Math.max(1,a); }
 function effMag(c){ let m=c.mag + (c.statuses.charmGain?c.statuses.charmGain.mag:0) - (c.statuses.charmed?c.statuses.charmed.mag:0); return Math.max(0,m); }
 
+// ---- The Alchemist: INT stands in for SP, and rot cannot touch her ----
+function usesInt(p){ return !!(p && p.classId === 'alchemist'); }
+function spLabel(p){ return usesInt(p) ? 'INT' : 'SP'; }
+function playerInt(p){ return p ? p.maxsp : 0; }          // INT is the max-mana pool, relabelled
+function immuneToRot(c){ return c === G.player && G.player && G.player.classId === 'alchemist'; }
+
 function shieldValue(spec, c, isPlayer){
   const hb = isPlayer ? Math.max(0, Math.floor(G.player.honor/6)) : 0;
   const m = /^def(\d*)$/.exec(String(spec));
@@ -1445,7 +1486,10 @@ function resolveAction(src, dst, action, srcIsPlayer){
 
   // on-hit effects to dst
   const ef = action.effect || {};
-  if (ef.poison){ dst.statuses.poison = { ...ef.poison }; log(`${dstIsPlayer?'You are':dst.name+' is'} afflicted!`, 'bad'); }
+  if (ef.poison){
+    if (immuneToRot(dst)) log('The rot cannot find purchase in you. Iron palate.', 'dim');
+    else { dst.statuses.poison = { ...ef.poison }; log(`${dstIsPlayer?'You are':dst.name+' is'} afflicted!`, 'bad'); }
+  }
   if (ef.weaken){ dst.statuses.weaken = { ...ef.weaken }; log(`${dstIsPlayer?'Your':dst.name+"'s"} strength wanes.`, 'mag'); }
   if (ef.stun && U.chance(ef.stun)){ dst.statuses.stun = 1; log(`${dstIsPlayer?'You are':dst.name+' is'} stunned!`, 'hi'); }
   rogueBleed(src, dst, srcIsPlayer);
@@ -1688,9 +1732,12 @@ function eatFood(id){
   log(`You eat the ${it.name} (+${Math.round(p.food) - before} FOOD).`, 'good');
   floatOn(true, `+${Math.round(p.food) - before}`, '#a87e34');
   if (it.risky && U.chance(0.3)){
-    p.statuses.poison = { dmg:3, turns:3 };
-    log('It goes down warm — then turns on you. Whatever it was, it disagrees with being eaten.', 'bad');
-    discoverCodex('meat_price');
+    if (immuneToRot(p)){ log('It fights back on the way down — and loses. Nothing turns your stomach anymore.', 'dim'); }
+    else {
+      p.statuses.poison = { dmg:3, turns:3 };
+      log('It goes down warm — then turns on you. Whatever it was, it disagrees with being eaten.', 'bad');
+      discoverCodex('meat_price');
+    }
   }
   updateHUD();
   if (G.state === 'COMBAT'){ G.busy=true; G.combat.turn='enemy'; renderActions(); setTimeout(beginEnemyTurn, 500); }
@@ -2406,6 +2453,43 @@ function floatOn(isPlayer, text, color){
 }
 
 // ================= ACTION PANEL =================
+// the Alchemist's combat panel: pick a target, then hurl or pour a brew
+function renderAlchemistCombat(box, p, myTurn){
+  if (!G.combat.potTarget) G.combat.potTarget = 'enemy';
+  const hasFollower = followerAlive();
+  if (G.combat.potTarget === 'follower' && !hasFollower) G.combat.potTarget = 'enemy';
+  // target row
+  const row = U.make('div','target-row');
+  const mk = (key, label) => {
+    const t = U.make('button','tbtn' + (G.combat.potTarget===key?' sel':''));
+    t.textContent = label;
+    t.onclick = () => { G.combat.potTarget = key; renderActions(); };
+    return t;
+  };
+  row.appendChild(mk('enemy', 'At the foe'));
+  row.appendChild(mk('self', 'On yourself'));
+  if (hasFollower) row.appendChild(mk('follower', 'On ' + p.follower.name.split(' ')[0]));
+  box.appendChild(row);
+  box.appendChild(U.make('div','line dim', 'Brew potions at the bench (Menu → Inventory). Throw the harmful ones at the foe; pour the good ones on yourself or your follower.'));
+
+  const kept = p.inv.filter(x => Data.POTIONS[x]);
+  const counts = {}; for (const id of kept) counts[id] = (counts[id]||0) + 1;
+  const order = Object.keys(counts).sort((a,b)=> ['offense','debuff','buff','food'].indexOf(Data.POTIONS[a].cat) - ['offense','debuff','buff','food'].indexOf(Data.POTIONS[b].cat));
+  for (const id of order){
+    const po = Data.POTIONS[id], good = po.cat === 'buff' || po.cat === 'food';
+    const b = Btn('', ()=>applyPotion(id, G.combat.potTarget), 'btn'+(good?' good':''));
+    b.innerHTML = `<span>${po.verb[0].toUpperCase()+po.verb.slice(1)} ${po.name} ×${counts[id]}</span>` +
+      `<span class="cost" style="color:${POT_CAT_COLOR[po.cat]}">${po.cat}</span><span class="sub">${po.desc}</span>`;
+    b.disabled = !myTurn;
+    box.appendChild(b);
+  }
+  // always available, so an empty pack is never a dead end
+  const sp = Btn('', improvisedSplash, 'btn');
+  sp.innerHTML = `<span class="k">✷</span>Improvised Splash<span class="sub">A weak throw of raw reagents at the foe — for when the bottles run dry.</span>`;
+  sp.disabled = !myTurn;
+  box.appendChild(sp);
+}
+
 function renderActions(){
   const box = U.el('actions'); box.innerHTML = '';
   const tc = U.el('touch-controls');
@@ -2415,6 +2499,11 @@ function renderActions(){
     // log gets the whole dock and the D-pad sits at the bottom of the screen
   } else if (G.state === 'COMBAT' && G.combat){
     const p = G.player, myTurn = G.combat.turn === 'player' && !G.busy;
+    // the Alchemist fights entirely through potions — her own panel replaces
+    // limb-aiming and the skill list
+    if (usesInt(p)){
+      renderAlchemistCombat(box, p, myTurn);
+    } else {
     // ---- aim row: physical attacks strike the chosen part ----
     const en = G.combat.enemy;
     if (en.parts){
@@ -2446,6 +2535,7 @@ function renderActions(){
       b.disabled = !myTurn || sk.cost > p.sp;
       box.appendChild(b);
     });
+    }   // end non-Alchemist limb-aim + skill list
     // relic powers — once per battle
     for (const slot of ['weapon','armor','trinket']){
       const id = p.equip[slot]; if (!id) continue;
@@ -2467,8 +2557,9 @@ function renderActions(){
     if (potions){ const b = Btn(`Draught of Mending ×${potions}`, ()=>usePotion('potion_heal'), 'btn good'); b.disabled=!myTurn; box.appendChild(b); }
     const focuses = p.inv.filter(x=>x==='potion_focus').length;
     if (focuses){ const b = Btn(`Draught of Focus ×${focuses} (+5 SP)`, ()=>usePotion('potion_focus'), 'btn'); b.disabled=!myTurn || p.sp>=p.maxsp; box.appendChild(b); }
-    // no skill you can pay for — offer an explicit way to yield the turn so SP ticks back
-    if (!hasAffordableSkill(p)){
+    // no skill you can pay for — offer an explicit way to yield the turn so SP ticks
+    // back (the Alchemist never needs this: Improvised Splash is always available)
+    if (!usesInt(p) && !hasAffordableSkill(p)){
       const b = Btn('', passTurn, 'btn danger');
       b.innerHTML = `<span class="k">⏳</span>Catch your breath<span class="sub">No focus left for any skill — yield the turn and recover SP.</span>`;
       b.disabled = !myTurn;
@@ -2535,21 +2626,32 @@ function showCharSelect(){
   const cards = {};
   for (const id in Data.CLASSES){
     const c = Data.CLASSES[id];
-    const card = U.make('div','card'+(id===G.selClass?' sel':''));
+    const locked = c.locked && !Save.hasAchievement(c.locked);
+    const card = U.make('div','card'+(id===G.selClass?' sel':'')+(locked?' locked':''));
     const cv = U.make('canvas'); cv.width=52; cv.height=52; card.appendChild(cv); Sprites.toCanvas(cv, c.sprite, 4);
     const info = U.make('div');
-    info.appendChild(U.make('h3',null,c.name));
+    info.appendChild(U.make('h3',null,c.name + (locked ? ' 🔒' : '')));
     info.appendChild(U.make('div','role',c.role));
-    const b=c.base;
-    info.appendChild(U.make('div','stats',
-      `<b>HP</b> ${b.hp} · <b>SP</b> ${b.sp} · <b>ATK</b> ${b.atk} · <b>DEF</b> ${b.def} · <b>MAG</b> ${b.mag} · <b>SPD</b> ${b.spd}<br>` +
-      `Honor start: <span style="color:${Data.honorTier(c.honor).color}">${c.honor} (${Data.honorTier(c.honor).name})</span><br>` +
-      ((Data.PASSIVES[id] || []).map(pv =>
-        `<span style="color:#9a5cc0">◈ ${pv.name}</span> — <span style="color:#8a7f9e">${pv.desc}</span><br>`).join('')) +
-      `<span style="color:#8a7f9e">${c.flavor}</span>`));
+    const b=c.base, sp = c.usesInt ? `<b>INT</b> ${b.sp}` : `<b>SP</b> ${b.sp}`;
+    if (locked){
+      info.appendChild(U.make('div','stats',
+        `<span style="color:#c05070">Locked.</span> Finish the potion-maker\'s quest — <i>“One drink and the pain goes away.”</i> — to earn this class.<br>` +
+        `<span style="color:#8a7f9e">${c.flavor}</span>`));
+    } else {
+      info.appendChild(U.make('div','stats',
+        `<b>HP</b> ${b.hp} · ${sp} · <b>ATK</b> ${b.atk} · <b>DEF</b> ${b.def} · <b>MAG</b> ${b.mag} · <b>SPD</b> ${b.spd}<br>` +
+        `Honor start: <span style="color:${Data.honorTier(c.honor).color}">${c.honor} (${Data.honorTier(c.honor).name})</span><br>` +
+        ((Data.PASSIVES[id] || []).map(pv =>
+          `<span style="color:#9a5cc0">◈ ${pv.name}</span> — <span style="color:#8a7f9e">${pv.desc}</span><br>`).join('')) +
+        `<span style="color:#8a7f9e">${c.flavor}</span>`));
+    }
     card.appendChild(info);
-    card.onclick = ()=>{ G.selClass=id; for(const k in cards) cards[k].classList.toggle('sel', k===id); };
+    if (!locked) card.onclick = ()=>{ G.selClass=id; for(const k in cards) cards[k].classList.toggle('sel', k===id); };
     cards[id]=card; grid.appendChild(card);
+  }
+  // if the current pick is a locked class (e.g. after a wipe), fall back to knight
+  if (Data.CLASSES[G.selClass] && Data.CLASSES[G.selClass].locked && !Save.hasAchievement(Data.CLASSES[G.selClass].locked)){
+    G.selClass = 'knight'; if (cards.knight) cards.knight.classList.add('sel');
   }
   s.appendChild(grid);
   const row = U.make('div','row');
@@ -3148,8 +3250,9 @@ function showInventory(){
   s.appendChild(U.make('div','sect', p.name + ' — Depth ' + G.depth));
   const tier = Data.honorTier(p.honor);
   const hs = hungerStage(p);
+  const spTxt = usesInt(p) ? `<b>INT</b> ${p.maxsp}` : `<b>SP</b> ${p.sp}/${p.maxsp}`;
   s.appendChild(U.make('div','p',
-    `<b>HP</b> ${p.hp}/${p.maxhp} · <b>SP</b> ${p.sp}/${p.maxsp} · <b>Gold</b> <span style="color:#d0a84e">${p.gold}</span><br>` +
+    `<b>HP</b> ${p.hp}/${p.maxhp} · ${spTxt} · <b>Gold</b> <span style="color:#d0a84e">${p.gold}</span><br>` +
     `<b>ATK</b> ${p.atk} · <b>DEF</b> ${p.def} · <b>MAG</b> ${p.mag} · <b>SPD</b> ${p.spd}<br>` +
     `<b>Honor</b> <span style="color:${tier.color}">${p.honor} (${tier.name})</span> · ` +
     `<b>FOOD</b> <span style="color:${hs>=2?'#c05030':'#a87e34'}">${Math.round(p.food)}/${FOOD_MAX}${hs?' — '+HUNGER_NAMES[hs]:''}</span>`));
@@ -3169,12 +3272,15 @@ function showInventory(){
     grid.appendChild(b);
   }
   s.appendChild(grid);
-  const learnRow = U.make('div','row');
-  const learnable = Object.keys(Data.SKILLS).some(id => Data.SKILLS[id].learnable && !p.skills.includes(id));
-  const lb = Btn(`Bind a New Skill — ◈ ${skillLearnCost(p)}`, showLearnSkill, 'btn');
-  lb.disabled = !learnable;
-  learnRow.appendChild(lb);
-  s.appendChild(learnRow);
+  // the Alchemist binds no skills — she brews instead
+  if (!(Data.CLASSES[p.classId] && Data.CLASSES[p.classId].craftOnly)){
+    const learnRow = U.make('div','row');
+    const learnable = Object.keys(Data.SKILLS).some(id => Data.SKILLS[id].learnable && !p.skills.includes(id));
+    const lb = Btn(`Bind a New Skill — ◈ ${skillLearnCost(p)}`, showLearnSkill, 'btn');
+    lb.disabled = !learnable;
+    learnRow.appendChild(lb);
+    s.appendChild(learnRow);
+  }
 
   s.appendChild(U.make('div','sect','Equipment'));
   for (const slot of ['weapon','armor','trinket']){
@@ -3208,7 +3314,29 @@ function showInventory(){
     }
   }
 
-  s.appendChild(U.make('div','sect','Skills'));
+  // The Alchemist has no skills — she has a crafting bench instead
+  if (Data.CLASSES[p.classId] && Data.CLASSES[p.classId].craftOnly){
+    s.appendChild(U.make('div','sect','The Bench'));
+    s.appendChild(U.make('div','p dim',
+      `Gathered herbs: <b style="color:#7fae3a">${plantCount(p)}</b>. Brew them into potions to hurl or pour in a fight — and every brew sharpens your <b>INT</b> (now ${p.maxsp}), which makes the next potion bite harder.`));
+    const brewBtn = Btn('⚗ Crafting bench', ()=>{ hideModal(); showCrafting(); }, 'btn good');
+    s.appendChild(brewBtn);
+    const kept = p.inv.filter(x=>Data.POTIONS[x]);
+    if (kept.length){
+      const counts = {}; for (const id of kept) counts[id] = (counts[id]||0)+1;
+      s.appendChild(U.make('div','p dim', 'Brewed and ready: ' +
+        Object.keys(counts).map(id => `${Data.POTIONS[id].name} ×${counts[id]}`).join(' · ')));
+    }
+  }
+
+  s.appendChild(U.make('div','sect', (Data.CLASSES[p.classId]&&Data.CLASSES[p.classId].craftOnly) ? 'Recipes known' : 'Skills'));
+  if (Data.CLASSES[p.classId] && Data.CLASSES[p.classId].craftOnly){
+    for (const id in Data.POTIONS){ const po = Data.POTIONS[id];
+      const catColor = { offense:'#c05070', debuff:'#9a5cc0', buff:'#63b7a6', food:'#a87e34' }[po.cat];
+      s.appendChild(U.make('div','p dim',
+        `<span style="color:${catColor}">${po.name}</span> <span style="font-size:10px">[${po.cat}]</span> — ${po.desc} <span class="dim">(${po.plants} herbs)</span>`));
+    }
+  } else
   for (const id of p.skills){
     const sk = Data.SKILLS[id], mine = skillOwned(p, id), lv = skillLevel(p, id);
     const pips = '<span style="color:#c8a24a">' + '◆'.repeat(lv) + '</span><span style="color:#3a3350">' + '◇'.repeat(3-lv) + '</span>';
@@ -3247,6 +3375,109 @@ function showInventory(){
   row.appendChild(Btn('Close', hideModal, 'btn center'));
   s.appendChild(row);
   setModal(s);
+}
+
+// ---- The crafting bench: turn gathered herbs into potions, sharpening INT ----
+const POT_CAT_COLOR = { offense:'#c05070', debuff:'#9a5cc0', buff:'#63b7a6', food:'#a87e34' };
+function craftPotion(id){
+  const p = G.player, po = Data.POTIONS[id];
+  if (!po || plantCount(p) < po.plants) return;
+  spendPlants(p, po.plants);
+  p.inv.push(id);
+  p.baseSp += 1; recomputeStats(p); p.sp = p.maxsp;   // every brew sharpens INT
+  log(`You brew a ${po.name}. Your hands remember the work — INT is now ${p.maxsp}.`, 'mag');
+  updateHUD();
+  showCrafting();
+}
+function showCrafting(){
+  const p = G.player;
+  const s = U.make('div','sheet');
+  s.appendChild(U.make('div','sect','The Crafting Bench'));
+  const herbs = Object.keys(p.plants||{}).filter(k=>p.plants[k]>0);
+  s.appendChild(U.make('div','p',
+    `<b>INT ${p.maxsp}</b> — every potion you brew scales with it. Herbs on hand: <b style="color:#7fae3a">${plantCount(p)}</b>.`));
+  s.appendChild(U.make('div','p dim', herbs.length
+    ? herbs.map(k=>`<span style="color:${Data.PLANTS[k].color}">${Data.PLANTS[k].glyph}</span> ${Data.PLANTS[k].name} ×${p.plants[k]}`).join(' · ')
+    : '<i>No herbs gathered. Walk over the sprigs that glow green on the floor.</i>'));
+
+  for (const cat of ['offense','debuff','buff','food']){
+    s.appendChild(U.make('div','sect', ({offense:'Offensive — to hurl',debuff:'Debuff — to hurl',buff:'Buff — to pour',food:'Food — to serve'})[cat]));
+    for (const id in Data.POTIONS){
+      const po = Data.POTIONS[id]; if (po.cat !== cat) continue;
+      const can = plantCount(p) >= po.plants;
+      const b = Btn('', ()=>craftPotion(id), 'btn'+(can?' good':''));
+      const have = p.inv.filter(x=>x===id).length;
+      b.innerHTML = `<span>${po.name}${have?` <span class="dim">(have ${have})</span>`:''}</span>` +
+        `<span class="cost">${po.plants} herbs</span><span class="sub">${po.desc} — brewing +1 INT</span>`;
+      b.disabled = !can;
+      s.appendChild(b);
+    }
+  }
+  const row = U.make('div','row');
+  row.appendChild(Btn('Back to Inventory', ()=>{ hideModal(); showInventory(); }, 'btn center'));
+  row.appendChild(Btn('Close', hideModal, 'btn center'));
+  s.appendChild(row);
+  setModal(s);
+}
+
+// ---- Using a potion in a fight: hurled at a foe, poured on an ally, or on you ----
+function potPower(spec, int){ return Array.isArray(spec) ? Math.round(spec[0] + int * spec[1]) : spec; }
+function potionTargetName(tgt){ return tgt === 'enemy' ? (G.combat && G.combat.enemy.name) : tgt === 'follower' ? (G.player.follower && G.player.follower.name) : 'yourself'; }
+function applyPotion(id, tgt){
+  if (G.busy || G.state !== 'COMBAT' || !G.combat) return;
+  const p = G.player, i = p.inv.indexOf(id);
+  if (i < 0) return;
+  const po = Data.POTIONS[id];
+  // resolve the target object
+  let T = tgt === 'enemy' ? G.combat.enemy : tgt === 'follower' ? p.follower : p;
+  if (!T){ log('There is no one there to catch it.', 'dim'); return; }
+  const tIsEnemy = tgt === 'enemy', tIsPlayer = T === p;
+  const int = playerInt(p);
+  p.inv.splice(i,1);
+  G.busy = true; G.combat.turn = 'enemy'; renderActions();
+
+  const nm = po.name, who = potionTargetName(tgt);
+  if (po.cat === 'offense'){
+    let dmg = potPower(po.dmg, int);
+    if (T.shield > 0){ const ab = Math.min(T.shield, dmg); T.shield -= ab; dmg -= ab; if (ab>0) log(`${tIsEnemy?T.name+"'s":'the'} shield absorbs ${ab}.`, 'dim'); }
+    T.hp -= Math.max(0, dmg);
+    log(`You ${po.verb} a ${nm} at ${who} — ${Math.max(0,dmg)} damage.`, tIsEnemy?'hi':'bad');
+    floatOn(!tIsEnemy && tIsPlayer, `-${Math.max(0,dmg)}`, '#c03636');
+  }
+  if (po.effect){
+    const ef = po.effect;
+    if (ef.poison){ if (immuneToRot(T)) log(`${who} shrugs off the rot.`, 'dim'); else { T.statuses.poison = { ...ef.poison }; log(`${who} is wracked with rot.`, tIsEnemy?'hi':'bad'); } }
+    if (ef.weaken){ T.statuses.weaken = { ...ef.weaken }; log(`${who} is weakened.`, tIsEnemy?'hi':'mag'); }
+    if (ef.stun && U.chance(ef.stun)){ if (!tIsPlayer){ T.statuses.stun = 1; log(`${who} is stunned!`, 'hi'); } }
+  }
+  if (po.buff){
+    if (po.buff.atkbuff){ const amt = potPower(po.buff.atkbuff, int); T.statuses.atkbuff = { amt, turns:3 }; log(`${who}: +${amt} ATK for 3 turns.`, 'good'); }
+    if (po.buff.regen){ const amt = potPower(po.buff.regen, int); T.statuses.regen = { amt, turns:3 }; log(`${who}: regenerating ${amt}/turn.`, 'good'); }
+    if (po.buff.shield){ const v = potPower(po.buff.shield, int); T.shield = Math.min(SHIELD_MAX, (T.shield||0) + v); log(`${who}: +${v} shield.`, 'good'); floatOn(tIsPlayer, `+${v}⛊`, '#8ab0e0'); }
+  }
+  if (po.heal){ const v = potPower(po.heal, int); const before = T.hp; T.hp = Math.min(maxHp(T, tIsPlayer), T.hp + v); log(`${who} mends ${T.hp-before} HP.`, 'good'); floatOn(tIsPlayer, `+${T.hp-before}`, '#6fbf6a'); }
+  if (po.food){
+    if (tIsEnemy){ log('The enemy has no belly you care to fill.', 'dim'); }
+    else if (tgt === 'follower'){ T.food = Math.min(FOLLOWER_FOOD_MAX, T.food + po.food); log(`${who} eats — FOOD restored.`, 'good'); }
+    else { const b = Math.round(p.food); p.food = Math.min(FOOD_MAX, p.food + po.food); log(`You drink the ${nm} (+${Math.round(p.food)-b} FOOD).`, 'good'); }
+  }
+  updateHUD();
+  if (G.combat.enemy.hp <= 0){ setTimeout(win, 550); return; }
+  setTimeout(beginEnemyTurn, 560);
+}
+// the Alchemist's fallback when the bottles run dry — a weak improvised splash
+function improvisedSplash(){
+  if (G.busy || G.state !== 'COMBAT' || !G.combat) return;
+  const p = G.player, en = G.combat.enemy;
+  G.busy = true; G.combat.turn = 'enemy'; renderActions();
+  let dmg = Math.max(1, Math.round(3 + playerInt(p) * 0.2 - en.def * 0.3));
+  if (en.shield > 0){ const ab = Math.min(en.shield, dmg); en.shield -= ab; dmg -= ab; }
+  en.hp -= Math.max(0, dmg);
+  log(`You fling a fistful of reagents — ${Math.max(0,dmg)} damage. It is not much.`, 'hi');
+  floatOn(false, `-${Math.max(0,dmg)}`, '#c03636');
+  updateHUD();
+  if (en.hp <= 0){ setTimeout(win, 550); return; }
+  setTimeout(beginEnemyTurn, 560);
 }
 
 function showCodex(fromGame){
