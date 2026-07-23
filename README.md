@@ -182,6 +182,37 @@ One signature rule each, always on:
 | **Oathwarden** | Last Vigil | **Once per descent** a killing blow leaves him on 1 HP — then **2 turns** to finish the foe. Kill it and he keeps that life; fail and it is over |
 | **Gravethief** | Cutthroat's Luck | Each fight a coin picks one: **every strike bleeds** (ATK×2+5 a turn), or **critical hits bite 10% deeper** |
 
+## Gear: rarity, passives and sets
+
+Nothing is bought blind. **Tapping any item in the shop opens an inspection sheet**: its
+full stats beside whatever you already wear in that slot, with a per-stat change column,
+its passive spelled out in plain words, and — for set pieces — how many of the set you
+have. Only then does the *Take it* button appear.
+
+- **Uniques** carry an always-on passive: Widowmaker (+18% crit), Glutton's Girdle (hunger
+  half speed), Reaper's Tithe (+50% Souls), Pilgrim's Mercy (mends you as you walk), Dread
+  Aegis (open every fight shielded), Brand of Ruin (+20% damage).
+- **Legendaries** keep their once-per-battle called power *and* a passive.
+- **Sets** are the gamble. **The Pauper's Vigil** and **Carrion Communion** are three pieces
+  each, and every piece is deliberately the feeblest thing in its slot — a stick, some rags,
+  an empty bowl. Wear all three and the set beats anything else in the game: the Pauper's
+  Vigil finishes at **+13 ATK / +11 DEF / +34 HP / +6 MAG / +3 SP**, blows that drink 20%,
+  and half-speed hunger — measured against 25/23/72 for the best legendary combination.
+
+## Setting a descent down
+
+**Menu → Set Down the Descent** saves everything: your character, the depth, the biome, the
+entire floor with its entities and every tile of fog you have lifted. The title screen then
+offers **Continue**. Dying, winning or abandoning clears the save — a descent that ended
+cannot be taken up again.
+
+## Reading the floor
+
+Encounters no longer show a blank `!`. Each of the 28 has **its own glyph and colour** —
+`☽` the woman at the well, `⚖` the Inquisition's envoy, `¤` the Nameless god's coin, `✂` the
+seamstress, `⚒` the forge widow, `♛` the Hollow Prince — so you can tell what waits in a
+room before you walk into it.
+
 ## Followers: a promise, not a perk
 
 The **Oathless** encounter offers you someone who wants to walk behind you. Taking them

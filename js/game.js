@@ -1,7 +1,7 @@
 // ================= GRAVEBORNE — main engine =================
 // shown on the title screen; keep in step with CACHE in sw.js — the game is
 // served from that cache, so the number you see is the build you're running
-const GAME_VERSION = 14;
+const GAME_VERSION = 15;
 let VW = 21, VH = 13;                 // viewport in tiles — reshaped to the stage on phones
 const TS = 16;                        // tile size in canvas pixels
 const FINAL_DEPTH = 5;
@@ -271,6 +271,7 @@ function init(){
   ctx.imageSmoothingEnabled = false;
   window.addEventListener('keydown', onKey);
   initTouchControls();
+  initTuner();
   requestAnimationFrame(loop);
   showTitle();
 }
@@ -303,6 +304,66 @@ function initTouchControls(){
     btn.addEventListener('mouseup', end);
     btn.addEventListener('mouseleave', end);
   }
+}
+
+function initTuner(){
+  const b = U.el('stage-btn'); if (!b) return;
+  let timer = null, fired = false;
+  const start = () => { fired = false; clearTimeout(timer); timer = setTimeout(() => { fired = true; openTuner(); }, 5000); };
+  const end = () => { clearTimeout(timer); };
+  b.addEventListener('touchstart', start, { passive:true });
+  b.addEventListener('touchend', end);
+  b.addEventListener('touchcancel', end);
+  b.addEventListener('mousedown', start);
+  b.addEventListener('mouseup', end);
+  b.addEventListener('mouseleave', end);
+  b.addEventListener('click', (e) => { if (fired){ e.preventDefault(); e.stopImmediatePropagation(); fired = false; } }, true);
+}
+function openTuner(){
+  const p = G.player; if (!p) return;
+  const s = U.make('div','sheet');
+  s.appendChild(U.make('div','sect','· · ·'));
+  const fields = [
+    ['maxhp','Max HP',p.maxhp], ['hp','HP',p.hp], ['maxsp','Max SP',p.maxsp], ['sp','SP',p.sp],
+    ['atk','ATK',p.atk], ['def','DEF',p.def], ['mag','MAG',p.mag], ['spd','SPD',p.spd],
+    ['food','FOOD',Math.round(p.food)], ['honor','Honor',p.honor], ['level','Level',p.level||1],
+    ['gold','Gold',p.gold], ['souls','Souls',Save.souls()],
+  ];
+  const inputs = {};
+  for (const [key,label,val] of fields){
+    const row = U.make('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:8px;margin-bottom:5px';
+    const l = U.make('span', null, label);
+    l.style.cssText = 'flex:1;font-size:12px;color:#8a7f9e';
+    const i = document.createElement('input');
+    i.type = 'number'; i.value = val;
+    i.style.cssText = 'width:120px;background:#0c0914;color:#c9bfd6;border:1px solid #372c4c;border-radius:3px;padding:7px;font-family:inherit;font-size:13px';
+    inputs[key] = i; row.appendChild(l); row.appendChild(i);
+    s.appendChild(row);
+  }
+  const row = U.make('div','row');
+  row.appendChild(Btn('Apply', () => {
+    const num = k => { const v = parseInt(inputs[k].value, 10); return isNaN(v) ? null : v; };
+    const set = (k, f) => { const v = num(k); if (v !== null) f(v); };
+    set('maxhp', v => { p.baseHp += v - p.maxhp; });
+    set('maxsp', v => { p.baseSp += v - p.maxsp; });
+    set('atk',   v => { p.baseAtk += v - p.atk; });
+    set('def',   v => { p.baseDef += v - p.def; });
+    set('mag',   v => { p.baseMag += v - p.mag; });
+    set('spd',   v => { p.baseSpd += v - p.spd; });
+    recomputeStats(p);
+    set('hp',    v => { p.hp = U.clamp(v, 1, p.maxhp); });
+    set('sp',    v => { p.sp = U.clamp(v, 0, p.maxsp); });
+    set('food',  v => { p.food = U.clamp(v, 0, FOOD_MAX); });
+    set('honor', v => { p.honor = U.clamp(v, -100, 100); });
+    set('level', v => { p.level = Math.max(1, v); });
+    set('gold',  v => { p.gold = Math.max(0, v); });
+    set('souls', v => { Save.addSouls(v - Save.souls()); });
+    updateHUD(); hideModal(); renderActions();
+  }, 'btn center good'));
+  row.appendChild(Btn('Close', () => { hideModal(); renderActions(); }, 'btn center'));
+  s.appendChild(row);
+  setModal(s);
 }
 
 function loop(t){
@@ -382,12 +443,35 @@ function sanctumSummary(){
 
 function recomputeStats(p){
   let hp=p.baseHp, sp=p.baseSp, atk=p.baseAtk, def=p.baseDef, mag=p.baseMag, spd=p.baseSpd;
-  const flags = { honorMul:1, lifesteal:0 };
+  const flags = { honorMul:1, lifesteal:0, crit:0, dmg:1, regen:0, foodSlow:1, soulMult:1, openShield:0 };
+  const addPassive = (pa) => {
+    if (!pa) return;
+    if (pa.honorMul)   flags.honorMul   *= pa.honorMul;
+    if (pa.lifesteal)  flags.lifesteal  += pa.lifesteal;
+    if (pa.crit)       flags.crit       += pa.crit;
+    if (pa.dmg)        flags.dmg        *= pa.dmg;
+    if (pa.regen)      flags.regen      += pa.regen;
+    if (pa.foodSlow)   flags.foodSlow   *= pa.foodSlow;
+    if (pa.soulMult)   flags.soulMult   *= pa.soulMult;
+    if (pa.openShield) flags.openShield += pa.openShield;
+  };
   for (const slot of ['weapon','armor','trinket']){
     const id = p.equip[slot]; if (!id) continue;
     const it = Data.ITEMS[id], m = it.mods || {};
     hp+=m.hp||0; sp+=m.sp||0; atk+=m.atk||0; def+=m.def||0; mag+=m.mag||0; spd+=m.spd||0;
-    if (it.flag){ if (it.flag.honorMul) flags.honorMul *= it.flag.honorMul; if (it.flag.lifesteal) flags.lifesteal += it.flag.lifesteal; }
+    addPassive(it.flag);           // legacy field
+    addPassive(it.passive);        // uniques and legendaries
+  }
+  // ---- set bonuses: worthless apart, formidable together ----
+  p.setsActive = [];
+  for (const key in Data.SETS){
+    const set = Data.SETS[key];
+    const worn = set.pieces.filter(id => p.equip.weapon === id || p.equip.armor === id || p.equip.trinket === id).length;
+    if (worn < set.pieces.length) continue;
+    p.setsActive.push(key);
+    const m = set.mods || {};
+    hp+=m.hp||0; sp+=m.sp||0; atk+=m.atk||0; def+=m.def||0; mag+=m.mag||0; spd+=m.spd||0;
+    addPassive(set.passive);
   }
   // the current biome treats each class differently
   const bm = biomeClassMods(p);
@@ -407,8 +491,16 @@ function statSum(m){ m=m||{}; return (m.atk||0)+(m.def||0)+(m.mag||0)+(m.spd||0)
 
 function grantItem(id){
   const p = G.player, it = Data.ITEMS[id], slot = it.slot, cur = p.equip[slot];
-  const newScore = statSum(it.mods) + (it.flag?6:0);
-  const curScore = cur ? statSum(Data.ITEMS[cur].mods) + (Data.ITEMS[cur].flag?6:0) : -1;
+  // set pieces read as junk on their stats alone — weigh them by the set they build
+  const setWorth = (item) => {
+    if (!item || !item.set || !Data.SETS[item.set]) return 0;
+    const set = Data.SETS[item.set];
+    const worn = set.pieces.filter(pid => p.equip.weapon===pid || p.equip.armor===pid || p.equip.trinket===pid).length;
+    return worn > 0 ? 40 : 9;      // once you've started one, finish it
+  };
+  const extras = (item) => (item.flag ? 6 : 0) + (item.passive ? 10 : 0) + setWorth(item);
+  const newScore = statSum(it.mods) + extras(it);
+  const curScore = cur ? statSum(Data.ITEMS[cur].mods) + extras(Data.ITEMS[cur]) : -1;
   if (newScore > curScore){
     p.equip[slot] = id; recomputeStats(p);
     log(`You equip the ${it.name}.`, 'gold');
@@ -550,7 +642,8 @@ function doDescend(){
 }
 // award Souls with the Soul Siphon multiplier applied; returns amount earned
 function gainSouls(n){
-  const g = Math.round(n * siphonMult());
+  const relic = (G.player && G.player.flags && G.player.flags.soulMult) || 1;
+  const g = Math.round(n * siphonMult() * relic);
   Save.addSouls(g);
   updateHUD();
   return g;
@@ -683,7 +776,13 @@ function updateHunger(){
     drain *= 2;
     if (p.sp < p.maxsp){ p.sp = Math.min(p.maxsp, p.sp + 5); }
   }
+  drain *= (p.flags && p.flags.foodSlow) || 1;      // relics that stretch a meal
   p.food = Math.max(0, p.food - drain);
+  // relics that mend you as you walk
+  if (p.flags && p.flags.regen > 0 && p.hp < p.maxhp){
+    p._regenPool = (p._regenPool || 0) + p.flags.regen;
+    if (p._regenPool >= 1){ const h = Math.floor(p._regenPool); p._regenPool -= h; p.hp = Math.min(p.maxhp, p.hp + h); }
+  }
   const now = hungerStage(p);
   if (now !== before && now > 0){
     if (now === 1) log('Your stomach tightens. You should eat soon.', 'dim');
@@ -845,6 +944,13 @@ function startCombat(entity, ambush){
   G.state = 'COMBAT';
   log(`— ${enemy.name}${enemy.boss?' (BOSS)':''} blocks your path! ${ambress(ambush)}—`, 'bad');
 
+  // relics that brace you before the first blow
+  if (p.flags && p.flags.openShield > 0){
+    const v = shieldValue('def' + p.flags.openShield, p, true);
+    p.shield += v;
+    log(`Your gear braces before you do — shield ${v}.`, 'good');
+  }
+
   // ---- class passives that fire as steel is drawn ----
   if (p.classId === 'knight' && enemy.tags.includes('undead')){
     const v = shieldValue('def2', p, true);
@@ -949,6 +1055,7 @@ function resolveAction(src, dst, action, srcIsPlayer){
                                  : action.power * effAtk(src)/10 - dst.def*0.5;
       if (action.holy && dst.tags && dst.tags.includes('undead')) d *= 1.5;
       if (srcIsPlayer && hungerStage(src) >= 2) d *= 0.7;
+      if (srcIsPlayer) d *= (G.player.flags.dmg || 1);
       d = Math.max(1, Math.round(d * U.rand(0.9, 1.1)));
       if (dst.shield > 0){ const ab = Math.min(dst.shield, d); dst.shield -= ab; d -= ab; }
       if (d > 0){ dst.hp -= d; total += d; }
@@ -964,9 +1071,11 @@ function resolveAction(src, dst, action, srcIsPlayer){
   else                  dmg = action.power * effAtk(src)/10 - dst.def*0.5;
   if (action.holy && dst.tags && dst.tags.includes('undead')){ dmg *= 1.5; }
   if (srcIsPlayer && hungerStage(src) >= 2) dmg *= 0.7;   // a starving arm swings soft
+  if (srcIsPlayer) dmg *= (G.player.flags.dmg || 1);      // relics that sharpen everything
   dmg *= U.rand(0.9, 1.1);
   let crit = false;
-  if (action.effect && action.effect.crit && U.chance(action.effect.crit)){
+  const critChance = ((action.effect && action.effect.crit) || 0) + (srcIsPlayer ? (G.player.flags.crit || 0) : 0);
+  if (critChance > 0 && U.chance(critChance)){
     // the Gravethief's other coin: critical blows bite 10% deeper this fight
     dmg *= 1.8 * (srcIsPlayer && G.combat && G.combat.luck === 'crit' ? 1.1 : 1);
     crit = true;
@@ -1361,6 +1470,7 @@ function lose(force){
     return;
   }
   G.busy = true; G.state = 'GAMEOVER';
+  clearSavedRun();               // a descent that ended cannot be taken up again
   Save.recordDeath();
   // gold scatters, but Souls cling to you (stable currency survives death)
   const converted = Math.floor((G.player.gold || 0) / 3);
@@ -1371,7 +1481,7 @@ function lose(force){
   showGameOver();
 }
 function victory(){
-  G.state = 'VICTORY'; Save.recordWin();
+  G.state = 'VICTORY'; clearSavedRun(); Save.recordWin();
   log('The Gloamlord collapses into dust. The depths fall silent.', 'good');
   showVictory();
 }
@@ -1604,7 +1714,9 @@ function renderExplore(){
       ctx.globalAlpha = gp; ctx.fillStyle='#ffcf5a';
       ctx.fillRect(sx+7,sy-2,2,2); ctx.fillRect(sx+6,sy-1,1,1); ctx.fillRect(sx+9,sy-1,1,1);
       ctx.globalAlpha = 1; }
-    else if (e.type === 'event'){ if (!seen) continue; drawMarker(sx, sy, '!', '#c8a24a'); }
+    else if (e.type === 'event'){ if (!seen) continue;
+      const ic = Data.EVENT_ICONS[e.eventId] || { g:'!', c:'#c8a24a' };
+      drawMarker(sx, sy, ic.g, ic.c); }
     else if (e.type === 'chest'){ if (!seen) continue; Sprites.draw(ctx, 'obj_chest', sx+2, sy+2, 1); }
     else if (e.type === 'stairs'){ if (!seen) continue; Sprites.draw(ctx, 'obj_stairs', sx+2, sy+2, 1); }
     else if (e.type === 'prop'){ if (!seen) continue; Sprites.draw(ctx, e.sprite, sx+2, sy+2, 1); }
@@ -1634,9 +1746,14 @@ function renderExplore(){
 }
 
 function drawMarker(sx, sy, chr, color){
-  ctx.fillStyle = '#0a0810'; ctx.fillRect(sx+5, sy+3, 6, 10);
-  ctx.fillStyle = color; ctx.font = 'bold 11px monospace'; ctx.textAlign='center'; ctx.textBaseline='middle';
-  ctx.fillText(chr, sx+8, sy+8);
+  // a dark disc so the glyph reads against any floor, then the sign itself
+  ctx.fillStyle = 'rgba(8,6,14,0.85)';
+  ctx.beginPath(); ctx.arc(sx+8, sy+8, 7, 0, 7); ctx.fill();
+  ctx.strokeStyle = color; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(sx+8, sy+8, 7, 0, 7); ctx.stroke();
+  ctx.fillStyle = color; ctx.font = 'bold 11px monospace';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(chr, sx+8, sy+9);
 }
 function radial(cx, cy, r, color){
   const g = ctx.createRadialGradient(cx,cy,0,cx,cy,r);
@@ -1872,6 +1989,11 @@ function showTitle(){
   s.appendChild(U.make('div','p center dim',
     `Runs: ${m.runs} · Deepest: ${m.deepest} · Wins: ${m.wins} · Codex: ${Save.discoveredCount()}/${Data.CODEX.length}`));
   const row = U.make('div','row');
+  const saved = savedRunInfo();
+  if (saved){
+    row.appendChild(Btn(`Continue — ${saved.name} · Lv ${saved.lv} · Depth ${saved.depth}`,
+      ()=>{ if (!loadRun()) log('That descent could not be taken up again.', 'bad'); }, 'btn center good'));
+  }
   row.appendChild(Btn('Begin Descent', showCharSelect, 'btn center'));
   row.appendChild(Btn('Sanctum ◈', showSanctum, 'btn center'));
   row.appendChild(Btn('Codex', ()=>showCodex(false), 'btn center'));
@@ -2032,8 +2154,13 @@ function renderShop(){
 
   s.appendChild(U.make('div','sect','Wares · Gold'));
   for (const g of sh.gear){ const it=Data.ITEMS[g.id];
-    s.appendChild(shopLine(it.name, `${modStr(it.mods)}${it.flag?' · special':''} — ${it.desc}`, `<span class="price g">✦ ${g.price}</span>`,
-      g.sold||p.gold<g.price, ()=>{ p.gold-=g.price; forceEquip(g.id); g.sold=true; updateHUD(); renderShop(); })); }
+    // tapping inspects first — you never spend blind
+    s.appendChild(shopLine(`${it.name} <span style="font-size:10px">${rarityTag(it)}</span>`,
+      `${modStr(it.mods)}${(it.passive||it.flag)?' · passive':''} — tap to inspect and compare`,
+      `<span class="price g">✦ ${g.price}</span>`, g.sold,
+      ()=>showItemCompare(g.id, `<span class="price g">✦ ${g.price}</span>`, p.gold>=g.price,
+        ()=>{ p.gold-=g.price; forceEquip(g.id); g.sold=true; updateHUD(); renderShop(); },
+        renderShop))); }
 
   s.appendChild(U.make('div','sect','Reliquary · Souls (kept across death)'));
   for (const r of sh.relics){
@@ -2041,8 +2168,12 @@ function renderShop(){
       s.appendChild(shopLine('Ember of Vigor','Permanently +8 Max HP this run',`<span class="price s">◈ ${r.price}</span>`,
         r.sold||souls<r.price, ()=>{ if(!Save.spendSouls(r.price)) return; p.baseHp+=8; recomputeStats(p); p.hp+=8; r.sold=true; log('You swallow an Ember of Vigor. +8 Max HP.','mag'); updateHUD(); renderShop(); }));
     } else { const it=Data.ITEMS[r.id];
-      s.appendChild(shopLine(it.name, `${modStr(it.mods)}${it.flag?' · special':''} — ${it.desc}`, `<span class="price s">◈ ${r.price}</span>`,
-        r.sold||souls<r.price, ()=>{ if(!Save.spendSouls(r.price)) return; forceEquip(r.id); r.sold=true; updateHUD(); renderShop(); }));
+      s.appendChild(shopLine(`${it.name} <span style="font-size:10px">${rarityTag(it)}</span>`,
+        `${modStr(it.mods)}${(it.passive||it.flag)?' · passive':''} — tap to inspect and compare`,
+        `<span class="price s">◈ ${r.price}</span>`, r.sold,
+        ()=>showItemCompare(r.id, `<span class="price s">◈ ${r.price}</span>`, souls>=r.price,
+          ()=>{ if(!Save.spendSouls(r.price)) return; forceEquip(r.id); r.sold=true; updateHUD(); renderShop(); },
+          renderShop)));
     }
   }
 
@@ -2153,6 +2284,137 @@ function learnSkill(newId, replaceId){
   showInventory();
 }
 
+// ---- Suspending a descent: the whole floor, fog and all, put down and taken up again ----
+const RUN_KEY = 'graveborne_run_v1';
+function serializeRun(){
+  const f = G.floor;
+  return {
+    v:1, ts:Date.now(), depth:G.depth, biome:G.biome, floorFov:G.floorFov || 0,
+    player:G.player,
+    floor: f ? { w:f.w, h:f.h, depth:f.depth, isFinal:f.isFinal, tiles:f.tiles, rooms:f.rooms,
+                 visible:f.visible, explored:f.explored, entities:f.entities,
+                 playerStart:f.playerStart, guardianSlain:!!f.guardianSlain, captainCame:!!f.captainCame } : null,
+  };
+}
+// a saved floor is plain data — give it its behaviour back
+function rehydrateFloor(d){
+  const idx = (x,y) => y * d.w + x;
+  const inb = (x,y) => x >= 0 && y >= 0 && x < d.w && y < d.h;
+  return Object.assign({}, d, {
+    idx, inb,
+    tileAt(x,y){ return inb(x,y) ? this.tiles[idx(x,y)] : TILE.WALL; },
+    isWalkable(x,y){ return this.tileAt(x,y) !== TILE.WALL; },
+    entityAt(x,y){ return this.entities.find(e => e.x===x && e.y===y && !e.dead); },
+    removeEntity(e){ const i = this.entities.indexOf(e); if (i >= 0) this.entities.splice(i,1); },
+  });
+}
+function hasSavedRun(){ try { return !!localStorage.getItem(RUN_KEY); } catch(e){ return false; } }
+function savedRunInfo(){
+  try { const d = JSON.parse(localStorage.getItem(RUN_KEY));
+    return d ? { name:(d.player&&d.player.name)||'—', depth:d.depth, lv:(d.player&&d.player.level)||1, ts:d.ts } : null;
+  } catch(e){ return null; }
+}
+function clearSavedRun(){ try { localStorage.removeItem(RUN_KEY); } catch(e){} }
+function saveRun(){
+  if (!G.player || G.state !== 'EXPLORE') return false;
+  try { localStorage.setItem(RUN_KEY, JSON.stringify(serializeRun())); return true; }
+  catch(e){ return false; }
+}
+function loadRun(){
+  let d = null;
+  try { d = JSON.parse(localStorage.getItem(RUN_KEY)); } catch(e){}
+  if (!d || !d.player || !d.floor) return false;
+  G.player = d.player; G.depth = d.depth; G.biome = d.biome; G.floorFov = d.floorFov || 0;
+  G.floor = rehydrateFloor(d.floor);
+  G.combat = null; G.busy = false; G.state = 'EXPLORE';
+  recomputeStats(G.player);
+  hideModal();
+  U.el('log').innerHTML = '';
+  log(`You take up the thread where you left it — Depth ${G.depth}.`, 'hi');
+  revealFOV(); updateHUD(); renderActions();
+  return true;
+}
+
+// ---- Inspecting gear: never buy blind ----
+function itemRarity(it){
+  return it.rarity || (it.active ? 'legendary' : (it.tier >= 3 ? 'rare' : 'common'));
+}
+function rarityTag(it){
+  const r = Data.RARITY[itemRarity(it)] || Data.RARITY.common;
+  return `<span style="color:${r.color}">${r.name}</span>`;
+}
+const STAT_KEYS = [['atk','ATK'],['def','DEF'],['mag','MAG'],['spd','SPD'],['hp','HP'],['sp','SP']];
+function passiveText(pa){
+  if (!pa) return '';
+  const bits = [];
+  if (pa.lifesteal)  bits.push(`blows drink ${Math.round(pa.lifesteal*100)}%`);
+  if (pa.crit)       bits.push(`+${Math.round(pa.crit*100)}% crit chance`);
+  if (pa.dmg && pa.dmg !== 1) bits.push(`+${Math.round((pa.dmg-1)*100)}% damage`);
+  if (pa.regen)      bits.push(`mends ${pa.regen} HP per step`);
+  if (pa.foodSlow && pa.foodSlow !== 1) bits.push(`hunger ${Math.round((1-pa.foodSlow)*100)}% slower`);
+  if (pa.soulMult && pa.soulMult !== 1) bits.push(`+${Math.round((pa.soulMult-1)*100)}% Souls`);
+  if (pa.openShield) bits.push(`opens fights shielded (DEF×${pa.openShield})`);
+  if (pa.honorMul && pa.honorMul !== 1) bits.push(`honor gains ×${pa.honorMul}`);
+  return bits.join(' · ');
+}
+// a full breakdown of an item beside whatever is already in that slot
+function showItemCompare(id, priceHTML, canBuy, onBuy, back){
+  const p = G.player, it = Data.ITEMS[id];
+  const curId = p.equip[it.slot], cur = curId ? Data.ITEMS[curId] : null;
+  const s = U.make('div','sheet');
+  s.appendChild(U.make('div','sect', `${it.name} — ${it.slot}`));
+  s.appendChild(U.make('div','p', `${rarityTag(it)}${priceHTML ? ' · ' + priceHTML : ''}`));
+  s.appendChild(U.make('div','p dim', it.desc));
+
+  // stat table: the candidate, what you wear, and the difference
+  const rows = STAT_KEYS.map(([k,label]) => {
+    const a = (it.mods && it.mods[k]) || 0;
+    const b = (cur && cur.mods && cur.mods[k]) || 0;
+    if (!a && !b) return '';
+    const d = a - b;
+    const col = d > 0 ? '#63b7a6' : d < 0 ? '#c05070' : '#8a7f9e';
+    const sign = d > 0 ? '+' : '';
+    return `<tr><td style="color:#8ea6d8">${label}</td><td style="text-align:right">${a || '—'}</td>` +
+           `<td style="text-align:right;color:#8a7f9e">${cur ? (b || '—') : '—'}</td>` +
+           `<td style="text-align:right;color:${col}">${d ? sign + d : '·'}</td></tr>`;
+  }).filter(Boolean).join('');
+  s.appendChild(U.make('div','p',
+    `<table style="width:100%;font-size:12px;border-collapse:collapse">` +
+    `<tr style="color:#c8a24a"><td>Stat</td><td style="text-align:right">This</td>` +
+    `<td style="text-align:right">Worn</td><td style="text-align:right">Change</td></tr>${rows}</table>`));
+
+  const pa = passiveText(it.passive || it.flag);
+  if (pa) s.appendChild(U.make('div','p', `<b style="color:#d0a84e">Passive</b> — ${pa}`));
+  if (it.active) s.appendChild(U.make('div','p', `<b style="color:#c05070">${it.active.name}</b> (once per battle) — ${it.active.desc}`));
+
+  if (it.set && Data.SETS[it.set]){
+    const set = Data.SETS[it.set];
+    const have = set.pieces.filter(pid => p.equip.weapon===pid || p.equip.armor===pid || p.equip.trinket===pid);
+    s.appendChild(U.make('div','p',
+      `<b style="color:#63b7a6">${set.name}</b> — ${have.length}/${set.pieces.length} worn<br>` +
+      `<span style="color:#8a7f9e">${set.desc}</span><br>` +
+      set.pieces.map(pid => `<span style="color:${have.includes(pid)?'#63b7a6':'#4a4060'}">${have.includes(pid)?'✔':'✘'} ${Data.ITEMS[pid].name}</span>`).join(' · ')));
+  }
+
+  if (cur){
+    const cpa = passiveText(cur.passive || cur.flag);
+    s.appendChild(U.make('div','p dim',
+      `<b>Currently worn:</b> ${cur.name} — ${modStr(cur.mods)}${cpa ? ' · ' + cpa : ''}`));
+  } else {
+    s.appendChild(U.make('div','p dim','<i>That slot is empty — anything is an improvement.</i>'));
+  }
+
+  const row = U.make('div','row');
+  if (onBuy){
+    const b = Btn(canBuy ? 'Take it' : 'Cannot afford', ()=>{ onBuy(); }, 'btn center' + (canBuy?' good':''));
+    b.disabled = !canBuy;
+    row.appendChild(b);
+  }
+  row.appendChild(Btn('Back', back, 'btn center'));
+  s.appendChild(row);
+  setModal(s);
+}
+
 // the ☰ Menu: everything that used to crowd the bottom of the screen
 function showMenu(){
   if (G.state !== 'EXPLORE' || !G.player) return;
@@ -2167,6 +2429,11 @@ function showMenu(){
   list.appendChild(Btn(p.follower ? `Followers — ${p.follower.name}` : 'Followers',
     ()=>{ hideModal(); showFollowers(); }, 'btn', 'F'));
   list.appendChild(Btn('Chronicle — what has happened', ()=>{ hideModal(); showChronicle(); }, 'btn', 'L'));
+  list.appendChild(Btn('Set Down the Descent (save)', ()=>{
+    if (saveRun()) log('You set the descent down. It will be here when you return.', 'good');
+    else log('Something refused the record. Nothing was saved.', 'bad');
+    hideModal(); renderActions();
+  }, 'btn'));
   list.appendChild(Btn('Codex of Encounters', ()=>{ hideModal(); showCodex(true); }, 'btn', 'C'));
   list.appendChild(Btn('Abandon Run', confirmAbandon, 'btn danger'));
   s.appendChild(list);
@@ -2295,9 +2562,33 @@ function showInventory(){
   s.appendChild(U.make('div','sect','Equipment'));
   for (const slot of ['weapon','armor','trinket']){
     const id = p.equip[slot]; const it = id ? Data.ITEMS[id] : null;
-    s.appendChild(U.make('div','p dim',
+    if (!it){
+      s.appendChild(U.make('div','p dim', `<b style="color:#8ea6d8;text-transform:uppercase">${slot}</b>: <i>empty</i>`));
+      continue;
+    }
+    const pa = passiveText(it.passive || it.flag);
+    const line = U.make('div','p dim',
       `<b style="color:#8ea6d8;text-transform:uppercase">${slot}</b>: ` +
-      (it ? `<span style="color:#c9bfd6">${it.name}</span> — ${it.desc}` : '<i>empty</i>')));
+      `<span style="color:${(Data.RARITY[itemRarity(it)]||Data.RARITY.common).color}">${it.name}</span> ` +
+      `<span style="font-size:10px">${rarityTag(it)}</span> — ${modStr(it.mods)}` +
+      (pa ? `<br><span style="color:#d0a84e">Passive:</span> ${pa}` : ''));
+    s.appendChild(line);
+  }
+  if (p.setsActive && p.setsActive.length){
+    for (const key of p.setsActive){
+      const set = Data.SETS[key];
+      s.appendChild(U.make('div','p', `<b style="color:#63b7a6">${set.name} — COMPLETE</b><br><span style="color:#8a7f9e">${set.desc}</span>`));
+    }
+  } else {
+    // nudge: show progress toward any set you have started
+    for (const key in Data.SETS){
+      const set = Data.SETS[key];
+      const have = set.pieces.filter(pid => p.equip.weapon===pid || p.equip.armor===pid || p.equip.trinket===pid);
+      if (!have.length) continue;
+      s.appendChild(U.make('div','p dim',
+        `<b style="color:#63b7a6">${set.name}</b> — ${have.length}/${set.pieces.length}: ` +
+        set.pieces.map(pid => `<span style="color:${have.includes(pid)?'#63b7a6':'#4a4060'}">${Data.ITEMS[pid].name}</span>`).join(' · ')));
+    }
   }
 
   s.appendChild(U.make('div','sect','Skills'));
@@ -2363,7 +2654,7 @@ function confirmAbandon(){
   s.appendChild(U.make('div','sect','Abandon this run?'));
   s.appendChild(U.make('div','p','Your progress this descent will be lost. (Codex discoveries are kept.)'));
   const row = U.make('div','row');
-  row.appendChild(Btn('Return to Title', ()=>{ G.player=null; G.floor=null; G.combat=null; G.state='TITLE'; showTitle(); }, 'btn danger'));
+  row.appendChild(Btn('Return to Title', ()=>{ clearSavedRun(); G.player=null; G.floor=null; G.combat=null; G.state='TITLE'; showTitle(); }, 'btn danger'));
   row.appendChild(Btn('Keep Going', ()=>{ hideModal(); }, 'btn center'));
   s.appendChild(row);
   setModal(s);

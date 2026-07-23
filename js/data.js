@@ -521,6 +521,36 @@ const ITEMS = {
   butchers_cleaver:{ id:'butchers_cleaver', name:'Butcher\'s Cleaver', slot:'weapon', mods:{atk:9}, flag:{lifesteal:0.12}, tier:3, desc:'Still warm. It has never once been washed.' },
   soulstone:      { id:'soulstone', name:'Soulstone', slot:'trinket', mods:{mag:6,sp:2}, tier:3, desc:'A shard of burning red. It whispers your name in a voice you almost know.' },
 
+  // ---- Uniques: one-of-a-kind, and the passive is the point ----
+  widowmaker:     { id:'widowmaker', name:'Widowmaker', slot:'weapon', mods:{atk:7,spd:2}, tier:3, rarity:'unique',
+    passive:{ crit:0.18 }, desc:'Notched once for every name it took. Passive: every blow finds the gap — +18% critical chance.' },
+  gluttons_girdle:{ id:'gluttons_girdle', name:"Glutton's Girdle", slot:'armor', mods:{def:5,hp:14}, tier:3, rarity:'unique',
+    passive:{ foodSlow:0.5 }, desc:'Someone was very hungry, once, and stopped being. Passive: you burn food half as fast.' },
+  reapers_tithe:  { id:'reapers_tithe', name:"Reaper's Tithe", slot:'trinket', mods:{mag:4}, tier:3, rarity:'unique',
+    passive:{ soulMult:1.5 }, desc:'It counts what dies near you. Passive: every deed pays 50% more Souls.' },
+  pilgrims_mercy: { id:'pilgrims_mercy', name:"Pilgrim's Mercy", slot:'trinket', mods:{hp:10,def:2}, tier:3, rarity:'unique',
+    passive:{ regen:0.5 }, desc:'Warm to the touch, always. Passive: the walking itself mends you.' },
+  dread_aegis:    { id:'dread_aegis', name:'Dread Aegis', slot:'armor', mods:{def:8,spd:-1}, tier:3, rarity:'unique',
+    passive:{ openShield:2 }, desc:'It braces before you do. Passive: you enter every fight already shielded.' },
+  ruin_brand:     { id:'ruin_brand', name:'Brand of Ruin', slot:'weapon', mods:{atk:6,mag:4}, tier:3, rarity:'unique',
+    passive:{ dmg:1.20 }, desc:'It wants the fight to end badly for someone. Passive: all your damage lands 20% harder.' },
+
+  // ---- Set: The Pauper's Vigil — three worthless things, never meant to be parted ----
+  pauper_rod:  { id:'pauper_rod', name:"Pauper's Rod", slot:'weapon', mods:{atk:1}, tier:1, rarity:'set', set:'pauper',
+    desc:'A stick. Genuinely, a stick. Worth nothing alone.' },
+  pauper_rags: { id:'pauper_rags', name:"Pauper's Rags", slot:'armor', mods:{def:1}, tier:1, rarity:'set', set:'pauper',
+    desc:'Cloth that has given up. Worth nothing alone.' },
+  pauper_bowl: { id:'pauper_bowl', name:"Pauper's Bowl", slot:'trinket', mods:{hp:2}, tier:1, rarity:'set', set:'pauper',
+    desc:'Empty. It has always been empty. Worth nothing alone.' },
+
+  // ---- Set: Carrion Communion — the crow, the shroud and the bell ----
+  carrion_hook:   { id:'carrion_hook', name:'Carrion Hook', slot:'weapon', mods:{atk:2}, tier:1, rarity:'set', set:'carrion',
+    desc:'A meat-hook with manners. Worth little alone.' },
+  carrion_shroud: { id:'carrion_shroud', name:'Carrion Shroud', slot:'armor', mods:{def:1,hp:2}, tier:1, rarity:'set', set:'carrion',
+    desc:'It has been worn by the dead, but only briefly. Worth little alone.' },
+  carrion_bell:   { id:'carrion_bell', name:'Carrion Bell', slot:'trinket', mods:{sp:1}, tier:1, rarity:'set', set:'carrion',
+    desc:'It rings when something nearby stops breathing. Worth little alone.' },
+
   // ---- Legendary relics: a passive gift, and a power you may call on once per battle ----
   skinners_needle:{ id:'skinners_needle', name:'Skinner\'s Needle', slot:'weapon', mods:{atk:8}, flag:{lifesteal:0.1}, tier:3,
     desc:'It sews shut, and it sews open. Passive: drinks a little of every wound.',
@@ -547,11 +577,37 @@ const CONSUMABLES = {
   strange_meat:{ id:'strange_meat', name:'Strange Meat', food:60, risky:true, desc:'Unlabeled, generous, still faintly warm. Restores 60 FOOD. Ask nothing.' },
 };
 
+// ---------- Item sets ----------
+// Each piece is deliberately the feeblest thing in its slot. Wear all three and
+// the set outclasses any legendary — the whole point is the commitment.
+const SETS = {
+  pauper: { name:"The Pauper's Vigil", pieces:['pauper_rod','pauper_rags','pauper_bowl'],
+    mods:{ atk:13, def:11, hp:34, mag:6, sp:3 },
+    passive:{ lifesteal:0.20, foodSlow:0.5 },
+    desc:'Three worthless things that were never meant to be parted. Together: +13 ATK, +11 DEF, +34 HP, +6 MAG, +3 SP, blows drink 20%, and hunger comes half as fast.' },
+  carrion: { name:'Carrion Communion', pieces:['carrion_hook','carrion_shroud','carrion_bell'],
+    mods:{ atk:15, def:8, hp:22, spd:3 },
+    passive:{ crit:0.20, dmg:1.15 },
+    desc:'The hook, the shroud and the bell. Together: +15 ATK, +8 DEF, +22 HP, +3 SPD, +20% critical chance, and all damage 15% harder.' },
+};
+
+// ---------- Item rarity ----------
+const RARITY = {
+  common:    { name:'Common',    color:'#c9bfd6' },
+  rare:      { name:'Rare',      color:'#7fb0d0' },
+  unique:    { name:'Unique',    color:'#d0a84e' },
+  legendary: { name:'Legendary', color:'#c05070' },
+  set:       { name:'Set',       color:'#63b7a6' },
+};
+
 // item pools by tier for treasure rolls
 const ITEM_POOL = {
-  1:['rusted_blade','iron_sword','grave_dagger','pilgrim_staff','leather','padded_doublet','ring_of_honor','charm_of_vigor','coward_totem','lucky_coin','iron_rations'],
-  2:['bone_cleaver','witch_wand','war_pick','hexed_scythe','chainmail','plate','shadow_cloak','bone_lamellar','witchweave','bloodstone','witch_eye','grave_idol','hunters_fang'],
-  3:['soul_edge','marrow_maul','stormbrand','gravewarden','plate','witch_eye','bloodstone','saints_knuckle','nights_eye'],
+  1:['rusted_blade','iron_sword','grave_dagger','pilgrim_staff','leather','padded_doublet','ring_of_honor','charm_of_vigor','coward_totem','lucky_coin','iron_rations',
+     'pauper_rod','pauper_rags','pauper_bowl','carrion_hook','carrion_shroud','carrion_bell'],
+  2:['bone_cleaver','witch_wand','war_pick','hexed_scythe','chainmail','plate','shadow_cloak','bone_lamellar','witchweave','bloodstone','witch_eye','grave_idol','hunters_fang',
+     'pauper_rod','pauper_rags','pauper_bowl','carrion_hook','carrion_shroud','carrion_bell'],
+  3:['soul_edge','marrow_maul','stormbrand','gravewarden','plate','witch_eye','bloodstone','saints_knuckle','nights_eye',
+     'widowmaker','gluttons_girdle','reapers_tithe','pilgrims_mercy','dread_aegis','ruin_brand'],
 };
 
 // ---------- Honor tiers ----------
@@ -562,6 +618,26 @@ const HONOR_TIERS = [
   { min:-59, name:'Tainted',   color:'#c08a5a' },
   { min:-999,name:'Vile',      color:'#c05070' },
 ];
+
+// ---------- Event map glyphs ----------
+// Each encounter shows what it is on the floor rather than a blank "!", so you
+// can read the room before you walk into it.
+const EVENT_ICONS = {
+  well:         { g:'☽', c:'#7fb0d0' },   cage:        { g:'⌗', c:'#c08a5a' },
+  beggar:       { g:'☂', c:'#c9bfd6' },   shrine:      { g:'†', c:'#d0a84e' },
+  mirror:       { g:'◉', c:'#9a5cc0' },   hanged:      { g:'‡', c:'#c05070' },
+  child:        { g:'✿', c:'#e0b0c0' },   oathblade:   { g:'⚔', c:'#c9bfd6' },
+  lightbearer:  { g:'✦', c:'#7fd0c2' },   envoy:       { g:'⚖', c:'#c05070' },
+  butcherdoor:  { g:'⚑', c:'#c03636' },   namelesscoin:{ g:'¤', c:'#d0a84e' },
+  larder:       { g:'⌂', c:'#c08a5a' },   oathless:    { g:'◈', c:'#9a5cc0' },
+  hollowprince: { g:'♛', c:'#9a5cc0' },   seamparlor:  { g:'✂', c:'#c05070' },
+  banquet:      { g:'♨', c:'#d0a84e' },   velvetchapel:{ g:'☾', c:'#9a5cc0' },
+  sporewife:    { g:'❀', c:'#7fae3a' },   ferryman:    { g:'≈', c:'#7fb0d0' },
+  forgewidow:   { g:'⚒', c:'#e08030' },   bonechoir:   { g:'♪', c:'#eae0f0' },
+  lamplighter:  { g:'☀', c:'#ffcf5a' },   overgrown:   { g:'⚐', c:'#7fae3a' },
+  bride:        { g:'♡', c:'#7fb0d0' },   cindermonk:  { g:'✹', c:'#e08030' },
+  saint:        { g:'☩', c:'#d0a84e' },   wolfmother:  { g:'▲', c:'#c08a5a' },
+};
 
 // ---------- Events (honor-driven encounters) ----------
 // perceive(honor) => which variant to show. Default: honor>=0 ? 'clear' : 'warped'
@@ -1487,7 +1563,7 @@ const SANCTUM = [
   { id:'favor',     name:"Merchant's Favor",   desc:'Shop Gold prices −10%, per rank.',           max:2, base:30, growth:20 },
 ];
 
-const Data = { SKILLS, PASSIVES, CLASSES, FOLLOWERS, ENEMIES, ITEMS, CONSUMABLES, ITEM_POOL, HUNTER_POOL, BIOME_ELITES, BIOME_GUARDIANS, BIOME_PROPS, HONOR_TIERS, EVENTS, CODEX, SANCTUM, BIOMES, WHISPERS,
+const Data = { SKILLS, PASSIVES, CLASSES, FOLLOWERS, ENEMIES, EVENT_ICONS, SETS, RARITY, ITEMS, CONSUMABLES, ITEM_POOL, HUNTER_POOL, BIOME_ELITES, BIOME_GUARDIANS, BIOME_PROPS, HONOR_TIERS, EVENTS, CODEX, SANCTUM, BIOMES, WHISPERS,
   honorTier(h){ for (const t of HONOR_TIERS){ if (h >= t.min) return t; } return HONOR_TIERS[HONOR_TIERS.length-1]; },
   enemyPool(depth){
     const ids = [];
