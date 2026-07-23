@@ -934,6 +934,36 @@ const SPR = {
     "  KKKKKKKK  ",
     "            ",
   ],
+  // the centrepiece of the ritual sanctum: a stone plinth cradling a live shard
+  obj_altar: [
+    "     MM     ",
+    "    MMMM    ",
+    "    KMMK    ",
+    "   KBMMBK   ",
+    "   KGGGGK   ",
+    "  KGSSSSGK  ",
+    "  KGSssSGK  ",
+    "  KGSSSSGK  ",
+    "  KGGGGGGK  ",
+    "  KGGGGGGK  ",
+    "  KKKKKKKK  ",
+    "            ",
+  ],
+  // a standing column — used to ring the larger halls and arenas
+  obj_pillar: [
+    "    KKKK    ",
+    "   KSSSSK   ",
+    "   KGSSGK   ",
+    "   KGSSGK   ",
+    "   KGSSGK   ",
+    "   KGSSGK   ",
+    "   KGSSGK   ",
+    "   KGSSGK   ",
+    "   KGSSGK   ",
+    "   KSSSSK   ",
+    "  KGGGGGGK  ",
+    "  KKKKKKKK  ",
+  ],
 };
 
 const Sprites = {

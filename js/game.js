@@ -1,7 +1,7 @@
 // ================= GRAVEBORNE — main engine =================
 // shown on the title screen; keep in step with CACHE in sw.js — the game is
 // served from that cache, so the number you see is the build you're running
-const GAME_VERSION = 21;
+const GAME_VERSION = 22;
 let VW = 21, VH = 13;                 // viewport in tiles — reshaped to the stage on phones
 const TS = 16;                        // tile size in canvas pixels
 const FINAL_DEPTH = 5;
@@ -1942,6 +1942,16 @@ function drawTile(t, sx, sy, x, y){
     ctx.fillStyle = pal.wallTop; ctx.fillRect(sx, sy, TS, 4);
     ctx.fillStyle = pal.wallDark; ctx.fillRect(sx, sy+TS-3, TS, 3);
     ctx.fillStyle = '#0a0a0f'; ctx.fillRect(sx, sy, 1, TS); ctx.fillRect(sx+TS-1, sy, 1, TS);
+  } else if (t === TILE.DOOR){
+    // floor underfoot, then a stone frame and a wooden leaf standing ajar
+    const alt = (x + y) % 2 === 0;
+    ctx.fillStyle = alt ? pal.floorA : pal.floorB; ctx.fillRect(sx, sy, TS, TS);
+    ctx.fillStyle = pal.wallTop;  ctx.fillRect(sx, sy, 2, TS); ctx.fillRect(sx+TS-2, sy, 2, TS);   // jambs
+    ctx.fillStyle = pal.wallFace; ctx.fillRect(sx+2, sy, TS-4, 3);                                  // lintel
+    ctx.fillStyle = '#3a2a18'; ctx.fillRect(sx+3, sy+3, TS-6, TS-4);                                // leaf
+    ctx.fillStyle = '#241a10'; ctx.fillRect(sx+7, sy+3, 1, TS-4);                                   // plank seam
+    ctx.fillStyle = '#5a4020'; ctx.fillRect(sx+3, sy+7, TS-6, 1);                                   // iron band
+    ctx.fillStyle = '#c9a24a'; ctx.fillRect(sx+TS-6, sy+8, 1, 2);                                   // handle
   } else if (t === TILE.HAZARD){
     const hz = curBiome().hazard;
     ctx.fillStyle = pal.floorB; ctx.fillRect(sx, sy, TS, TS);
@@ -1981,6 +1991,12 @@ function renderExplore(){
       if (!f.explored[i]) continue;
       drawTile(f.tileAt(x,y), sx, sy, x, y);
     }
+  }
+  // ritual circle drawn onto the sanctum floor, under everything else
+  for (const e of f.entities){
+    if (!(e.type === 'prop' && e.ritual)) continue;
+    const i = f.idx(e.x, e.y); if (!f.explored[i]) continue;
+    drawRitual((e.x-camX)*TS+8, (e.y-camY)*TS+8, f.visible[i]);
   }
   // static entities (remembered) + dynamic (visible only)
   for (const e of f.entities){
@@ -2022,6 +2038,10 @@ function renderExplore(){
   for (const e of f.entities){ if (e.type==='torch' && f.visible[f.idx(e.x,e.y)]){
     const fl = Math.sin(G.time/120 + e.x)*0.2+0.8;
     radial((e.x-camX)*TS+8, (e.y-camY)*TS+8, 46, `rgba(${pal.torch},${0.28*fl})`); } }
+  // the sanctum's shard casts its own cold arcane glow
+  for (const e of f.entities){ if (e.type==='prop' && e.ritual && f.visible[f.idx(e.x,e.y)]){
+    const fl = Math.sin(G.time/300)*0.15+0.85;
+    radial((e.x-camX)*TS+8, (e.y-camY)*TS+8, 52, `rgba(154,92,192,${0.22*fl})`); } }
   ctx.globalCompositeOperation = 'source-over';
   vignette();
 }
@@ -2035,6 +2055,21 @@ function drawMarker(sx, sy, chr, color){
   ctx.fillStyle = color; ctx.font = 'bold 11px monospace';
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillText(chr, sx+8, sy+9);
+}
+// a ritual sigil on the sanctum floor: two rings and a slowly turning rune band
+function drawRitual(cx, cy, bright){
+  const a = bright ? 0.8 : 0.35;
+  ctx.strokeStyle = `rgba(154,92,192,${a})`; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(cx, cy, 21, 0, 7); ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx, cy, 14, 0, 7); ctx.stroke();
+  ctx.strokeStyle = `rgba(208,168,78,${a})`;
+  for (let i = 0; i < 8; i++){
+    const ang = i/8 * Math.PI*2 + G.time/2600;
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(ang)*21, cy + Math.sin(ang)*21);
+    ctx.lineTo(cx + Math.cos(ang)*25, cy + Math.sin(ang)*25);
+    ctx.stroke();
+  }
 }
 function radial(cx, cy, r, color){
   const g = ctx.createRadialGradient(cx,cy,0,cx,cy,r);
