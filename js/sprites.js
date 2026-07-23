@@ -55,19 +55,23 @@ const SPR = {
     "   Kp  pK   ",
     "   KK  KK   ",
   ],
+  // The torso and legs used to sit one pixel left of the head, and the legs one
+  // left of where every other hero's stand — he read as lopsided next to them.
+  // Squared up: hood centred, robe symmetrical, feet on the same columns as the
+  // Knight's, staff outside the silhouette where it belongs.
   hero_warden: [
     "    KKKK    ",
     "   KwwwwK   ",
-    "  KwFFFFwK  ",
+    "   KwFFwK   ",
     "  KwllllwK  ",
     "  Kwh  hwK  ",
     "  KwwwwwwK  ",
     "  KcFccFcK  ",
-    " FKcccccK   ",
-    " FKcFFccK   ",
-    " FKcccccK   ",
-    "  Kc  cK    ",
-    "  KK  KK    ",
+    " FKccccccK  ",
+    " FKcFFFFcK  ",
+    " FKccccccK  ",
+    "   Kc  cK   ",
+    "   KK  KK   ",
   ],
 
   // ---- Enemies ----

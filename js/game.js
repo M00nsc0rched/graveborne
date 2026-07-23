@@ -1,7 +1,7 @@
 // ================= GRAVEBORNE — main engine =================
 // shown on the title screen; keep in step with CACHE in sw.js — the game is
 // served from that cache, so the number you see is the build you're running
-const GAME_VERSION = 18;
+const GAME_VERSION = 19;
 let VW = 21, VH = 13;                 // viewport in tiles — reshaped to the stage on phones
 const TS = 16;                        // tile size in canvas pixels
 const FINAL_DEPTH = 5;
@@ -474,11 +474,36 @@ function newPlayer(classId){
     follower:null, followerLost:false, followerFled:false,
     eventsUsed:{},                      // encounters you only get one of per descent
   };
+  // Eliza is not left to the general shuffle: she turns up in half of the
+  // Gravethief's descents and a third of everyone else's, on a floor picked now.
+  // 0 means she is not down here at all this time.
+  p.elizaDepth = U.chance(classId === 'rogue' ? 0.50 : 0.30) ? U.randInt(1, FINAL_DEPTH - 1) : 0;
+  applyAllotment(p);                    // the twenty points you spent before the stair
   applySanctum(p);
   recomputeStats(p);
   p.hp = p.maxhp; p.sp = p.maxsp;
   p.unlockPool = rollUnlockPool(p);     // a different offer of skills every descent
   return p;
+}
+
+// ---- The twenty: what you were before the dark got a say ----
+// Every descent starts with twenty points of your own to put somewhere. Ten in
+// one stat is the ceiling, so nobody arrives as a single enormous number.
+const ALLOT_POINTS = 20, ALLOT_CAP = 10;
+const ALLOT_STATS = [
+  { key:'hp',  base:'baseHp',  amt:3, label:'Max HP' },
+  { key:'sp',  base:'baseSp',  amt:1, label:'Max SP' },
+  { key:'atk', base:'baseAtk', amt:1, label:'ATK' },
+  { key:'def', base:'baseDef', amt:1, label:'DEF' },
+  { key:'mag', base:'baseMag', amt:1, label:'MAG' },
+  { key:'spd', base:'baseSpd', amt:1, label:'SPD' },
+];
+function blankAllotment(){ const a = {}; for (const s of ALLOT_STATS) a[s.key] = 0; return a; }
+function allotSpent(a){ return ALLOT_STATS.reduce((n,s)=>n + (a[s.key]||0), 0); }
+function applyAllotment(p){
+  const a = G.allot || blankAllotment();
+  for (const s of ALLOT_STATS) p[s.base] += (a[s.key] || 0) * s.amt;
+  p.allot = { ...a };                   // kept on the player so the sheet can show it
 }
 
 // apply permanent Sanctum upgrades to a freshly-made player (before recompute)
@@ -582,6 +607,11 @@ function grantItem(id){
 // ================= FLOOR / MOVEMENT =================
 function startRun(){
   Save.bumpRun();
+  // A run that ended in death left G.busy latched true (lose() sets it and nothing
+  // clears it), so the next descent started with every input gated shut and the
+  // game looked frozen until a reload. Wipe all the turn latches before we begin.
+  G.busy = false; G.moving = false; G.combat = null;
+  G.pendingEvent = null; G.usedActives = {}; G.shop = null;
   G.biome = null;
   G.player = newPlayer(G.selClass);
   G.depth = 1;
@@ -615,10 +645,13 @@ function enterFloor(){
     if (ev.once && G.player.eventsUsed && G.player.eventsUsed[k]) return false;   // met once, and once only
     return true;
   });
-  const eventKeys = [
+  let eventKeys = [
     ...U.shuffle(eligible.filter(k => Data.EVENTS[k].biome)),
     ...U.shuffle(eligible.filter(k => !Data.EVENTS[k].biome)),
   ];
+  // this is her floor — she takes the first slot rather than trusting the shuffle
+  if (G.player.elizaDepth === G.depth && eligible.includes('sinclair'))
+    eventKeys = ['sinclair', ...eventKeys.filter(k => k !== 'sinclair')];
   let eventCount = U.clamp(1 + Math.floor(G.depth/2), 1, 3);
   if (align === 'HALLOWED') eventCount = U.clamp(eventCount + 1, 1, 4);   // the kind draw near
 
@@ -1013,15 +1046,13 @@ function startCombat(entity, ambush){
 
   // relics that brace you before the first blow
   if (p.flags && p.flags.openShield > 0){
-    const v = shieldValue('def' + p.flags.openShield, p, true);
-    p.shield += v;
+    const v = addShield(p, shieldValue('def' + p.flags.openShield, p, true));
     log(`Your gear braces before you do — shield ${v}.`, 'good');
   }
 
   // ---- class passives that fire as steel is drawn ----
   if (p.classId === 'knight' && enemy.tags.includes('undead')){
-    const v = shieldValue('def2', p, true);
-    p.shield += v;
+    const v = addShield(p, shieldValue('def2', p, true));
     p.statuses.atkbuff = { amt:5, turns:3 };
     log(`Oathbound: the dead are your old business. You open braced — shield ${v}, and your fury already up.`, 'good');
   }
@@ -1039,6 +1070,31 @@ function startCombat(entity, ambush){
 function ambress(a){ return a ? 'It ambushes you! ' : ''; }
 
 // charmed: what Eliza took off it. charmGain: the same stuff, in your hands.
+// ---- Shields: there is a ceiling, and the great ones know where it is ----
+// No fight lets you stack more than 30. Bosses will not brawl with a wall: the
+// deeper you hide behind one, the likelier they are to take the whole thing off
+// in a single blow.
+const SHIELD_MAX = 30;
+function addShield(c, v){
+  const before = c.shield;
+  c.shield = Math.min(SHIELD_MAX, c.shield + v);
+  return c.shield - before;                 // what actually stuck, not what was offered
+}
+function bossShieldBreakChance(sh){
+  if (sh <= 0)  return 0;
+  if (sh <= 10) return 0.10;
+  if (sh <= 20) return 0.40;
+  return 0.75;
+}
+function bossSunder(en, p){
+  const lost = p.shield;
+  p.shield = 0;
+  log(`${en.name} does not swing at you — it swings at the wall you built.`, 'bad');
+  log('“Pathetic. You call for a fight, and then you hide inside it?”', 'bad');
+  log(`Sunder — ${lost} shield comes apart in one blow, and there is nothing left between you.`, 'bad');
+  floatOn(true, `-${lost}⛊`, '#c05070');
+}
+
 function effAtk(c){ let a=c.atk + (c.statuses.atkbuff?c.statuses.atkbuff.amt:0) - (c.statuses.weaken?c.statuses.weaken.amt:0)
   + (c.statuses.charmGain?c.statuses.charmGain.atk:0) - (c.statuses.charmed?c.statuses.charmed.atk:0); return Math.max(1,a); }
 function effMag(c){ let m=c.mag + (c.statuses.charmGain?c.statuses.charmGain.mag:0) - (c.statuses.charmed?c.statuses.charmed.mag:0); return Math.max(0,m); }
@@ -1072,8 +1128,12 @@ function resolveAction(src, dst, action, srcIsPlayer){
   const type = action.type;
 
   if (type === 'defend'){
-    const v = shieldValue(action.shield, src, srcIsPlayer);
-    src.shield += v; log(`${srcIsPlayer?'You brace':src.name+' braces'} — shield ${v}.`, 'hi');
+    const v = addShield(src, shieldValue(action.shield, src, srcIsPlayer));
+    if (v <= 0){
+      log(`${srcIsPlayer?'You brace':src.name+' braces'}, but there is no more guard to be had — ${SHIELD_MAX} is all anyone can hold.`, 'dim');
+      return;
+    }
+    log(`${srcIsPlayer?'You brace':src.name+' braces'} — shield ${v}.`, 'hi');
     floatOn(srcIsPlayer, `+${v}⛊`, '#8ab0e0'); return;
   }
   if (type === 'heal'){
@@ -1109,7 +1169,7 @@ function resolveAction(src, dst, action, srcIsPlayer){
     if (action.cleanse && src.statuses.poison){ delete src.statuses.poison; log('The rot is drawn back out of you.', 'good'); }
     if (ef.regen)   src.statuses.regen   = { ...ef.regen };
     if (ef.atkbuff) src.statuses.atkbuff = { ...ef.atkbuff };
-    if (ef.shield){ const v = shieldValue(ef.shield, src, srcIsPlayer); src.shield += v; }
+    if (ef.shield) addShield(src, shieldValue(ef.shield, src, srcIsPlayer));
     log(`${srcIsPlayer?'You steel yourself':src.name+' steels itself'}. (${action.name})`, 'hi');
     floatOn(srcIsPlayer, action.name, '#c8a24a'); return;
   }
@@ -1481,6 +1541,12 @@ function beginEnemyTurn(){
   if (en.parts && en.parts.legs.cut && U.chance(0.3)){
     log(`${en.name} drags itself, and its moment passes.`, 'good');
     setTimeout(beginPlayerTurn, 550); return;
+  }
+  // a boss spends its whole turn tearing your guard down, and says so
+  if (en.boss && p.shield > 0 && U.chance(bossShieldBreakChance(p.shield))){
+    bossSunder(en, p);
+    updateHUD();
+    setTimeout(beginPlayerTurn, 700); return;
   }
   const usable = en.moves.filter(m => !m.disabled);
   const move = usable.length ? U.weighted(usable) : { name:'Desperate Flail', type:'attack', power:6 };
@@ -2133,6 +2199,8 @@ function showTitle(){
   const s = U.make('div','sheet');
   s.appendChild(U.make('div','title-big','GRAVEBORNE'));
   s.appendChild(U.make('div','title-sub','· A DARK-FANTASY DESCENT ·'));
+  s.appendChild(U.make('div','p center dim',
+    `<i>${U.choice(Data.DISCOURAGEMENTS)}</i>`));
   s.appendChild(U.make('div','p center dim','Buriedbornes-style skill combat · roguelike depths · your <b style="color:#c8a24a">HONOR</b> decides what the dark shows you.'));
   const m = Save.meta();
   s.appendChild(U.make('div','p center',
@@ -2182,8 +2250,66 @@ function showCharSelect(){
   }
   s.appendChild(grid);
   const row = U.make('div','row');
-  row.appendChild(Btn('Descend', startRun, 'btn center'));
+  row.appendChild(Btn('Continue', showAllotment, 'btn center'));
   row.appendChild(Btn('Back', showTitle, 'btn center'));
+  s.appendChild(row);
+  setModal(s);
+}
+
+// ---- Spend the twenty before the stair ----
+function showAllotment(){
+  G.state = 'ALLOT';
+  G.allot = G.allot || blankAllotment();
+  const a = G.allot, c = Data.CLASSES[G.selClass];
+  const left = ALLOT_POINTS - allotSpent(a);
+
+  const s = U.make('div','sheet');
+  s.appendChild(U.make('div','sect','What You Were Before'));
+  s.appendChild(U.make('div','p dim','Twenty points of whoever you used to be, and the dark gets everything after that. No more than ten into any one of them.'));
+
+  const head = U.make('div','card sel');
+  const cv = U.make('canvas'); cv.width=52; cv.height=52; head.appendChild(cv); Sprites.toCanvas(cv, c.sprite, 4);
+  const info = U.make('div');
+  info.appendChild(U.make('h3', null, c.name));
+  info.appendChild(U.make('div','role', c.role));
+  const b = c.base;
+  info.appendChild(U.make('div','stats', ALLOT_STATS.map(st => {
+    const add = (a[st.key]||0) * st.amt;
+    const bv  = st.key === 'hp' ? b.hp : st.key === 'sp' ? b.sp : b[st.key];
+    return `<b>${st.label}</b> ${bv}${add ? ` <span style="color:#6fbf6a">+${add}</span>` : ''}`;
+  }).join(' · ')));
+  head.appendChild(info);
+  s.appendChild(head);
+
+  s.appendChild(U.make('div','balance',
+    `<span class="${left ? 'g' : 's'}">${left} point${left===1?'':'s'} left of twenty</span>`));
+
+  for (const st of ALLOT_STATS){
+    const n = a[st.key] || 0;
+    const line = U.make('div','allot-row');
+    line.appendChild(U.make('span','allot-name',
+      `<b>${st.label}</b> <span class="dim">+${st.amt} each</span>`));
+    const minus = Btn('−', ()=>{ a[st.key] = Math.max(0, n-1); showAllotment(); }, 'btn allot-btn');
+    minus.disabled = n <= 0;
+    const val = U.make('span','allot-val', `${n}${n ? ` <span class="dim">(+${n*st.amt})</span>` : ''}`);
+    const plus = Btn('+', ()=>{ a[st.key] = Math.min(ALLOT_CAP, n+1); showAllotment(); }, 'btn allot-btn');
+    plus.disabled = n >= ALLOT_CAP || left <= 0;
+    line.appendChild(minus); line.appendChild(val); line.appendChild(plus);
+    s.appendChild(line);
+  }
+
+  const row = U.make('div','row');
+  const go = Btn('Descend', startRun, 'btn center');
+  go.disabled = left > 0;
+  if (left > 0) row.appendChild(Btn('Spread them evenly', ()=>{
+    const each = Math.floor(ALLOT_POINTS / ALLOT_STATS.length);
+    let rest = ALLOT_POINTS - each * ALLOT_STATS.length;
+    for (const st of ALLOT_STATS){ a[st.key] = each + (rest-- > 0 ? 1 : 0); }
+    showAllotment();
+  }, 'btn center'));
+  if (allotSpent(a) > 0) row.appendChild(Btn('Clear', ()=>{ G.allot = blankAllotment(); showAllotment(); }, 'btn center'));
+  row.appendChild(go);
+  row.appendChild(Btn('Back', showCharSelect, 'btn center'));
   s.appendChild(row);
   setModal(s);
 }
@@ -2479,7 +2605,8 @@ function loadRun(){
   if (!d || !d.player || !d.floor) return false;
   G.player = d.player; G.depth = d.depth; G.biome = d.biome; G.floorFov = d.floorFov || 0;
   G.floor = rehydrateFloor(d.floor);
-  G.combat = null; G.busy = false; G.state = 'EXPLORE';
+  G.combat = null; G.busy = false; G.moving = false; G.state = 'EXPLORE';
+  G.pendingEvent = null; G.usedActives = {}; G.shop = null;
   recomputeStats(G.player);
   hideModal();
   U.el('log').innerHTML = '';
@@ -2820,10 +2947,26 @@ function confirmAbandon(){
   s.appendChild(U.make('div','sect','Abandon this run?'));
   s.appendChild(U.make('div','p','Your progress this descent will be lost. (Codex discoveries are kept.)'));
   const row = U.make('div','row');
-  row.appendChild(Btn('Return to Title', ()=>{ clearSavedRun(); G.player=null; G.floor=null; G.combat=null; G.state='TITLE'; showTitle(); }, 'btn danger'));
+  row.appendChild(Btn('Return to Title', desertRun, 'btn danger'));
   row.appendChild(Btn('Keep Going', ()=>{ hideModal(); }, 'btn center'));
   s.appendChild(row);
   setModal(s);
+}
+
+// Walking out does not get a summary screen. It gets the lights turned off and
+// one sentence, and then you can go back to the title and think about it.
+function desertRun(){
+  clearSavedRun();
+  G.player=null; G.floor=null; G.combat=null;
+  G.busy=false; G.moving=false; G.state='TITLE';
+  hideModal();
+
+  const veil = U.make('div','blackout');
+  veil.appendChild(U.make('span', null, U.choice(Data.DESERTIONS)));
+  const leave = () => { if (veil.parentNode) veil.parentNode.removeChild(veil); showTitle(); };
+  veil.onclick = leave;
+  document.body.appendChild(veil);
+  setTimeout(() => { if (veil.parentNode) leave(); }, 3600);
 }
 
 function showGameOver(){

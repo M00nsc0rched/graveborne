@@ -663,6 +663,35 @@ const EVENT_ICONS = {
   saint:        { g:'☩', c:'#d0a84e' },   wolfmother:  { g:'▲', c:'#c08a5a' },
 };
 
+// ---------- What the dark says to you ----------
+// One of these sits under the title. None of them are encouraging, because
+// nothing down here is.
+const DISCOURAGEMENTS = [
+  'Everyone who came down here was also going to be the one who came back.',
+  'You are not the first. You are barely worth counting.',
+  'The depths do not need you. They will take you regardless.',
+  'Bring a name worth losing, or do not bother.',
+  'Nothing down here has ever been impressed.',
+  'Others have gone further with less. They are still down there.',
+  'The stair only goes one way, and it is not the way you think.',
+  'Your bones will be indistinguishable from the rest.',
+  'Whatever you are hoping to find has already found someone else.',
+  'You will die tired, and it will not mean anything.',
+  'Turn back. You will not, but you were told.',
+  'The dark has been doing this much longer than you have.',
+];
+// What it says when you walk out on your own descent.
+const DESERTIONS = [
+  'Was that all you had?',
+  "You shouldn't have come down for this little.",
+  'Disappointing.',
+  'Pathetic.',
+  'You called that a descent.',
+  'The dark barely noticed you were in it.',
+  'Not even worth burying.',
+  'You walked out. It was always going to be walking out.',
+];
+
 // ---------- Events (honor-driven encounters) ----------
 // perceive(honor) => which variant to show. Default: honor>=0 ? 'clear' : 'warped'
 const clearIfHonored = (h) => h >= 0 ? 'clear' : 'warped';
@@ -1622,7 +1651,7 @@ const SANCTUM = [
   { id:'favor',     name:"Merchant's Favor",   desc:'Shop Gold prices −10%, per rank.',           max:2, base:30, growth:20 },
 ];
 
-const Data = { SKILLS, PASSIVES, CLASSES, FOLLOWERS, ENEMIES, EVENT_ICONS, SETS, RARITY, ITEMS, CONSUMABLES, ITEM_POOL, HUNTER_POOL, BIOME_ELITES, BIOME_GUARDIANS, BIOME_PROPS, HONOR_TIERS, EVENTS, CODEX, SANCTUM, BIOMES, WHISPERS,
+const Data = { SKILLS, PASSIVES, CLASSES, FOLLOWERS, ENEMIES, EVENT_ICONS, SETS, RARITY, ITEMS, CONSUMABLES, ITEM_POOL, HUNTER_POOL, BIOME_ELITES, BIOME_GUARDIANS, BIOME_PROPS, HONOR_TIERS, EVENTS, CODEX, SANCTUM, BIOMES, WHISPERS, DISCOURAGEMENTS, DESERTIONS,
   honorTier(h){ for (const t of HONOR_TIERS){ if (h >= t.min) return t; } return HONOR_TIERS[HONOR_TIERS.length-1]; },
   enemyPool(depth){
     const ids = [];
