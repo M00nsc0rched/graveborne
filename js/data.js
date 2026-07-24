@@ -405,7 +405,8 @@ Object.assign(ENEMIES, {
 });
 
 // which named terror may prowl each biome's floors
-const BIOME_ELITES = { catacombs:'gravemaw', fungal:'sporetyrant', drowned:'undertow', ember:'cinderprophet', ossuary:'marrowcantor', umbral:'rootwolf' };
+const BIOME_ELITES = { catacombs:'gravemaw', fungal:'sporetyrant', drowned:'undertow', ember:'cinderprophet', ossuary:'marrowcantor', umbral:'rootwolf',
+  dungeon:'gravemaw', desert:'cinderprophet', castle:'marrowcantor', cathedral:'undertow', monastery:'rootwolf' };
 
 // ---- Decorative props: dressing that fits each biome. Purely visual — they
 // never block a route (see the decorative-entity rule in game.js/dungeon.js).
@@ -416,6 +417,11 @@ const BIOME_PROPS = {
   ember:     ['obj_brazier','obj_barrel','obj_statue','obj_bones'],
   ossuary:   ['obj_bones','obj_sarcophagus','obj_statue','obj_urn','obj_shelf'],
   umbral:    ['obj_stump','obj_mushroom','obj_bones','obj_urn'],
+  dungeon:   ['obj_barrel','obj_urn','obj_shelf','obj_table','obj_chair','obj_brazier'],
+  desert:    ['obj_bones','obj_urn','obj_statue','obj_sarcophagus','obj_pillar'],
+  castle:    ['obj_table','obj_chair','obj_shelf','obj_statue','obj_pillar','obj_brazier'],
+  cathedral: ['obj_statue','obj_pillar','obj_brazier','obj_sarcophagus','obj_urn'],
+  monastery: ['obj_shelf','obj_table','obj_chair','obj_urn','obj_brazier','obj_statue'],
 };
 
 // ---- Legendary Guardians: one bars the stair on every floor; slay them to descend ----
@@ -508,7 +514,8 @@ Object.assign(ENEMIES, {
 });
 
 // which legend bars each biome's stair
-const BIOME_GUARDIANS = { catacombs:'morr', fungal:'mycel', drowned:'brine', ember:'pyraxes', ossuary:'curator', umbral:'firstshadow' };
+const BIOME_GUARDIANS = { catacombs:'morr', fungal:'mycel', drowned:'brine', ember:'pyraxes', ossuary:'curator', umbral:'firstshadow',
+  dungeon:'morr', desert:'pyraxes', castle:'curator', cathedral:'firstshadow', monastery:'mycel' };
 
 // ---------- Items ----------
 const ITEMS = {
@@ -1661,12 +1668,12 @@ const BIOMES = {
     classMods:{ knight:{def:-2}, rogue:{spd:2}, mage:{mag:3}, warden:{mag:-2} },
     hazard:{ name:'Spore Clouds', kind:'poison', color:'#7fae3a', accent:'#a8d060', immune:'mage' },
     flavor:'Spore-light drifts like snow. Everything here is patiently eating everything else.' },
-  drowned: { id:'drowned', name:'The Drowned Halls',
-    pal:{ wallTop:'#2f3a52', wallFace:'#1c2434', wallDark:'#0d121c', floorA:'#111721', floorB:'#0f141d', speck:'#2a4a66', ambient:'50,70,110', torch:'80,140,224' },
-    fov:0, enemyTags:{spirit:3},
+  drowned: { id:'drowned', name:'The Sunken Harbor',
+    pal:{ wallTop:'#33463f', wallFace:'#1e2e29', wallDark:'#0d1712', floorA:'#132019', floorB:'#111c17', speck:'#2f6a52', ambient:'50,90,80', torch:'90,180,150' },
+    fov:0, enemyTags:{spirit:2.5, beast:1.4},
     classMods:{ knight:{spd:-2, def:1}, rogue:{spd:-1}, mage:{sp:2}, warden:{mag:2} },
-    hazard:{ name:'Frigid Pools', kind:'chill', color:'#4a74c0', accent:'#7fb0d0' },
-    flavor:'Black water sheets the stone. Every pool remembers a face that is not yours.' },
+    hazard:{ name:'Sucking Mire', kind:'chill', color:'#3a7a5a', accent:'#7fd0a0' },
+    flavor:'A drowned harbor gone to swamp — rotted jetties, black water, and the potion-maker\'s crooked stall on the last dry stone.' },
   ember: { id:'ember', name:'The Ember Chasm',
     pal:{ wallTop:'#523a2f', wallFace:'#34211c', wallDark:'#1c0f0d', floorA:'#1f1411', floorB:'#1b110f', speck:'#c04a20', ambient:'110,60,40', torch:'224,110,48' },
     fov:1, enemyTags:{human:2.5},
@@ -1679,12 +1686,44 @@ const BIOMES = {
     classMods:{ knight:{def:1}, rogue:{spd:1}, mage:{sp:-2}, warden:{mag:3} },
     hazard:{ name:'Grasping Bones', kind:'phys', color:'#c6c0a8', accent:'#8a8570', immune:'warden' },
     flavor:'Walls of stacked bone, mortared with prayer. The dead here never finished dying.' },
-  umbral: { id:'umbral', name:'The Umbral Weald',
-    pal:{ wallTop:'#2a2138', wallFace:'#171126', wallDark:'#0a0714', floorA:'#0e0a17', floorB:'#0c0914', speck:'#070510', ambient:'60,45,85', torch:'150,90,220' },
+  umbral: { id:'umbral', name:'The Blackwood',
+    pal:{ wallTop:'#2f3a24', wallFace:'#1a2416', wallDark:'#0c130a', floorA:'#111a0e', floorB:'#0f170c', speck:'#3a5a24', ambient:'70,95,45', torch:'150,190,90' },
     fov:-2, enemyTags:{spirit:2, beast:1.5},
     classMods:{ knight:{def:-1}, rogue:{spd:2, fov:2}, mage:{mag:2}, warden:{fov:1} },
-    hazard:{ name:'Root Snares', kind:'snare', color:'#9a5cc0', accent:'#5a3a78', immune:'rogue' },
+    hazard:{ name:'Root Snares', kind:'snare', color:'#6a9a3a', accent:'#3a5a1a', immune:'rogue' },
     flavor:'A forest of petrified roots where the lamplight simply gives up.' },
+
+  // ---- new themed regions (no biome-locked events of their own; they draw from
+  // the general encounter pool) ----
+  dungeon: { id:'dungeon', name:'The Dungeon',
+    pal:{ wallTop:'#4a4a55', wallFace:'#2c2c36', wallDark:'#151519', floorA:'#20202a', floorB:'#1c1c25', speck:'#12121c', ambient:'80,80,100', torch:'224,150,70' },
+    fov:0, enemyTags:{}, classMods:{},
+    hazard:{ name:'Rusted Traps', kind:'phys', color:'#7a6a5a', accent:'#48382a' },
+    flavor:'Cold cells and colder iron. Whatever this place jailed, the doors are open now.' },
+  desert: { id:'desert', name:'The Sunscoured Waste',
+    pal:{ wallTop:'#6a5a3a', wallFace:'#463a24', wallDark:'#261f12', floorA:'#3a3020', floorB:'#342b1c', speck:'#8a7a4a', ambient:'150,120,70', torch:'255,200,90' },
+    fov:1, enemyTags:{human:2.2, beast:1.5, undead:0.6},
+    classMods:{ knight:{spd:-1}, rogue:{spd:1}, mage:{sp:-1}, warden:{def:1} },
+    hazard:{ name:'Scouring Sand', kind:'fire', color:'#d0a050', accent:'#ffe0a0' },
+    flavor:'Buried halls under a sea of sand. The heat is a hand pressing you down into it.' },
+  castle: { id:'castle', name:'The Broken Keep',
+    pal:{ wallTop:'#45485a', wallFace:'#2a2d3c', wallDark:'#14151f', floorA:'#1e2030', floorB:'#1a1c28', speck:'#3a4a6a', ambient:'80,90,130', torch:'224,170,90' },
+    fov:0, enemyTags:{human:2.5, undead:1.3},
+    classMods:{ knight:{atk:2, def:1}, rogue:{spd:1}, mage:{mag:1}, warden:{def:1} },
+    hazard:{ name:'Loose Flagstones', kind:'phys', color:'#6a7088', accent:'#3a4056' },
+    flavor:'A fortress that lost its war. The banners rotted; the garrison did not leave.' },
+  cathedral: { id:'cathedral', name:'The Shattered Cathedral',
+    pal:{ wallTop:'#4a3a5a', wallFace:'#2e2438', wallDark:'#16101c', floorA:'#201828', floorB:'#1c1522', speck:'#6a4a8a', ambient:'110,80,150', torch:'255,210,120' },
+    fov:0, enemyTags:{undead:2, human:1.5, spirit:1.5},
+    classMods:{ knight:{def:1}, rogue:{spd:-1}, mage:{mag:2}, warden:{mag:3} },
+    hazard:{ name:'Weeping Cold', kind:'chill', color:'#8a6ac0', accent:'#c0a0f0' },
+    flavor:'Stained glass over an altar no one has tended in an age. The prayers here curdled long ago.' },
+  monastery: { id:'monastery', name:'The Silent Cloister',
+    pal:{ wallTop:'#52463a', wallFace:'#342c22', wallDark:'#1a150f', floorA:'#26201a', floorB:'#221d17', speck:'#6a5a3a', ambient:'140,105,60', torch:'240,190,110' },
+    fov:0, enemyTags:{spirit:2, human:1.6, undead:1.2},
+    classMods:{ knight:{def:1}, rogue:{spd:1}, mage:{sp:1}, warden:{mag:2} },
+    hazard:{ name:'Censer Fumes', kind:'poison', color:'#b0904a', accent:'#e0c070' },
+    flavor:'Cells, a refectory, a library gone to mold. The brothers took a vow of silence and kept it past death.' },
 };
 
 // ---------- Sanctum: permanent between-run upgrades bought with Souls ----------

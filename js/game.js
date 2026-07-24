@@ -1,7 +1,7 @@
 // ================= GRAVEBORNE — main engine =================
 // shown on the title screen; keep in step with CACHE in sw.js — the game is
 // served from that cache, so the number you see is the build you're running
-const GAME_VERSION = 26;
+const GAME_VERSION = 27;
 let VW = 21, VH = 13;                 // viewport in tiles — reshaped to the stage on phones
 const TS = 16;                        // tile size in canvas pixels
 const FINAL_DEPTH = 5;
@@ -299,13 +299,16 @@ function fovRadius(){
   const b = curBiome(), cm = biomeClassMods(G.player);
   return Math.max(2, FOV_R + (b.fov || 0) + (cm.fov || 0) + (G.floorFov || 0));
 }
-// each new depth has a chance to shift terrain; depth 1 is always the Catacombs,
-// and the Gloamlord keeps his throne in the Whitemarrow
+// each new depth has a chance to shift terrain; depth 1 is always the Dungeon
+// entry, and the Gloamlord keeps his throne in the Whitemarrow
 function rollBiome(){
-  if (G.depth === 1) return 'catacombs';
+  if (G.depth === 1) return 'dungeon';
   if (G.depth === FINAL_DEPTH) return 'ossuary';
-  if (G.biome && U.chance(0.35)) return G.biome;
-  return U.choice(Object.keys(Data.BIOMES).filter(k => k !== G.biome));
+  // guarantee the Sunken Harbor turns up once per descent (that is where the
+  // potion-maker is), so his quest — and the Alchemist unlock — stays reachable
+  if (G.depth === FINAL_DEPTH - 1 && !G.harborSeen) return 'drowned';
+  if (G.biome && U.chance(0.30)) return G.biome;
+  return U.choice(Object.keys(Data.BIOMES).filter(k => k !== G.biome && k !== 'ossuary'));
 }
 
 // ---- Bounty / Heat: the hunt ramps the longer you linger while Marked ----
@@ -690,7 +693,7 @@ function startRun(){
   // game looked frozen until a reload. Wipe all the turn latches before we begin.
   G.busy = false; G.moving = false; G.combat = null;
   G.pendingEvent = null; G.usedActives = {}; G.shop = null;
-  G.biome = null;
+  G.biome = null; G.harborSeen = false;
   G.player = newPlayer(G.selClass);
   G.depth = 1;
   enterFloor();
@@ -710,6 +713,7 @@ function enterFloor(){
   // roll this depth's terrain first — it gates events and reshapes the chosen character
   const prevBiome = G.biome;
   G.biome = rollBiome();
+  if (G.biome === 'drowned') G.harborSeen = true;   // remember the harbor came up this run
   const b = curBiome();
   G.floorFov = 0;                       // floor-scoped sight bonuses (lanterns etc.) reset
   recomputeStats(G.player);

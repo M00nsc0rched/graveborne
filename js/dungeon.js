@@ -207,9 +207,10 @@ function makeDungeon(depth, opts){
     }
   }
 
-  // --- the potion-maker sets up on some non-final floors, with a herb quest ---
-  // (final floors end at the boss, so there is no coming back to hand plants in)
-  if (!isFinal && Data.PLANTS && U.chance(0.5)){
+  // --- the potion-maker keeps his crooked stall in the Sunken Harbor, and only
+  // there — every harbor floor has him (final floors end at the boss, so there is
+  // no coming back to hand plants in) ---
+  if (!isFinal && opts.biome === 'drowned' && Data.PLANTS){
     const cand = U.shuffle(rooms.filter((r,i) => i !== FEATURE && i !== startIdx));
     for (const room of cand){
       const p = randInRoom(room);
