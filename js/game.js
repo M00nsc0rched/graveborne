@@ -1,7 +1,7 @@
 // ================= GRAVEBORNE — main engine =================
 // shown on the title screen; keep in step with CACHE in sw.js — the game is
 // served from that cache, so the number you see is the build you're running
-const GAME_VERSION = 28;
+const GAME_VERSION = 29;
 let VW = 21, VH = 13;                 // viewport in tiles — reshaped to the stage on phones
 const TS = 16;                        // tile size in canvas pixels
 const FINAL_DEPTH = 5;
@@ -282,6 +282,8 @@ function rollUnlockPool(p){
     const sk = Data.SKILLS[id];
     if (sk.cls === 'common' || p.skills.includes(id)) return false;
     if (!sk.open && sk.cls !== p.classId) return false;    // signatures stay with their class
+    // the Necromancer's Cursed Path: only the chosen discipline is offered
+    if (p.classId === 'necromancer' && sk.cls === 'necromancer' && sk.theme && sk.theme !== p.necroStyle) return false;
     return true;
   });
   return U.shuffle(ids).slice(0, 8);
@@ -579,6 +581,13 @@ function newPlayer(classId){
     for (let i = 0; i < 4; i++){ const h = U.choice(hk); p.plants[h] = (p.plants[h] || 0) + 1; }
     p.inv.push('potion_heal', 'potion_heal');
   }
+  // the Necromancer picks a discipline for the whole run and starts with two
+  // spells of it; from here it may only learn more of the same path
+  if (classId === 'necromancer'){
+    p.necroStyle = G.necroStyle || 'offense';
+    const starters = p.necroStyle === 'offense' ? ['n_bonespear','n_teeth'] : ['n_bonearmor','n_weaken'];
+    for (const id of starters) if (!p.skills.includes(id)) p.skills.push(id);
+  }
   return p;
 }
 
@@ -714,6 +723,7 @@ function startRun(){
   G.busy = false; G.moving = false; G.combat = null;
   G.pendingEvent = null; G.usedActives = {}; G.shop = null;
   G.biome = null; G.harborSeen = false;
+  if (G.selClass !== 'necromancer') G.necroStyle = null;   // keep the chosen path only for this run
   G.player = newPlayer(G.selClass);
   G.depth = 1;
   enterFloor();
@@ -1857,6 +1867,10 @@ function win(){
     }
     // the potion-maker's keeper-herb grows where the guardian fell
     dropGuardianPlant(c.origin.x, c.origin.y, en.name);
+    // slaying Omen in the cathedral earns the Necromancer class
+    if (en.id === 'omen' && Save.earnAchievement('omen')){
+      log('✦ Achievement — Omen is unmade. The Necromancer is now a playable class.', 'mag');
+    }
   } else if (en.elite){
     grantItem(en.drop || Data.rollItemId(3));
     p.inv.push('potion_heal'); log('The elite\'s cache holds a Draught of Mending.', 'good');
@@ -2718,6 +2732,21 @@ function showAllotment(){
   head.appendChild(info);
   s.appendChild(head);
 
+  // the Necromancer chooses a discipline for the whole descent, here and now
+  if (G.selClass === 'necromancer'){
+    s.appendChild(U.make('div','sect','The Cursed Path'));
+    s.appendChild(U.make('div','p dim','Pick the discipline you will follow this whole descent. You will only be able to learn spells of the path you choose.'));
+    const prow = U.make('div','target-row');
+    for (const [key, label, sub] of [['offense','⚔ Offensive','bone, poison, curses that kill'],['defense','⛨ Defensive','bone armor, the golem, curses that unstring']]){
+      const on = G.necroStyle === key;
+      const t = U.make('button','tbtn'+(on?' sel':''));
+      t.innerHTML = `${label}<span class="lhp">${sub}</span>`;
+      t.onclick = () => { G.necroStyle = key; showAllotment(); };
+      prow.appendChild(t);
+    }
+    s.appendChild(prow);
+  }
+
   // the Witch skips the whole ledger — her passive does this work in the dark
   if (!allowed){
     const pv = (Data.PASSIVES[G.selClass] || [])[0];
@@ -2752,8 +2781,9 @@ function showAllotment(){
   }
 
   const row = U.make('div','row');
-  const go = Btn('Descend', startRun, 'btn center');
-  go.disabled = left > 0;
+  const needStyle = G.selClass === 'necromancer' && !G.necroStyle;
+  const go = Btn(needStyle ? 'Choose a path first' : 'Descend', startRun, 'btn center');
+  go.disabled = left > 0 || needStyle;
   if (left > 0) row.appendChild(Btn('Spread them evenly', ()=>{
     const each = Math.floor(ALLOT_POINTS / ALLOT_STATS.length);
     let rest = ALLOT_POINTS - each * ALLOT_STATS.length;

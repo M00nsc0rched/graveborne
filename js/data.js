@@ -153,6 +153,44 @@ const SKILLS = {
   convince: { name:'Convince', type:'magic', cost:30, cls:'mage', open:false, desc:'Ask, in the old way, and sometimes it says yes.',
     lv:[{power:2,charm:0.05},{power:2,charm:0.10},{power:2,charm:0.12}] },
 
+  // ================= NECROMANCER — the cursed one (Diablo-II inspired) =================
+  // cls 'necromancer', not open: no other class learns these, and the Necromancer
+  // learns none but its own. theme tags let the style-passive lock a run to one set.
+  // ---- Offensive: bone, poison, and curses that make the dead do the work ----
+  n_bonespear:   { name:'Bone Spear',      type:'magic', cost:3, cls:'necromancer', open:false, theme:'offense', desc:'A shard of the dead, thrown clean through.',
+    lv:[{power:22},{power:28},{power:36}] },
+  n_teeth:       { name:'Teeth',           type:'magic', cost:1, cls:'necromancer', open:false, theme:'offense', desc:'A cheap spray of splintered bone.',
+    lv:[{power:6,hits:3,acc:0.85},{power:7,hits:4,acc:0.85},{power:8,hits:5,acc:0.85}] },
+  n_poisonnova:  { name:'Poison Nova',     type:'magic', cost:4, cls:'necromancer', open:false, theme:'offense', desc:'A ring of rot that spares nothing near.',
+    lv:[{power:14,effect:{poison:{dmg:10,turns:3}}},{power:18,effect:{poison:{dmg:14,turns:3}}},{power:22,effect:{poison:{dmg:18,turns:4}}}] },
+  n_corpseburst: { name:'Corpse Explosion',type:'magic', cost:4, cls:'necromancer', open:false, theme:'offense', desc:'Use what is already dead against what is not.',
+    lv:[{power:26},{power:34},{power:44}] },
+  n_bonespirit:  { name:'Bone Spirit',     type:'magic', cost:3, cls:'necromancer', open:false, theme:'offense', desc:'A hunting ghost of bone that finds the gap.',
+    lv:[{power:20,effect:{crit:0.25}},{power:26,effect:{crit:0.30}},{power:32,effect:{crit:0.40}}] },
+  n_amplify:     { name:'Amplify Damage',  type:'magic', cost:2, cls:'necromancer', open:false, theme:'offense', desc:'Everything bites it deeper now.',
+    lv:[{power:3,effect:{weaken:{amt:10,turns:3}}},{power:3,effect:{weaken:{amt:14,turns:3}}},{power:3,effect:{weaken:{amt:18,turns:4}}}] },
+  n_lowerresist: { name:'Lower Resist',    type:'magic', cost:2, cls:'necromancer', open:false, theme:'offense', desc:'Take its guard apart from the inside.',
+    lv:[{power:4,effect:{weaken:{amt:8,turns:3}}},{power:4,effect:{weaken:{amt:11,turns:3}}},{power:4,effect:{weaken:{amt:14,turns:4}}}] },
+  n_bloodstar:   { name:'Blood Star',      type:'magic', cost:3, cls:'necromancer', open:false, theme:'offense', desc:'Cast your own blood as a burning star, and drink it back.',
+    lv:[{power:16,effect:{lifesteal:1.0}},{power:20,effect:{lifesteal:1.0}},{power:26,effect:{lifesteal:1.0}}] },
+  // ---- Defensive: bone armor, the golem's guard, and curses that unstring the foe ----
+  n_bonearmor:   { name:'Bone Armor',      type:'defend', cost:2, cls:'necromancer', open:false, theme:'defense', desc:'A cage of the dead, worn close.',
+    lv:[{shield:'def3'},{shield:'def5'},{shield:'def7'}] },
+  n_bonewall:    { name:'Bone Wall',       type:'defend', cost:3, cls:'necromancer', open:false, theme:'defense', desc:'Raise the dead between you and the blow.',
+    lv:[{shield:'def5'},{shield:'def8'},{shield:'def10'}] },
+  n_boneprison:  { name:'Bone Prison',     type:'magic', cost:3, cls:'necromancer', open:false, theme:'defense', desc:'Close it in a fist of bone — it cannot move.',
+    lv:[{power:10,effect:{stun:0.45}},{power:12,effect:{stun:0.55}},{power:14,effect:{stun:0.65}}] },
+  n_claygolem:   { name:'Clay Golem',      type:'buff', cls:'necromancer', open:false, theme:'defense', cost:3, desc:'A servant of mud stands its watch — shield and slow mending.',
+    lv:[{effect:{shield:'def3',regen:{amt:6,turns:4}}},{effect:{shield:'def5',regen:{amt:9,turns:4}}},{effect:{shield:'def6',regen:{amt:12,turns:5}}}] },
+  n_dimvision:   { name:'Dim Vision',      type:'magic', cost:2, cls:'necromancer', open:false, theme:'defense', desc:'Blind it to you; its arm forgets the way.',
+    lv:[{power:3,effect:{weaken:{amt:7,turns:3}}},{power:3,effect:{weaken:{amt:10,turns:3}}},{power:3,effect:{weaken:{amt:13,turns:4}}}] },
+  n_weaken:      { name:'Weaken',          type:'magic', cost:1, cls:'necromancer', open:false, theme:'defense', desc:'Its strength runs out through your curse.',
+    lv:[{power:2,effect:{weaken:{amt:6,turns:3}}},{power:2,effect:{weaken:{amt:9,turns:3}}},{power:2,effect:{weaken:{amt:12,turns:4}}}] },
+  n_lifetap:     { name:'Life Tap',        type:'buff', cost:2, cls:'necromancer', open:false, theme:'defense', desc:'Open a vein between you — mend, and steel yourself.',
+    lv:[{effect:{regen:{amt:6,turns:3},shield:'def2'}},{effect:{regen:{amt:9,turns:3},shield:'def3'}},{effect:{regen:{amt:12,turns:4},shield:'def4'}}] },
+  n_decrepify:   { name:'Decrepify',       type:'magic', cost:3, cls:'necromancer', open:false, theme:'defense', desc:'Age it a hundred years in a breath — slow, and weak.',
+    lv:[{power:4,effect:{weaken:{amt:9,turns:3},stun:0.25}},{power:4,effect:{weaken:{amt:13,turns:3},stun:0.30}},{power:5,effect:{weaken:{amt:17,turns:4},stun:0.35}}] },
+
   // ================= WARDEN — holy protector =================
   smite: { name:'Smite', type:'magic', cost:3, cls:'warden', open:true, holy:true, desc:'Holy fire; scourges the undead.',
     lv:[{power:18,holy:true},{power:25,holy:true},{power:30,holy:true}] },
@@ -224,6 +262,7 @@ const PASSIVES = {
   warden: [ { name:'Last Vigil', desc:'Once per descent a killing blow leaves you at 1 HP — then you have 2 turns to finish the foe, or it finishes you.' } ],
   rogue:  [ { name:"Cutthroat's Luck", desc:'Each fight the coin picks one: every strike bleeds, or your critical hits land far harder.' } ],
   alchemist: [ { name:'Iron Palate', desc:'A lifetime of tasting the worst leaves nothing that can turn your stomach. You are immune to poison, rot and bleed.' } ],
+  necromancer: [ { name:'The Cursed Path', desc:'At the start of each descent you choose a path — Offensive or Defensive — and for that whole run you may only learn spells of that one discipline.' } ],
 };
 
 const CLASSES = {
@@ -250,6 +289,15 @@ const CLASSES = {
     base:{ hp:30, sp:9, atk:11, def:10, mag:12, spd:7 }, honor:40,
     skills:['strike','smite','prayer','heal'],
     flavor:'A lantern in the deep. Mercy is a weapon. Begins most honorable.'
+  },
+  // Unlocked by slaying Omen in the cathedral. A glass-cannon mage: almost nothing
+  // with steel, but savage magic. The Cursed Path passive locks each run to one
+  // spell discipline (see necroStyle handling in game.js).
+  necromancer: {
+    id:'necromancer', name:'The Necromancer', role:'The cursed one', sprite:'hero_necromancer',
+    base:{ hp:25, sp:30, atk:5, def:9, mag:47, spd:10 }, honor:-20,
+    skills:['strike'], locked:'omen',
+    flavor:'Omen, unmade and worn as a name. The dead answer it; the living learn to.'
   },
   // Unlocked by finishing the potion-maker's quest. Uses INT (crafting-grown)
   // in place of SP, cannot strike or cast, and fights only by brewing and
@@ -511,11 +559,30 @@ Object.assign(ENEMIES, {
       hallowed:'“So bright, so clean. You will leave such a beautiful stain.”',
       items:{},
       defeat:'“Light... always... the light...”' } },
+
+  // Omen, the Cursed One — the cathedral's main boss. A necromancer: almost all
+  // magic, and the dead answer it. Slaying it earns the Necromancer class.
+  omen: { id:'omen', name:'Omen, the Cursed One', sprite:'en_omen', guardian:true, tier:1, tags:['undead'],
+    hp:110, atk:8, def:9, mag:22, spd:10, gold:[36,58],
+    moves:[ {name:'Bone Spear',type:'magic',power:20,w:3}, {name:'Poison Nova',type:'magic',power:12,effect:{poison:{dmg:8,turns:3}},w:2},
+            {name:'Teeth',type:'magic',power:6,hits:4,acc:0.85,w:2}, {name:'Amplify Damage',type:'magic',power:4,effect:{weaken:{amt:8,turns:3}},w:1},
+            {name:'Bone Armor',type:'defend',shield:'def2',w:1} ],
+    dialogue:{
+      intro:'“I was a man, once, and then a word men were afraid to say. Now I keep this altar, and the dead keep me. Come and be counted among them.”',
+      class:{ knight:'“Steel and a vow. The last one who brought me those is holding my staff\'s left hand now.”',
+              rogue:'“Quick, and quiet. The quiet ones make the most patient corpses.”',
+              mage:'“You reach into the same dark I did. Reach a little further. See where it ends.”',
+              warden:'“A light. Good. I have missed watching one go out.”',
+              alchemist:'“You brew borrowed life. I keep the real thing on a leash. Sit. Have a drink. Have the last one.”' },
+      marked:'“The Choir wants you unmade. We want for so little, they and I.”',
+      hallowed:'“Clean. Whole. Unbroken. I will fix all three.”',
+      items:{},
+      defeat:'“So this... is how it... looks from... the other side.”' } },
 });
 
 // which legend bars each biome's stair
 const BIOME_GUARDIANS = { catacombs:'morr', fungal:'mycel', drowned:'brine', ember:'pyraxes', ossuary:'curator', umbral:'firstshadow',
-  dungeon:'morr', desert:'pyraxes', castle:'curator', cathedral:'firstshadow', monastery:'mycel' };
+  dungeon:'morr', desert:'pyraxes', castle:'curator', cathedral:'omen', monastery:'mycel' };
 
 // ---------- Items ----------
 const ITEMS = {

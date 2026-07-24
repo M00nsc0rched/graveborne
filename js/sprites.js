@@ -74,7 +74,38 @@ const SPR = {
     "   KK  KK   ",
   ],
 
+  // The Necromancer — hooded dark robe, green witch-light in the hood
+  hero_necromancer: [
+    "    KKKK    ",
+    "   KxxxxK   ",
+    "  KxxvvxxK  ",
+    "  KxxxxxxK  ",
+    "  KxxxxxxK  ",
+    "  KxGxxGxK  ",
+    "  KxxxxxxK  ",
+    "  KxxxxxxK  ",
+    "  Kxx  xxK  ",
+    "  Kx    xK  ",
+    "  KK    KK  ",
+    "            ",
+  ],
+
   // ---- Enemies ----
+  // Omen, the Cursed One — the cathedral's boss: red witch-light, a star-staff
+  en_omen: [
+    "  R KKKK R  ",
+    "  RKxxxxKR  ",
+    "  KxxRRxxK  ",
+    "  KxxxxxxK  ",
+    "  KxxxxxxK  ",
+    " oKxGxxGxK  ",
+    " OKxxxxxxK  ",
+    " oKxxxxxxK  ",
+    "  Kxx  xxK  ",
+    "  Kx    xK  ",
+    "  KK    KK  ",
+    "            ",
+  ],
   en_rat: [
     "            ",
     "            ",
