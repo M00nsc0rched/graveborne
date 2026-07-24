@@ -1,7 +1,7 @@
 // ================= GRAVEBORNE — main engine =================
 // shown on the title screen; keep in step with CACHE in sw.js — the game is
 // served from that cache, so the number you see is the build you're running
-const GAME_VERSION = 25;
+const GAME_VERSION = 26;
 let VW = 21, VH = 13;                 // viewport in tiles — reshaped to the stage on phones
 const TS = 16;                        // tile size in canvas pixels
 const FINAL_DEPTH = 5;
@@ -549,10 +549,12 @@ function newPlayer(classId){
   recomputeStats(p);
   p.hp = p.maxhp; p.sp = p.maxsp;
   p.unlockPool = rollUnlockPool(p);     // a different offer of skills every descent
-  // the Alchemist arrives with a few herbs so her first fight isn't bare-handed
+  // the Alchemist begins with two mending draughts, a handful of herbs, and
+  // only her one starter recipe — she brews her INT up to unlock the rest
   if (classId === 'alchemist'){
     const hk = Object.keys(Data.PLANTS);
-    for (let i = 0; i < 5; i++){ const h = U.choice(hk); p.plants[h] = (p.plants[h] || 0) + 1; }
+    for (let i = 0; i < 4; i++){ const h = U.choice(hk); p.plants[h] = (p.plants[h] || 0) + 1; }
+    p.inv.push('potion_heal', 'potion_heal');
   }
   return p;
 }
@@ -3331,10 +3333,13 @@ function showInventory(){
 
   s.appendChild(U.make('div','sect', (Data.CLASSES[p.classId]&&Data.CLASSES[p.classId].craftOnly) ? 'Recipes known' : 'Skills'));
   if (Data.CLASSES[p.classId] && Data.CLASSES[p.classId].craftOnly){
-    for (const id in Data.POTIONS){ const po = Data.POTIONS[id];
+    const ids = Object.keys(Data.POTIONS).sort((a,b)=>(Data.POTIONS[a].intReq||0)-(Data.POTIONS[b].intReq||0));
+    for (const id of ids){ const po = Data.POTIONS[id];
       const catColor = { offense:'#c05070', debuff:'#9a5cc0', buff:'#63b7a6', food:'#a87e34' }[po.cat];
+      const open = recipeUnlocked(p, po);
+      const gate = po.intReq ? (open ? `<span style="color:#6fbf6a">INT ${po.intReq} ✔</span>` : `<span style="color:#c05070">🔒 INT ${po.intReq}</span>`) : '<span style="color:#6fbf6a">starter</span>';
       s.appendChild(U.make('div','p dim',
-        `<span style="color:${catColor}">${po.name}</span> <span style="font-size:10px">[${po.cat}]</span> — ${po.desc} <span class="dim">(${po.plants} herbs)</span>`));
+        `${gate} <span style="color:${open?catColor:'#5a5270'}">${po.name}</span> <span style="font-size:10px">[${po.cat}]</span> — ${po.desc} <span class="dim">(${po.plants} herbs)</span>`));
     }
   } else
   for (const id of p.skills){
@@ -3379,13 +3384,19 @@ function showInventory(){
 
 // ---- The crafting bench: turn gathered herbs into potions, sharpening INT ----
 const POT_CAT_COLOR = { offense:'#c05070', debuff:'#9a5cc0', buff:'#63b7a6', food:'#a87e34' };
+const INT_PER_BREW = 2;
+function recipeUnlocked(p, po){ return playerInt(p) >= (po.intReq || 0); }
 function craftPotion(id){
   const p = G.player, po = Data.POTIONS[id];
-  if (!po || plantCount(p) < po.plants) return;
+  if (!po || plantCount(p) < po.plants || !recipeUnlocked(p, po)) return;
   spendPlants(p, po.plants);
   p.inv.push(id);
-  p.baseSp += 1; recomputeStats(p); p.sp = p.maxsp;   // every brew sharpens INT
+  p.baseSp += INT_PER_BREW; recomputeStats(p); p.sp = p.maxsp;   // every brew sharpens INT
   log(`You brew a ${po.name}. Your hands remember the work — INT is now ${p.maxsp}.`, 'mag');
+  // announce any recipe that just came within reach
+  for (const rid in Data.POTIONS){ const r = Data.POTIONS[rid];
+    if (r.intReq && p.maxsp - INT_PER_BREW < r.intReq && p.maxsp >= r.intReq)
+      log(`Your understanding deepens — you can now brew ${r.name} (INT ${r.intReq}).`, 'good'); }
   updateHUD();
   showCrafting();
 }
@@ -3400,15 +3411,22 @@ function showCrafting(){
     ? herbs.map(k=>`<span style="color:${Data.PLANTS[k].color}">${Data.PLANTS[k].glyph}</span> ${Data.PLANTS[k].name} ×${p.plants[k]}`).join(' · ')
     : '<i>No herbs gathered. Walk over the sprigs that glow green on the floor.</i>'));
 
+  s.appendChild(U.make('div','p dim',
+    `You know your <b>Bitter Tonic</b> from the start. The rest open as your INT climbs — brewing anything raises INT by ${INT_PER_BREW}, and every potion hits harder the higher your INT.`));
   for (const cat of ['offense','debuff','buff','food']){
     s.appendChild(U.make('div','sect', ({offense:'Offensive — to hurl',debuff:'Debuff — to hurl',buff:'Buff — to pour',food:'Food — to serve'})[cat]));
-    for (const id in Data.POTIONS){
-      const po = Data.POTIONS[id]; if (po.cat !== cat) continue;
-      const can = plantCount(p) >= po.plants;
+    // low tiers first
+    const ids = Object.keys(Data.POTIONS).filter(id => Data.POTIONS[id].cat === cat)
+      .sort((a,b) => (Data.POTIONS[a].intReq||0) - (Data.POTIONS[b].intReq||0));
+    for (const id of ids){
+      const po = Data.POTIONS[id];
+      const unlocked = recipeUnlocked(p, po);
+      const can = unlocked && plantCount(p) >= po.plants;
       const b = Btn('', ()=>craftPotion(id), 'btn'+(can?' good':''));
       const have = p.inv.filter(x=>x===id).length;
+      const gate = unlocked ? `${po.plants} herbs` : `🔒 INT ${po.intReq}`;
       b.innerHTML = `<span>${po.name}${have?` <span class="dim">(have ${have})</span>`:''}</span>` +
-        `<span class="cost">${po.plants} herbs</span><span class="sub">${po.desc} — brewing +1 INT</span>`;
+        `<span class="cost">${gate}</span><span class="sub">${po.desc}${unlocked?` — +${INT_PER_BREW} INT`:` — locked until INT ${po.intReq}`}</span>`;
       b.disabled = !can;
       s.appendChild(b);
     }
@@ -3437,17 +3455,21 @@ function applyPotion(id, tgt){
   G.busy = true; G.combat.turn = 'enemy'; renderActions();
 
   const nm = po.name, who = potionTargetName(tgt);
-  if (po.cat === 'offense'){
+  // effect magnitudes grow proportionally with the INT you bring over the recipe's tier
+  const effMult = 1 + Math.max(0, int - (po.intReq || 0)) * 0.025;
+  if (po.dmg){
     let dmg = potPower(po.dmg, int);
     if (T.shield > 0){ const ab = Math.min(T.shield, dmg); T.shield -= ab; dmg -= ab; if (ab>0) log(`${tIsEnemy?T.name+"'s":'the'} shield absorbs ${ab}.`, 'dim'); }
     T.hp -= Math.max(0, dmg);
     log(`You ${po.verb} a ${nm} at ${who} — ${Math.max(0,dmg)} damage.`, tIsEnemy?'hi':'bad');
     floatOn(!tIsEnemy && tIsPlayer, `-${Math.max(0,dmg)}`, '#c03636');
   }
+  if (po.selfHeal){ const v = potPower(po.selfHeal, int); const b = p.hp; p.hp = Math.min(p.maxhp, p.hp + v);
+    if (p.hp - b > 0){ log(`The tonic steadies you (+${p.hp-b} HP).`, 'good'); floatOn(true, `+${p.hp-b}`, '#6fbf6a'); } }
   if (po.effect){
     const ef = po.effect;
-    if (ef.poison){ if (immuneToRot(T)) log(`${who} shrugs off the rot.`, 'dim'); else { T.statuses.poison = { ...ef.poison }; log(`${who} is wracked with rot.`, tIsEnemy?'hi':'bad'); } }
-    if (ef.weaken){ T.statuses.weaken = { ...ef.weaken }; log(`${who} is weakened.`, tIsEnemy?'hi':'mag'); }
+    if (ef.poison){ if (immuneToRot(T)) log(`${who} shrugs off the rot.`, 'dim'); else { T.statuses.poison = { dmg:Math.max(1,Math.round(ef.poison.dmg*effMult)), turns:ef.poison.turns }; log(`${who} is wracked with rot (${T.statuses.poison.dmg}/turn).`, tIsEnemy?'hi':'bad'); } }
+    if (ef.weaken){ T.statuses.weaken = { amt:Math.max(1,Math.round(ef.weaken.amt*effMult)), turns:ef.weaken.turns }; log(`${who} is weakened (−${T.statuses.weaken.amt} ATK).`, tIsEnemy?'hi':'mag'); }
     if (ef.stun && U.chance(ef.stun)){ if (!tIsPlayer){ T.statuses.stun = 1; log(`${who} is stunned!`, 'hi'); } }
   }
   if (po.buff){

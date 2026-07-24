@@ -256,9 +256,9 @@ const CLASSES = {
   // throwing potions. See usesInt / craftOnly.
   alchemist: {
     id:'alchemist', name:'The Alchemist', role:'Bartender in another life', sprite:'npc_alchemist',
-    base:{ hp:30, sp:20, atk:0, def:17, mag:0, spd:14 }, honor:10,
+    base:{ hp:30, sp:8, atk:0, def:17, mag:0, spd:14 }, honor:10,
     skills:[], usesInt:true, craftOnly:true, locked:'one_drink',
-    flavor:'Poured drinks in a kinder life. Down here she pours worse. Every fight is a recipe.'
+    flavor:'Poured drinks in a kinder life. Down here she pours worse. She starts with one recipe and brews her INT up to the rest.'
   },
 };
 
@@ -626,20 +626,29 @@ const PLANTS = {
 // ---------- Potions the Alchemist brews from gathered plants ----------
 // cat: offense | debuff | buff | food. Numeric fields written [base, intScale]
 // scale with the brewer's INT (her max mana). verb colours the log line.
-// plants: how many gathered herbs a brew costs. Every brew also raises INT by 1.
+// plants: herbs a brew costs. Every brew raises INT by 2.
+// intReq: the INT level a recipe unlocks at. She begins knowing only the starter
+// (intReq 0); the twelve tiered recipes open as her INT climbs to 10/20/30/40,
+// and their potency and effects scale up with the INT she brings to them.
 const POTIONS = {
-  flask_vitriol:   { id:'flask_vitriol',   name:'Vitriol Flask',   cat:'offense', verb:'hurl',  plants:2, dmg:[8,0.8],  effect:{ weaken:{amt:4,turns:2} }, desc:'Acid that eats armour and nerve alike.' },
-  flask_pyre:      { id:'flask_pyre',       name:'Firebomb',        cat:'offense', verb:'hurl',  plants:2, dmg:[12,1.0], desc:'Bottled ignition. Throw it, then look away.' },
-  flask_shatter:   { id:'flask_shatter',    name:'Shatter-Glass',   cat:'offense', verb:'hurl',  plants:3, dmg:[16,1.2], effect:{ weaken:{amt:5,turns:2} }, desc:'A flask that flowers into a hundred edges.' },
-  vial_miasma:     { id:'vial_miasma',      name:'Miasma Vial',     cat:'debuff',  verb:'hurl',  plants:2, effect:{ poison:{dmg:5,turns:3}, weaken:{amt:3,turns:3} }, desc:'A cloud that rots resolve and flesh together.' },
-  vial_torpor:     { id:'vial_torpor',      name:'Torpor Draught',  cat:'debuff',  verb:'hurl',  plants:2, effect:{ stun:0.6, weaken:{amt:3,turns:2} }, desc:'Sleep, bottled — for a moment, at least.' },
-  vial_solvent:    { id:'vial_solvent',     name:'Solvent Vial',    cat:'debuff',  verb:'hurl',  plants:2, effect:{ weaken:{amt:8,turns:3} }, desc:'It unstitches whatever holds a thing together.' },
-  brew_vigor:      { id:'brew_vigor',       name:'Brew of Vigor',   cat:'buff',    verb:'pour',  plants:2, buff:{ atkbuff:[3,0.3], shield:[4,0.6] }, desc:'Liquid nerve: strength, and a guard to spend it behind.' },
-  tonic_ward:      { id:'tonic_ward',       name:'Warding Tonic',   cat:'buff',    verb:'pour',  plants:2, buff:{ shield:[6,0.9] }, desc:'A skin of glass drawn over the skin you have.' },
-  elixir_mend:     { id:'elixir_mend',      name:'Mending Elixir',  cat:'buff',    verb:'pour',  plants:2, heal:[10,1.0], desc:'Closes a wound the way a good night closes a bad day.' },
-  draught_fervor:  { id:'draught_fervor',   name:'Draught of Fervor',cat:'buff',   verb:'pour',  plants:3, buff:{ atkbuff:[6,0.5], regen:[2,0.2] }, desc:'Courage you can pour. It does not last, but it lands.' },
-  nourishing_stew: { id:'nourishing_stew',  name:'Nourishing Stew', cat:'food',    verb:'serve', plants:1, food:70, desc:'The one drink that actually feeds you.' },
-  cordial_marrow:  { id:'cordial_marrow',   name:'Marrow Cordial',  cat:'food',    verb:'serve', plants:2, food:100, heal:[6,0.4], desc:'Thick, warm, and it does not bear thinking about. Fills you and mends you.' },
+  // --- her first and only starting recipe ---
+  starter_tonic:   { id:'starter_tonic',    name:'Bitter Tonic',    cat:'offense', verb:'hurl',  plants:1, intReq:0,  dmg:[10,0.12], selfHeal:[4,0.08], desc:'Her first recipe. A splash that scalds the foe and steadies the hand — 10 damage, and it mends you 4.' },
+  // --- INT 10 ---
+  flask_vitriol:   { id:'flask_vitriol',    name:'Vitriol Flask',   cat:'offense', verb:'hurl',  plants:2, intReq:10, dmg:[8,0.7],  effect:{ weaken:{amt:4,turns:2} }, desc:'Acid that eats armour and nerve alike.' },
+  tonic_ward:      { id:'tonic_ward',       name:'Warding Tonic',   cat:'buff',    verb:'pour',  plants:2, intReq:10, buff:{ shield:[5,0.7] }, desc:'A skin of glass drawn over the skin you have.' },
+  nourishing_stew: { id:'nourishing_stew',  name:'Nourishing Stew', cat:'food',    verb:'serve', plants:1, intReq:10, food:60, desc:'The one drink that actually feeds you.' },
+  // --- INT 20 ---
+  flask_pyre:      { id:'flask_pyre',       name:'Firebomb',        cat:'offense', verb:'hurl',  plants:2, intReq:20, dmg:[12,1.0], desc:'Bottled ignition. Throw it, then look away.' },
+  vial_miasma:     { id:'vial_miasma',      name:'Miasma Vial',     cat:'debuff',  verb:'hurl',  plants:2, intReq:20, effect:{ poison:{dmg:5,turns:3}, weaken:{amt:3,turns:3} }, desc:'A cloud that rots resolve and flesh together.' },
+  brew_vigor:      { id:'brew_vigor',       name:'Brew of Vigor',   cat:'buff',    verb:'pour',  plants:2, intReq:20, buff:{ atkbuff:[3,0.35], shield:[4,0.6] }, desc:'Liquid nerve: strength, and a guard to spend it behind.' },
+  // --- INT 30 ---
+  elixir_mend:     { id:'elixir_mend',      name:'Mending Elixir',  cat:'buff',    verb:'pour',  plants:2, intReq:30, heal:[10,1.0], desc:'Closes a wound the way a good night closes a bad day.' },
+  vial_torpor:     { id:'vial_torpor',      name:'Torpor Draught',  cat:'debuff',  verb:'hurl',  plants:2, intReq:30, effect:{ stun:0.6, weaken:{amt:3,turns:2} }, desc:'Sleep, bottled — for a moment, at least.' },
+  vial_solvent:    { id:'vial_solvent',     name:'Solvent Vial',    cat:'debuff',  verb:'hurl',  plants:2, intReq:30, effect:{ weaken:{amt:8,turns:3} }, desc:'It unstitches whatever holds a thing together.' },
+  // --- INT 40 ---
+  flask_shatter:   { id:'flask_shatter',    name:'Shatter-Glass',   cat:'offense', verb:'hurl',  plants:3, intReq:40, dmg:[16,1.3], effect:{ weaken:{amt:5,turns:2} }, desc:'A flask that flowers into a hundred edges.' },
+  draught_fervor:  { id:'draught_fervor',   name:'Draught of Fervor',cat:'buff',   verb:'pour',  plants:3, intReq:40, buff:{ atkbuff:[6,0.5], regen:[2,0.25] }, desc:'Courage you can pour. It does not last, but it lands.' },
+  cordial_marrow:  { id:'cordial_marrow',   name:'Marrow Cordial',  cat:'food',    verb:'serve', plants:2, intReq:40, food:100, heal:[8,0.5], desc:'Thick, warm, and best not thought about. Fills you and mends you.' },
 };
 
 // ---------- Item sets ----------

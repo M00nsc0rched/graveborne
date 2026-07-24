@@ -200,7 +200,7 @@ function makeDungeon(depth, opts){
   // Alchemist brews with them; anyone can pick them up) ---
   if (Data.PLANTS){
     const herbIds = Object.keys(Data.PLANTS);
-    const herbCount = U.randInt(4, 7) + Math.floor(depth/2);
+    const herbCount = U.randInt(7, 11) + depth;
     for (let i = 0; i < herbCount; i++){
       const p = randInRoom(U.choice(rooms));
       if (p) d.entities.push({ type:'plant', plant:U.choice(herbIds), x:p.x, y:p.y, wild:true });
