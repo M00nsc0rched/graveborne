@@ -1,7 +1,7 @@
 // ================= GRAVEBORNE — main engine =================
 // shown on the title screen; keep in step with CACHE in sw.js — the game is
 // served from that cache, so the number you see is the build you're running
-const GAME_VERSION = 27;
+const GAME_VERSION = 28;
 let VW = 21, VH = 13;                 // viewport in tiles — reshaped to the stage on phones
 const TS = 16;                        // tile size in canvas pixels
 const FINAL_DEPTH = 5;
@@ -471,6 +471,26 @@ function openTuner(){
     inputs[key] = i; row.appendChild(l); row.appendChild(i);
     s.appendChild(row);
   }
+  // ---- unlock / lock the playable classes that are normally earned ----
+  const lockedClasses = Object.keys(Data.CLASSES).filter(id => Data.CLASSES[id].locked);
+  if (lockedClasses.length){
+    s.appendChild(U.make('div','sect','Playable classes'));
+    for (const id of lockedClasses){
+      const c = Data.CLASSES[id], ach = c.locked, have = Save.hasAchievement(ach);
+      const line = U.make('div');
+      line.style.cssText = 'display:flex;align-items:center;gap:8px;margin-bottom:5px';
+      const lbl = U.make('span', null, `${c.name} — ${have ? '<span style="color:#6fbf6a">unlocked</span>' : '<span style="color:#c05070">locked</span>'}`);
+      lbl.style.cssText = 'flex:1;font-size:12px;color:#8a7f9e';
+      const btn = Btn(have ? 'Lock' : 'Unlock', () => {
+        if (have) Save.revokeAchievement(ach); else Save.earnAchievement(ach);
+        log(have ? `${c.name} re-locked.` : `${c.name} unlocked — choose it at character select.`, 'mag');
+        openTuner();   // re-render to reflect the new state
+      }, 'btn' + (have ? '' : ' good'));
+      line.appendChild(lbl); line.appendChild(btn);
+      s.appendChild(line);
+    }
+  }
+
   const row = U.make('div','row');
   row.appendChild(Btn('Apply', () => {
     const num = k => { const v = parseInt(inputs[k].value, 10); return isNaN(v) ? null : v; };

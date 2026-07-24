@@ -45,6 +45,7 @@ const Save = {
   achievements(){ return this._read(this.KEY_ACH, {}); },
   hasAchievement(id){ return !!this.achievements()[id]; },
   earnAchievement(id){ const a = this.achievements(); if (a[id]) return false; a[id] = { at: Date.now() }; this._write(this.KEY_ACH, a); return true; },
+  revokeAchievement(id){ const a = this.achievements(); if (!a[id]) return false; delete a[id]; this._write(this.KEY_ACH, a); return true; },
 
   // ---- Display options: how much screen the game takes, and which way up ----
   // fill: 0.80–1.00 of the phone's viewport · orient: 'auto' | 'landscape'
