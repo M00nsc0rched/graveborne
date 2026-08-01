@@ -1,0 +1,49 @@
+name: Deploy to GitHub Pages
+
+# The game is a static site (plain HTML/JS, no build step), so every push to the
+# default branch publishes the repo root straight to Pages. Manual runs are allowed
+# too, in case a deploy needs re-triggering without a new commit.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# least privilege the Pages deploy needs: read the checkout, write the Pages site,
+# and mint the OIDC token deploy-pages uses to publish
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# one deploy at a time; a newer push supersedes an in-flight run
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # enablement:true turns Pages on the first time this runs, so no manual
+      # visit to Settings -> Pages is needed to bootstrap the site
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      # publish the repo root as-is; index.html + js/ + styles.css + icons all
+      # use relative paths, so they resolve under the /graveborne/ project path
+      - name: Upload site
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'
+
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
