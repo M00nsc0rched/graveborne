@@ -165,9 +165,12 @@ function makeDungeon(depth, opts){
     for (const t of (Data.ENEMIES[id].tags || [])) if (tagW[t] != null) wt = Math.max(wt, 0) * tagW[t];
     return { id, w:wt };
   });
+  // the arena room (stairIdx) holds the floor's keeper — the boss on the final
+  // floor, a Legendary Guardian otherwise. It stays clear of every other actor and
+  // pickup, so a boss room is only ever the boss (and its atmospheric dressing).
+  const arenaIdx = stairIdx;
   for (let ri = 0; ri < rooms.length; ri++){
-    if (ri === FEATURE || ri === startIdx) continue;
-    if (isFinal && ri === stairIdx) continue;                 // the boss stands alone
+    if (ri === FEATURE || ri === startIdx || ri === arenaIdx) continue;   // keeper stands alone
     const room = rooms[ri];
     // cells are cramped side-chambers — only some hold a lurker, so the floor
     // doesn't turn into a monster in every closet
@@ -183,16 +186,18 @@ function makeDungeon(depth, opts){
   const evtPool = (opts.eventKeys && opts.eventKeys.length) ? opts.eventKeys.slice() : Object.keys(Data.EVENTS);
   const eventKeys = opts.eventsOrdered ? evtPool : U.shuffle(evtPool);
   const eventCount = opts.eventCount != null ? opts.eventCount : U.clamp(1 + Math.floor(depth/2), 1, 3);
-  const eventRooms = U.shuffle(rooms.filter((r,i) => i !== FEATURE && i !== startIdx && !(isFinal && i === stairIdx)));
+  const eventRooms = U.shuffle(rooms.filter((r,i) => i !== FEATURE && i !== startIdx && i !== arenaIdx));
   for (let i = 0; i < eventCount && i < eventKeys.length && i < eventRooms.length; i++){
     const p = randInRoom(eventRooms[i]); if (!p) continue;
     d.entities.push({ type:'event', eventId:eventKeys[i], x:p.x, y:p.y });
   }
 
   // --- chests (larger floors hide more, on top of the sanctum's prize) ---
+  // never in the keeper's arena — its room holds nothing but the fight
+  const lootRooms = rooms.filter((r,i) => i !== arenaIdx);
   const chestCount = U.randInt(2, 3);
   for (let i = 0; i < chestCount; i++){
-    const p = randInRoom(U.choice(rooms));
+    const p = randInRoom(U.choice(lootRooms));
     if (p) d.entities.push({ type:'chest', x:p.x, y:p.y, tier:U.clamp(Math.ceil(depth/2), 1, 3) });
   }
 
@@ -202,7 +207,7 @@ function makeDungeon(depth, opts){
     const herbIds = Object.keys(Data.PLANTS);
     const herbCount = U.randInt(7, 11) + depth;
     for (let i = 0; i < herbCount; i++){
-      const p = randInRoom(U.choice(rooms));
+      const p = randInRoom(U.choice(lootRooms));                // keep the arena bare
       if (p) d.entities.push({ type:'plant', plant:U.choice(herbIds), x:p.x, y:p.y, wild:true });
     }
   }
@@ -211,7 +216,7 @@ function makeDungeon(depth, opts){
   // there — every harbor floor has him (final floors end at the boss, so there is
   // no coming back to hand plants in) ---
   if (!isFinal && opts.biome === 'drowned' && Data.PLANTS){
-    const cand = U.shuffle(rooms.filter((r,i) => i !== FEATURE && i !== startIdx));
+    const cand = U.shuffle(rooms.filter((r,i) => i !== FEATURE && i !== startIdx && i !== arenaIdx));
     for (const room of cand){
       const p = randInRoom(room);
       if (p){ d.entities.push({ type:'npc', npc:'potionmaker', x:p.x, y:p.y, quest:{ stage:'offer' } }); break; }
