@@ -1,10 +1,28 @@
 // ================= GRAVEBORNE — main engine =================
 // shown on the title screen; keep in step with CACHE in sw.js — the game is
 // served from that cache, so the number you see is the build you're running
-const GAME_VERSION = 29;
+const GAME_VERSION = 30;
 let VW = 21, VH = 13;                 // viewport in tiles — reshaped to the stage on phones
 const TS = 16;                        // tile size in canvas pixels
 const FINAL_DEPTH = 5;
+
+// ---- Movement animation: the step used to teleport a whole tile every keypress,
+// which is a fast way to a headache. Now the world scrolls a step over SLIDE_MS,
+// and a faint trail sells the motion. Held keys chain one slide into the next
+// (input is gated while a slide runs), so the pace is smooth, not frantic.
+const SLIDE_MS = 110;                  // how long one tile-step takes to settle
+function motionMode(){ try { return Save.opts().motion || 'smooth'; } catch(e){ return 'smooth'; } }
+function motionOn(){ return motionMode() !== 'instant'; }
+// smoothstep: eases in and out, so chained steps read as one continuous glide
+function slideEase(k){ return k*k*(3 - 2*k); }
+// is a tile-slide still playing? drives the input gate and the camera follow
+function slideActive(){ const s = G.slide; return !!(s && (G.time - s.start) < s.dur); }
+// snap the drawn position onto the logical tile — used on floor changes so the
+// player never appears to skate across the whole map after a descent
+function snapPlayerVisual(){
+  const p = G.player; if (!p) return;
+  p.rx = p.x; p.ry = p.y; G.slide = null; G.moving = false;
+}
 const FOV_R = 5;
 const MARK_AT = -40;   // honor <= this  → Marked: hunted by the Inquisition, richer loot
 const HALLOW_AT = 40;  // honor >= this  → Hallowed: safe, friendly encounters, leaner loot
@@ -398,9 +416,20 @@ function showSettings(back){
       ()=>{ Save.setOpt('orient', key); applyDisplayOpts(); showSettings(back); }));
   }
 
+  s.appendChild(U.make('div','sect','Movement'));
+  s.appendChild(U.make('div','p dim','Smooth glides the view a step at a time, with a faint trail behind you — easier on the eyes over a long descent. Instant snaps tile to tile, the old way.'));
+  for (const [key, label, sub] of [
+    ['smooth','Smooth','The world slides a step at a time. A little motion sells the walk.'],
+    ['instant','Instant','Hard snap between tiles. No slide, no trail.'],
+  ]){
+    const on = (o.motion || 'smooth') === key;
+    s.appendChild(shopLine(`${on ? '◈ ' : ''}${label}`, sub, '', false,
+      ()=>{ Save.setOpt('motion', key); snapPlayerVisual(); showSettings(back); }));
+  }
+
   const row = U.make('div','row');
   row.appendChild(Btn('Reset to full & upright', ()=>{
-    Save.setOpt('fill', 1); Save.setOpt('orient', 'auto'); applyDisplayOpts(); showSettings(back);
+    Save.setOpt('fill', 1); Save.setOpt('orient', 'auto'); Save.setOpt('motion', 'smooth'); applyDisplayOpts(); snapPlayerVisual(); showSettings(back);
   }, 'btn center'));
   row.appendChild(Btn('Back', ()=>{ hideModal(); (back || showTitle)(); }, 'btn center'));
   s.appendChild(row);
@@ -414,7 +443,7 @@ function initTouchControls(){
   if (!pad) return;
   let repeatTimer = null;
   const act = (btn) => {
-    if (G.state !== 'EXPLORE' || G.busy) return;
+    if (G.state !== 'EXPLORE' || G.busy || slideActive()) return;
     if (btn.dataset.wait){ worldTurn(); if (G.state === 'EXPLORE') revealFOV(); return; }
     move(parseInt(btn.dataset.dx, 10), parseInt(btn.dataset.dy, 10));
   };
@@ -530,8 +559,9 @@ function loop(t){
 // ---------------- input ----------------
 function onKey(e){
   const k = e.key.toLowerCase();
-  // modal-driven states ignore movement keys
-  if (G.state === 'EXPLORE' && !G.busy && !G.moving){
+  // modal-driven states ignore movement keys; a slide in progress holds the next
+  // step until it settles, so a held key chains smoothly instead of racing ahead
+  if (G.state === 'EXPLORE' && !G.busy && !slideActive()){
     if (k === 'arrowup' || k === 'w'){ move(0,-1); e.preventDefault(); }
     else if (k === 'arrowdown' || k === 's'){ move(0,1); e.preventDefault(); }
     else if (k === 'arrowleft' || k === 'a'){ move(-1,0); e.preventDefault(); }
@@ -556,7 +586,7 @@ function newPlayer(classId){
     baseHp:c.base.hp, baseSp:c.base.sp, baseAtk:c.base.atk, baseDef:c.base.def, baseMag:c.base.mag, baseSpd:c.base.spd,
     hp:c.base.hp, sp:c.base.sp, honor:c.honor, gold:20, food:FOOD_MAX,
     skills:c.skills.slice(), equip:{weapon:null,armor:null,trinket:null}, inv:[],
-    statuses:{}, shield:0, x:0, y:0, dir:1, allies:[],
+    statuses:{}, shield:0, x:0, y:0, rx:0, ry:0, dir:1, allies:[],
     heat:0, reinforceCd:null, pocketCoin:false,
     level:1, skillsBought:0,
     skillLv:{}, unlockPool:[], skillBonus:{},   // per-skill tiers, run offers, earned power
@@ -770,6 +800,7 @@ function enterFloor(){
   G.floor = makeDungeon(G.depth, { finalFloor: final, eventKeys, eventCount, eventsOrdered: true, biome: G.biome });
   G.player.x = G.floor.playerStart.x;
   G.player.y = G.floor.playerStart.y;
+  snapPlayerVisual();                    // start the new floor without sliding in from the old spot
   Save.recordDepth(G.depth);
   revealFOV();
 
@@ -880,13 +911,25 @@ function move(dx, dy){
     // torches and props are scenery: you walk straight past them, so dressing
     // can never wall off a route
   }
+  const fromX = p.x, fromY = p.y;
   p.x = tx; p.y = ty;
+  startSlide(fromX, fromY, tx, ty);        // glide the view onto the new tile
   if (f.tileAt(tx, ty) === TILE.HAZARD){
     if (!applyHazard()) return;              // hazard killed you
     if (G.state !== 'EXPLORE') return;       // snare ambush pulled you into combat
   }
   worldTurn();
   revealFOV();
+}
+
+// begin the visual glide from the old tile to the new one. With motion off the
+// draw simply snaps, so this is a no-op beyond keeping rx/ry in step.
+function startSlide(fromX, fromY, toX, toY){
+  const p = G.player;
+  if (!motionOn()){ p.rx = toX; p.ry = toY; G.slide = null; G.moving = false; return; }
+  p.rx = fromX; p.ry = fromY;
+  G.slide = { fromX, fromY, toX, toY, start: G.time, dur: SLIDE_MS };
+  G.moving = true;
 }
 
 // stepping onto a biome hazard tile; returns false if it kills you
@@ -2231,10 +2274,10 @@ function ensureFloorMeta(f){
     altar.x >= r.x && altar.x < r.x + r.w && altar.y >= r.y && altar.y < r.y + r.h) || null) : null;
 }
 // a double frame with corner keys, echoing the fret borders of a ritual floor
-function drawSanctumFret(f, camX, camY){
+function drawSanctumFret(f, SX, SY){
   const r = f._sanctum; if (!r) return;
-  const x0 = (r.x - camX)*TS + 3,          y0 = (r.y - camY)*TS + 3;
-  const x1 = (r.x + r.w - camX)*TS - 3,     y1 = (r.y + r.h - camY)*TS - 3;
+  const x0 = SX(r.x) + 3,          y0 = SY(r.y) + 3;
+  const x1 = SX(r.x + r.w) - 3,    y1 = SY(r.y + r.h) - 3;
   ctx.strokeStyle = 'rgba(208,168,78,0.20)'; ctx.lineWidth = 1;
   ctx.strokeRect(x0, y0, x1-x0, y1-y0);
   ctx.strokeRect(x0+3, y0+3, x1-x0-6, y1-y0-6);
@@ -2250,15 +2293,33 @@ function renderExplore(){
   const f = G.floor, p = G.player;
   ensureFloorMeta(f);
   ctx.fillStyle = '#050409'; ctx.fillRect(0,0,canvas.width,canvas.height);
-  const camX = U.clamp(p.x - (VW>>1), 0, Math.max(0, f.w - VW));
-  const camY = U.clamp(p.y - (VH>>1), 0, Math.max(0, f.h - VH));
+
+  // advance the tile-slide: rx/ry are where the player is *drawn*, easing from the
+  // tile just left toward the tile just entered. The whole view follows this, so
+  // the world scrolls a step rather than jumping — that is the headache cure.
+  const s = G.slide;
+  if (s){
+    const k = (G.time - s.start) / s.dur;
+    if (k >= 1){ p.rx = s.toX; p.ry = s.toY; G.slide = null; G.moving = false; }
+    else { const e = slideEase(k); p.rx = s.fromX + (s.toX - s.fromX)*e; p.ry = s.fromY + (s.toY - s.fromY)*e; }
+  } else { p.rx = p.x; p.ry = p.y; }
+
+  // a fractional camera keyed to the drawn position; the integer part indexes
+  // tiles, the fraction becomes a sub-pixel scroll. Rounding every screen point
+  // against the same origin keeps the pixel art seam-free and crisp.
+  const camFx = U.clamp(p.rx - (VW>>1), 0, Math.max(0, f.w - VW));
+  const camFy = U.clamp(p.ry - (VH>>1), 0, Math.max(0, f.h - VH));
+  const camX = Math.floor(camFx), camY = Math.floor(camFy);
+  const originX = camFx * TS, originY = camFy * TS;
+  const SX = w => Math.round(w*TS - originX);
+  const SY = h => Math.round(h*TS - originY);
   const sanc = f._sanctum;
 
-  // tiles
-  for (let vy = 0; vy < VH; vy++){
-    for (let vx = 0; vx < VW; vx++){
+  // tiles — one extra row/column so the partial edge tiles fill the scroll gap
+  for (let vy = 0; vy <= VH; vy++){
+    for (let vx = 0; vx <= VW; vx++){
       const x = camX+vx, y = camY+vy; if (!f.inb(x,y)) continue;
-      const i = f.idx(x,y); const sx = vx*TS, sy = vy*TS;
+      const i = f.idx(x,y); const sx = SX(x), sy = SY(y);
       if (!f.explored[i]) continue;
       drawTile(f.tileAt(x,y), sx, sy, x, y);
       // the sanctum floor takes a warm, consecrated tone
@@ -2268,18 +2329,18 @@ function renderExplore(){
     }
   }
   // the fret border framing the sanctum (fog paints over the unexplored parts after)
-  drawSanctumFret(f, camX, camY);
+  drawSanctumFret(f, SX, SY);
   // ritual circle drawn onto the sanctum floor, under everything else
   for (const e of f.entities){
     if (!(e.type === 'prop' && e.ritual)) continue;
     const i = f.idx(e.x, e.y); if (!f.explored[i]) continue;
-    drawRitual((e.x-camX)*TS+8, (e.y-camY)*TS+8, f.visible[i]);
+    drawRitual(SX(e.x)+8, SY(e.y)+8, f.visible[i]);
   }
   // static entities (remembered) + dynamic (visible only)
   for (const e of f.entities){
     const i = f.idx(e.x, e.y);
     const vis = f.visible[i], seen = f.explored[i];
-    const sx = (e.x-camX)*TS, sy = (e.y-camY)*TS;
+    const sx = SX(e.x), sy = SY(e.y);
     if (sx < -TS || sy < -TS || sx > canvas.width || sy > canvas.height) continue;
     if (e.type === 'enemy'){ if (!vis) continue; Sprites.draw(ctx, Data.ENEMIES[e.enemyId].sprite, sx+2, sy+2, 1);
       if (e.elite){ ctx.fillStyle='#d0a84e'; ctx.fillRect(sx+5,sy,1,2); ctx.fillRect(sx+7,sy-1,2,3); ctx.fillRect(sx+10,sy,1,2); } }
@@ -2304,14 +2365,26 @@ function renderExplore(){
     else if (e.type === 'prop'){ if (!seen) continue; Sprites.draw(ctx, e.sprite, sx+2, sy+2, 1); }
     else if (e.type === 'torch'){ if (!vis) continue; const fl = Math.sin(G.time/120 + e.x)*0.5+0.5; Sprites.draw(ctx, 'obj_torch', sx+2, sy+2 - (fl>0.6?1:0), 1); }
   }
-  // player
-  Sprites.draw(ctx, p.sprite, (p.x-camX)*TS+2, (p.y-camY)*TS+2, 1);
+  // player — while a slide runs, a couple of fading afterimages trail behind the
+  // step, the "motion blur" that reads the movement without smearing the pixels
+  if (s && G.slide){
+    const dx = s.toX - s.fromX, dy = s.toY - s.fromY;
+    const k = U.clamp((G.time - s.start) / s.dur, 0, 1);
+    const fade = 1 - k;                                   // trail thins as the step arrives
+    for (const [back, a] of [[0.34, 0.22], [0.62, 0.11]]){
+      const t = Math.max(0, slideEase(k) - back);
+      ctx.globalAlpha = a * fade;
+      Sprites.draw(ctx, p.sprite, SX(s.fromX + dx*t)+2, SY(s.fromY + dy*t)+2, 1);
+    }
+    ctx.globalAlpha = 1;
+  }
+  Sprites.draw(ctx, p.sprite, SX(p.rx)+2, SY(p.ry)+2, 1);
 
   // fog: darken explored-not-visible
-  for (let vy = 0; vy < VH; vy++){
-    for (let vx = 0; vx < VW; vx++){
+  for (let vy = 0; vy <= VH; vy++){
+    for (let vx = 0; vx <= VW; vx++){
       const x = camX+vx, y = camY+vy; if (!f.inb(x,y)) continue;
-      const i = f.idx(x,y); const sx=vx*TS, sy=vy*TS;
+      const i = f.idx(x,y); const sx=SX(x), sy=SY(y);
       if (!f.explored[i]){ ctx.fillStyle = '#050409'; ctx.fillRect(sx,sy,TS,TS); }
       else if (!f.visible[i]){ ctx.fillStyle = 'rgba(5,4,10,0.6)'; ctx.fillRect(sx,sy,TS,TS); }
     }
@@ -2319,18 +2392,18 @@ function renderExplore(){
   // torch + player light (colors follow the biome)
   const pal = curBiome().pal;
   ctx.globalCompositeOperation = 'lighter';
-  radial((p.x-camX)*TS+8, (p.y-camY)*TS+8, 70, `rgba(${pal.ambient},0.30)`);
+  radial(SX(p.rx)+8, SY(p.ry)+8, 70, `rgba(${pal.ambient},0.30)`);
   for (const e of f.entities){ if (e.type==='torch' && f.visible[f.idx(e.x,e.y)]){
     const fl = Math.sin(G.time/120 + e.x)*0.2+0.8;
-    radial((e.x-camX)*TS+8, (e.y-camY)*TS+8, 46, `rgba(${pal.torch},${0.28*fl})`); } }
+    radial(SX(e.x)+8, SY(e.y)+8, 46, `rgba(${pal.torch},${0.28*fl})`); } }
   // the sanctum's shard casts its own cold arcane glow
   for (const e of f.entities){ if (e.type==='prop' && e.ritual && f.visible[f.idx(e.x,e.y)]){
     const fl = Math.sin(G.time/300)*0.15+0.85;
-    radial((e.x-camX)*TS+8, (e.y-camY)*TS+8, 52, `rgba(154,92,192,${0.22*fl})`); } }
+    radial(SX(e.x)+8, SY(e.y)+8, 52, `rgba(154,92,192,${0.22*fl})`); } }
   // a quest herb glows faintly so a needed sprig can be spotted across a lit room
   for (const e of f.entities){ if (e.type==='plant' && f.visible[f.idx(e.x,e.y)]){
     const fl = Math.sin(G.time/220 + e.x)*0.2+0.8;
-    radial((e.x-camX)*TS+8, (e.y-camY)*TS+8, 26, `rgba(120,200,120,${0.26*fl})`); } }
+    radial(SX(e.x)+8, SY(e.y)+8, 26, `rgba(120,200,120,${0.26*fl})`); } }
   ctx.globalCompositeOperation = 'source-over';
   vignette();
 }
