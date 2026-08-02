@@ -40,6 +40,10 @@ const I18N = (function(){
     'Hold to repeat · ● waits': 'Tartsd nyomva az ismétléshez · ● várakozik',
     'HONOR': 'BECSÜLET', 'BOUNTY': 'VÉRDÍJ', 'DEPTH': 'MÉLYSÉG',
     'Skills': 'Képességek', 'Recipes known': 'Ismert receptek',
+    // — inventory: the paper doll and the pack —
+    'The Pack': 'A csomag', 'LEVEL': 'SZINT',
+    'weapon': 'fegyver', 'armor': 'páncél', 'trinket': 'ereklye',
+    'The Reckoning': 'A Számvetés',
     'Hungry': 'Éhes', 'STARVING': 'ÉHEZIK', 'STARVED': 'KIÉHEZETT',
     'none': 'nincs', 'empty': 'üres', '(free)': '(ingyenes)',
     // sanctum boon summary fragments (assembled in sanctumSummary)
