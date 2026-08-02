@@ -1,7 +1,7 @@
 // ================= GRAVEBORNE — main engine =================
 // shown on the title screen; keep in step with CACHE in sw.js — the game is
 // served from that cache, so the number you see is the build you're running
-const GAME_VERSION = 35;
+const GAME_VERSION = 36;
 let VW = 21, VH = 13;                 // viewport in tiles — reshaped to the stage on phones
 const TS = 16;                        // tile size in canvas pixels
 const FINAL_DEPTH = 5;
@@ -600,6 +600,12 @@ function loop(t){
 // ---------------- input ----------------
 function onKey(e){
   const k = e.key.toLowerCase();
+  // the deck is driven from the keyboard too: browse with the arrows, draw with ↑
+  if (G.state === 'CHARSELECT' && G.deck){
+    if (k === 'arrowleft' || k === 'a'){ G.deck.prev(); e.preventDefault(); return; }
+    if (k === 'arrowright' || k === 'd'){ G.deck.next(); e.preventDefault(); return; }
+    if (k === 'arrowup' || k === 'w' || k === 'enter'){ G.deck.draw(); e.preventDefault(); return; }
+  }
   // modal-driven states ignore movement keys; a slide in progress holds the next
   // step until it settles, so a held key chains smoothly instead of racing ahead
   if (G.state === 'EXPLORE' && !G.busy && !slideActive()){
@@ -2769,50 +2775,339 @@ function showTitle(){
   setModal(s);
 }
 
+// ---- Character select: a deck you draw from ----
+// The classes sit in a carousel of tarot-style cards. Only the centred card can
+// be taken, and taking it means pulling it up out of the rail — it burns away as
+// it rises, and the run begins. Locked classes are chained and never show their
+// art; you get a sigil and nothing more.
+
+// Which stats a class is notably strong and weak in, measured against the
+// average of every class, so the card can show its bargain at a glance.
+const DECK_STATS = [['hp','HP'], ['sp','SP'], ['atk','ATK'], ['def','DEF'], ['mag','MAG'], ['spd','SPD']];
+function classStatDeltas(id){
+  const ids = Object.keys(Data.CLASSES);
+  const cls = Data.CLASSES[id].base;
+  const n = ids.length;
+  // Rank against the other classes rather than measure distance from the mean:
+  // one extreme class (the Necromancer's 47 MAG) blows the spread up far enough
+  // to hide that the Hollow Witch is the second-best caster in the game.
+  const scored = DECK_STATS.map(([k, label]) => {
+    const vals = ids.map(o => Data.CLASSES[o].base[k]).sort((a, b) => b - a);
+    return { k, label, rank: vals.indexOf(cls[k]), val: cls[k] };
+  });
+  const byRank = scored.slice().sort((a, b) => a.rank - b.rank);
+  let up = byRank.filter(s => s.rank <= 1).slice(0, 2);
+  // the Oathwarden is middling in all six, which left its card with an empty
+  // box; every class always names at least its best and its worst
+  if (!up.length) up = [byRank[0]];
+  let dn = byRank.filter(s => s.rank >= n - 2 && !up.includes(s)).reverse().slice(0, 2);
+  if (!dn.length) dn = byRank.filter(s => !up.includes(s)).slice(-1);
+  return { up, dn };
+}
+
+// the card face: a lit alcove with the class standing in it
+function paintCardArt(cv, c){
+  const ctx = cv.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+  const W = cv.width, H = cv.height;
+  ctx.clearRect(0, 0, W, H);
+  const g = ctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, '#1a1428'); g.addColorStop(0.55, '#100c1a'); g.addColorStop(1, '#07050d');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  // an arch behind the figure, so every card reads as the same shrine
+  ctx.strokeStyle = 'rgba(208,168,78,0.16)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(W/2, H*0.46, W*0.34, Math.PI, 0); ctx.stroke();
+  ctx.fillStyle = 'rgba(208,168,78,0.05)';
+  ctx.fillRect(Math.round(W/2 - W*0.34), Math.round(H*0.46), Math.round(W*0.68), Math.round(H*0.32));
+  // floor line + the glow the figure stands in
+  const rg = ctx.createRadialGradient(W/2, H*0.62, 2, W/2, H*0.62, W*0.5);
+  rg.addColorStop(0, 'rgba(208,168,78,0.13)'); rg.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = rg; ctx.fillRect(0, 0, W, H);
+  Sprites.draw(ctx, c.sprite, Math.round(W/2 - 24), Math.round(H*0.62 - 44), 4);
+  ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(0, H - 3, W, 3);
+}
+
+// the locked face: the sigil the sketch asks for, and no hint of who is under it
+function paintLockedArt(cv){
+  const ctx = cv.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+  const W = cv.width, H = cv.height;
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#0a0812'; ctx.fillRect(0, 0, W, H);
+  const cx = Math.round(W/2), cy = Math.round(H*0.45), r = Math.round(W*0.2);
+  ctx.strokeStyle = '#3a3350'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.stroke();
+  ctx.strokeStyle = '#4a4166'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(cx, cy, r + 5, 0, Math.PI*2); ctx.stroke();
+  // a squat cross inside the ring, blocky enough to sit with the pixel art
+  ctx.fillStyle = '#5a5074';
+  ctx.fillRect(cx - 2, cy - r + 3, 4, r*2 - 6);
+  ctx.fillRect(cx - r + 3, cy - 2, r*2 - 6, 4);
+  ctx.fillStyle = '#6f6390';
+  for (const [dx, dy] of [[0,-1],[0,1],[-1,0],[1,0]])
+    ctx.fillRect(cx + dx*(r+5) - 1, cy + dy*(r+5) - 1, 3, 3);
+}
+
 function showCharSelect(){
-  G.state='CHARSELECT';
+  G.state = 'CHARSELECT';
+  const ids = Object.keys(Data.CLASSES);
+  const isLocked = (id) => { const c = Data.CLASSES[id]; return !!(c.locked && !Save.hasAchievement(c.locked)); };
+  // a locked pick can survive a wipe; never open the deck on one
+  if (isLocked(G.selClass) || !Data.CLASSES[G.selClass]) G.selClass = 'knight';
+
   const s = U.make('div','sheet');
-  s.appendChild(U.make('div','sect','Choose Your Doomed'));
-  s.appendChild(U.make('div','p dim','Each begins at a different point on the road of honor — and will meet the depths differently for it.'));
+  const head = U.make('div','deck-head');
+  head.appendChild(U.make('div','sect','Choose Your Doomed'));
+  head.appendChild(U.make('div','p dim','Each begins at a different point on the road of honor — and will meet the depths differently for it.'));
+  s.appendChild(head);
   const ss = sanctumSummary();
   if (ss) s.appendChild(U.make('div','p','<span style="color:#7fb0d0">Sanctum boons active:</span> ' + ss));
-  const grid = U.make('div','cards');
-  const cards = {};
-  for (const id in Data.CLASSES){
-    const c = Data.CLASSES[id];
-    const locked = c.locked && !Save.hasAchievement(c.locked);
-    const card = U.make('div','card'+(id===G.selClass?' sel':'')+(locked?' locked':''));
-    const cv = U.make('canvas'); cv.width=52; cv.height=52; card.appendChild(cv); Sprites.toCanvas(cv, c.sprite, 4);
-    const info = U.make('div');
-    info.appendChild(U.make('h3',null,c.name + (locked ? ' 🔒' : '')));
-    info.appendChild(U.make('div','role',c.role));
-    const b=c.base, sp = c.usesInt ? `<b>INT</b> ${b.sp}` : `<b>SP</b> ${b.sp}`;
+
+  const deck = U.make('div','deck');
+  const rail = U.make('div','deck-rail');
+  const cardEls = [];
+
+  ids.forEach((id) => {
+    const c = Data.CLASSES[id], locked = isLocked(id);
+    const el = U.make('div','tcard' + (locked ? ' locked' : ''));
+    el.dataset.id = id;
+
+    el.appendChild(U.make('div','tcard-name', locked ? '???' : c.name.toUpperCase()));
+
+    const frame = U.make('div','tcard-frame');
+    const cv = U.make('canvas'); cv.width = 59; cv.height = 84;
+    frame.appendChild(cv);
     if (locked){
-      info.appendChild(U.make('div','stats',
-        `<span style="color:#c05070">Locked.</span> Finish the potion-maker\'s quest — <i>“One drink and the pain goes away.”</i> — to earn this class.<br>` +
-        `<span style="color:#8a7f9e">${c.flavor}</span>`));
+      paintLockedArt(cv);
+      const ch = U.make('div','chains');
+      ch.appendChild(U.make('b')); ch.appendChild(U.make('b')); ch.appendChild(U.make('b'));
+      frame.appendChild(ch);
+      frame.appendChild(U.make('div','lock-badge','LOCKED'));
     } else {
-      info.appendChild(U.make('div','stats',
-        `<b>HP</b> ${b.hp} · ${sp} · <b>ATK</b> ${b.atk} · <b>DEF</b> ${b.def} · <b>MAG</b> ${b.mag} · <b>SPD</b> ${b.spd}<br>` +
-        `Honor start: <span style="color:${Data.honorTier(c.honor).color}">${c.honor} (${Data.honorTier(c.honor).name})</span><br>` +
-        ((Data.PASSIVES[id] || []).map(pv =>
-          `<span style="color:#9a5cc0">◈ ${pv.name}</span> — <span style="color:#8a7f9e">${pv.desc}</span><br>`).join('')) +
-        `<span style="color:#8a7f9e">${c.flavor}</span>`));
+      paintCardArt(cv, c);
     }
-    card.appendChild(info);
-    if (!locked) card.onclick = ()=>{ G.selClass=id; for(const k in cards) cards[k].classList.toggle('sel', k===id); };
-    cards[id]=card; grid.appendChild(card);
-  }
-  // if the current pick is a locked class (e.g. after a wipe), fall back to knight
-  if (Data.CLASSES[G.selClass] && Data.CLASSES[G.selClass].locked && !Save.hasAchievement(Data.CLASSES[G.selClass].locked)){
-    G.selClass = 'knight'; if (cards.knight) cards.knight.classList.add('sel');
-  }
-  s.appendChild(grid);
+    for (const k of ['tl','tr','bl','br']) frame.appendChild(U.make('i', k));
+    el.appendChild(frame);
+
+    el.appendChild(U.make('div','tcard-tag', locked ? 'Sealed to you' : c.role));
+
+    const mods = U.make('div','tcard-mods');
+    if (locked){
+      for (let i = 0; i < 4; i++) mods.appendChild(U.make('span', i < 2 ? 'up' : 'dn', '???'));
+    } else {
+      const d = classStatDeltas(id);
+      const cells = [];
+      for (const u of d.up) cells.push(['up', '+' + u.label]);
+      while (cells.length < 2) cells.push(['up', '']);
+      for (const v of d.dn) cells.push(['dn', '−' + v.label]);
+      while (cells.length < 4) cells.push(['dn', '']);
+      for (const [cls, txt] of cells) mods.appendChild(U.make('span', cls, txt));
+    }
+    el.appendChild(mods);
+
+    rail.appendChild(el);
+    cardEls.push(el);
+  });
+
+  deck.appendChild(rail);
+  s.appendChild(deck);
+
+  const nav = U.make('div','deck-nav');
+  const prevB = U.make('button', null, '◀');
+  const pips = U.make('div','deck-pips');
+  ids.forEach(() => pips.appendChild(U.make('i')));
+  const nextB = U.make('button', null, '▶');
+  nav.appendChild(prevB); nav.appendChild(pips); nav.appendChild(nextB);
+  s.appendChild(nav);
+
+  const hint = U.make('div','deck-hint','Pull the card up to draw it — <b>↑</b> or drag');
+  s.appendChild(hint);
+
   const row = U.make('div','row');
-  row.appendChild(Btn('Continue', showAllotment, 'btn center'));
   row.appendChild(Btn('Back', showTitle, 'btn center'));
   s.appendChild(row);
+
+  // ---- rail mechanics ----
+  let cur = Math.max(0, ids.indexOf(G.selClass));
+  let drawing = false, teardown = null;
+  // a previous visit's window listeners go before this one installs its own
+  if (G.deckTeardown) G.deckTeardown();
+
+  function layout(){
+    const el = cardEls[cur];
+    if (!el) return;
+    // centre the current card: the rail's origin sits at the deck's midpoint
+    const x = el.offsetLeft + el.offsetWidth / 2;
+    rail.style.transform = `translateX(${-x}px)`;
+    cardEls.forEach((c, i) => c.classList.toggle('is-current', i === cur));
+    [...pips.children].forEach((p, i) => p.classList.toggle('on', i === cur));
+    const id = ids[cur];
+    if (!isLocked(id)) G.selClass = id;
+    hint.innerHTML = isLocked(id)
+      ? T('This one is sealed. Earn it, and it will take your hand.')
+      : T('Pull the card up to draw it — <b>↑</b> or drag');
+    prevB.disabled = cur <= 0; nextB.disabled = cur >= ids.length - 1;
+  }
+  function go(d){
+    if (drawing) return;
+    cur = U.clamp(cur + d, 0, ids.length - 1);
+    layout();
+  }
+
+  prevB.onclick = () => go(-1);
+  nextB.onclick = () => go(1);
+  cardEls.forEach((el, i) => {
+    el.addEventListener('click', () => {
+      if (swallowClick){ swallowClick = false; return; }
+      if (drawing) return;
+      if (i !== cur){ cur = i; layout(); return; }
+      if (!isLocked(ids[i])) beginDraw(el);
+    });
+  });
+
+  // ---- pull-to-draw ----
+  // One drag at a time, tracked here rather than per card, so the window
+  // listeners are a single pair that gets torn down when the deck closes —
+  // otherwise every visit to this screen left another twelve behind.
+  let dragEl = null, startY = null, moved = 0, swallowClick = false;
+  const ptrY = (e) => (e.touches && e.touches[0]) ? e.touches[0].clientY : e.clientY;
+  const onMove = (e) => {
+    if (!dragEl) return;
+    moved = startY - ptrY(e);
+    if (moved > 0){
+      if (e.cancelable) e.preventDefault();
+      dragEl.classList.add('drawing');
+      dragEl.style.transform = `translateY(${-Math.min(moved, 90)}px) scale(1)`;
+    }
+  };
+  const onUp = () => {
+    if (!dragEl) return;
+    const el = dragEl; dragEl = null;
+    // releasing also fires a click; an aborted pull must not draw the card anyway
+    if (Math.abs(moved) > 4) swallowClick = true;
+    if (moved > 46){ beginDraw(el); return; }
+    el.classList.remove('drawing');
+    el.style.transform = '';
+  };
+  cardEls.forEach((el, i) => {
+    const down = (e) => {
+      if (drawing || i !== cur || isLocked(ids[i])) return;
+      dragEl = el; startY = ptrY(e); moved = 0;
+    };
+    el.addEventListener('touchstart', down, { passive:true });
+    el.addEventListener('touchmove', onMove, { passive:false });
+    el.addEventListener('touchend', onUp);
+    el.addEventListener('touchcancel', onUp);
+    el.addEventListener('mousedown', down);
+  });
+  window.addEventListener('mousemove', onMove);
+  window.addEventListener('mouseup', onUp);
+  teardown = () => {
+    window.removeEventListener('mousemove', onMove);
+    window.removeEventListener('mouseup', onUp);
+  };
+
+  function beginDraw(el){
+    if (drawing) return;
+    drawing = true;
+    G.selClass = el.dataset.id;
+    G.deck = null;
+    if (teardown){ teardown(); G.deckTeardown = null; }
+    burnCard(el, () => showAllotment());
+  }
+
+  // arrow keys and Enter drive the deck too (see onKey)
+  G.deck = { prev:()=>go(-1), next:()=>go(1),
+             draw:()=>{ if (!isLocked(ids[cur])) beginDraw(cardEls[cur]); } };
+  G.deckTeardown = teardown;
+
   setModal(s);
+  layout();
+  // the rail measures itself only once it is in the document
+  requestAnimationFrame(layout);
+}
+
+// The card rises out of the rail and is eaten from the bottom up: the DOM node is
+// clipped to a jagged front that climbs, while a canvas paints the ember edge and
+// the sparks coming off it. Reduced-motion skips straight to the payload.
+function burnCard(el, done){
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reduce){ done(); return; }
+
+  el.classList.add('drawing');
+  const rect = el.getBoundingClientRect();
+  const layer = U.make('div','burn-layer');
+  const cv = U.make('canvas');
+  const W = Math.ceil(rect.width) + 36, H = Math.ceil(rect.height) + 34;
+  cv.width = W; cv.height = H;
+  layer.appendChild(cv);
+  el.appendChild(layer);
+  const ctx = cv.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+
+  // one jagged profile, reused every frame so the edge does not swim about
+  const COLS = 22;
+  const jag = [];
+  for (let i = 0; i <= COLS; i++) jag.push((Math.random() * 2 - 1) * 7);
+
+  const sparks = [];
+  const DUR = 760, LIFT = 118;
+  const t0 = performance.now();
+
+  function frame(now){
+    const k = Math.min(1, (now - t0) / DUR);
+    const ease = k * k * (3 - 2 * k);
+
+    // the card climbs out of the rail as it goes
+    el.style.transform = `translateY(${-(LIFT * ease)}px) scale(${1 - 0.06 * ease})`;
+    el.style.opacity = String(1 - 0.15 * ease);
+
+    // burn front, as a fraction of the card height from the bottom
+    const front = ease;                       // 0 = untouched, 1 = wholly gone
+    const pts = [];
+    for (let i = 0; i <= COLS; i++){
+      const px = (i / COLS) * 100;
+      // quantise to keep the edge blocky, like the rest of the art
+      const py = Math.max(0, Math.min(100, (1 - front) * 100 + jag[i] * (1 - Math.abs(0.5 - front) * 1.2)));
+      pts.push(`${px}% ${Math.round(py / 2) * 2}%`);
+    }
+    el.style.clipPath = `polygon(0 0, 100% 0, ${[...pts].reverse().join(', ')}, 0 0)`;
+    el.style.webkitClipPath = el.style.clipPath;
+
+    // ---- embers along the front, drawn in the layer's own space ----
+    ctx.clearRect(0, 0, W, H);
+    const padX = 18, padY = 24;
+    const cardW = rect.width, cardH = rect.height;
+    for (let i = 0; i <= COLS; i++){
+      const px = padX + (i / COLS) * cardW;
+      const pyPct = (1 - front) * 100 + jag[i] * (1 - Math.abs(0.5 - front) * 1.2);
+      const py = padY + (Math.max(0, Math.min(100, pyPct)) / 100) * cardH;
+      if (front <= 0.01 || front >= 0.995) continue;
+      ctx.fillStyle = 'rgba(255,150,40,0.95)';
+      ctx.fillRect(Math.round(px) - 2, Math.round(py) - 2, 5, 4);
+      ctx.fillStyle = 'rgba(255,215,120,0.85)';
+      ctx.fillRect(Math.round(px) - 1, Math.round(py) - 1, 2, 2);
+      ctx.fillStyle = 'rgba(90,40,20,0.75)';
+      ctx.fillRect(Math.round(px) - 3, Math.round(py) + 2, 7, 3);
+      if (Math.random() < 0.25) sparks.push({ x:px, y:py, vx:(Math.random()-0.5)*0.5, vy:-(0.5+Math.random()*1.4), life:1 });
+    }
+    for (let i = sparks.length - 1; i >= 0; i--){
+      const sp = sparks[i];
+      sp.x += sp.vx; sp.y += sp.vy; sp.vy -= 0.012; sp.life -= 0.026;
+      if (sp.life <= 0){ sparks.splice(i, 1); continue; }
+      ctx.fillStyle = `rgba(255,${Math.round(120 + 90*sp.life)},${Math.round(40*sp.life)},${sp.life.toFixed(2)})`;
+      const sz = sp.life > 0.6 ? 2 : 1;
+      ctx.fillRect(Math.round(sp.x), Math.round(sp.y), sz, sz);
+    }
+
+    // once the card is gone, hold just long enough for the last embers to die —
+    // waiting for the spark list to drain stretched the transition past a second
+    if (k < 1 || now - t0 < DUR + 220){ requestAnimationFrame(frame); return; }
+    layer.remove();
+    el.style.clipPath = ''; el.style.webkitClipPath = '';
+    done();
+  }
+  requestAnimationFrame(frame);
 }
 
 // ---- Spend the twenty before the stair ----
