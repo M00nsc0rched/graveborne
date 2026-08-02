@@ -1,7 +1,7 @@
 // ================= GRAVEBORNE — main engine =================
 // shown on the title screen; keep in step with CACHE in sw.js — the game is
 // served from that cache, so the number you see is the build you're running
-const GAME_VERSION = 43;
+const GAME_VERSION = 44;
 let VW = 21, VH = 13;                 // viewport in tiles — reshaped to the stage on phones
 const TS = 32;                        // tile size in canvas pixels
 const TU = TS / 16;                   // old design unit -> new, for art not yet re-authored
@@ -2581,18 +2581,28 @@ function renderCombat(){
   radial(canvas.width*0.62, 74, 90, 'rgba(150,60,120,0.10)');
   ctx.globalCompositeOperation='source-over';
 
-  // enemy sprite (right/upper) — bosses, guardians and elites loom larger.
-  // its name / HP / limbs / statuses are drawn crisply in the DOM enemy panel.
-  const es = (en.boss || en.elite || en.guardian) ? 7 : 6;
-  const ex = Math.round(canvas.width*0.60), ey = 34;
-  if (!Figures.draw(ctx, en.sprite, ex - 6, ey - 8, 12*es + 16))
-    Sprites.drawFit(ctx, en.sprite, ex, ey, 12*es);
+  // The two fighters. Both stand on the floor band rather than hanging in the
+  // air, and the player is drawn larger than the foe because the player is the
+  // one nearer the eye — at matched sizes the hero read as the smaller of the
+  // two. A figure's own ground shadow sits at 95% of its box, so that fraction
+  // is what gets placed on the floor line, not the bottom edge.
+  const FOOT = 0.95;
+  const stand = (name, size, cx, floor, fbSize, fbDy) => {
+    if (!Figures.draw(ctx, name, Math.round(cx - size/2), Math.round(floor - size*FOOT), size))
+      Sprites.drawFit(ctx, name, Math.round(cx - fbSize/2), Math.round(floor - fbSize + fbDy), fbSize);
+  };
+  // the foe stands a little further back, so its feet land higher
+  const es = (en.boss || en.elite || en.guardian) ? 116 : 100;
+  stand(en.sprite, es, Math.round(canvas.width*0.63), 158, 88, 4);
 
-  // player sprite (left/lower)
-  if (!Figures.draw(ctx, p.sprite, 34, canvas.height-92, 76))
-    Sprites.drawFit(ctx, p.sprite, 40, canvas.height-84, 60);
-  drawStatusIcons(p, 40, canvas.height-20);
-  if (p.shield>0){ ctx.fillStyle='#8ab0e0'; ctx.font='8px monospace'; ctx.fillText(`⛊${p.shield}`, 92, canvas.height-70); }
+  // the player, nearest the eye
+  const ps = 122, pcx = 74, pfloor = 197;
+  stand(p.sprite, ps, pcx, pfloor, 74, 2);
+  drawStatusIcons(p, pcx - 22, canvas.height-16);
+  if (p.shield>0){
+    ctx.fillStyle='#8ab0e0'; ctx.font='9px monospace';
+    ctx.fillText(`⛊${p.shield}`, pcx + ps/2 + 4, pfloor - ps*FOOT + 26);
+  }
 
   vignetteIn(canvas.width, canvas.height);
   ctx.restore();
@@ -2772,7 +2782,7 @@ function renderActions(){
       const b = Btn('', ()=>doPlayer(id), 'btn '+(sk.type==='defend'||sk.type==='heal'||sk.type==='buff'?'good':''), String(idx+1));
       const lv = skillLevel(p, id), mine = skillOwned(p, id);
       const pips = '◆'.repeat(lv) + '◇'.repeat(3-lv);
-      b.innerHTML = `<span class="k">${idx+1}</span>${sk.name} <span style="font-size:10px;color:${mine?'#c8a24a':'#c05070'}">${pips}${mine?'':' borrowed'}</span>` +
+      b.innerHTML = `<span class="k">${idx+1}</span>${sk.name} <span class="pips" style="font-size:10px;color:${mine?'#c8a24a':'#c05070'}">${pips}${mine?'':' borrowed'}</span>` +
         `${sk.cost?`<span class="cost">${sk.cost} SP</span>`:''}<span class="sub">${sk.desc}</span>`;
       b.disabled = !myTurn || sk.cost > p.sp;
       box.appendChild(b);
