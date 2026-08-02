@@ -1,7 +1,7 @@
 // ================= GRAVEBORNE — main engine =================
 // shown on the title screen; keep in step with CACHE in sw.js — the game is
 // served from that cache, so the number you see is the build you're running
-const GAME_VERSION = 36;
+const GAME_VERSION = 37;
 let VW = 21, VH = 13;                 // viewport in tiles — reshaped to the stage on phones
 const TS = 16;                        // tile size in canvas pixels
 const FINAL_DEPTH = 5;
@@ -605,6 +605,7 @@ function onKey(e){
     if (k === 'arrowleft' || k === 'a'){ G.deck.prev(); e.preventDefault(); return; }
     if (k === 'arrowright' || k === 'd'){ G.deck.next(); e.preventDefault(); return; }
     if (k === 'arrowup' || k === 'w' || k === 'enter'){ G.deck.draw(); e.preventDefault(); return; }
+    if (k === 'arrowdown' || k === 's'){ G.deck.detail(); e.preventDefault(); return; }
   }
   // modal-driven states ignore movement keys; a slide in progress holds the next
   // step until it settles, so a held key chains smoothly instead of racing ahead
@@ -694,31 +695,12 @@ function applyAllotment(p){
 }
 
 // apply permanent Sanctum upgrades to a freshly-made player (before recompute)
-function applySanctum(p){
-  const S = Save;
-  p.baseHp  += 6 * S.sanctumLevel('vigor');
-  p.baseAtk += 1 * S.sanctumLevel('whet');
-  p.baseDef += 1 * S.sanctumLevel('ward');
-  p.baseMag += 1 * S.sanctumLevel('arcane');
-  p.baseSp  += 1 * S.sanctumLevel('focus');
-  p.gold    += 15 * S.sanctumLevel('pockets');
-  p.honor    = U.clamp(p.honor + 8 * S.sanctumLevel('oath'), -100, 100);
-  for (let i = 0; i < S.sanctumLevel('provision'); i++) p.inv.push('potion_heal');
-  for (let i = 0; i < S.sanctumLevel('larder'); i++) p.inv.push('ration');
-}
-function siphonMult(){ return 1 + 0.2 * Save.sanctumLevel('siphon'); }
-function sanctumCost(u, rank){ return Math.round(u.base + u.growth * (rank - 1)); }
-function sanctumSummary(){
-  const S = Save, parts = [];
-  const map = [['vigor','HP',6],['whet','ATK',1],['ward','DEF',1],['arcane','MAG',1],['focus','SP',1],['pockets','Gold',15],['oath','Honor',8]];
-  for (const [id,label,per] of map){ const l = S.sanctumLevel(id); if (l) parts.push(`+${per*l} ${T(label)}`); }
-  const prov = S.sanctumLevel('provision'); if (prov) parts.push(`${prov} ${T(prov>1?'Draughts':'Draught')}`);
-  const lard = S.sanctumLevel('larder'); if (lard) parts.push(`${lard} ${T('Grave-Bread')}`);
-  const si = S.sanctumLevel('siphon'); if (si) parts.push(`+${20*si}% ${T('Souls')}`);
-  const fa = S.sanctumLevel('favor'); if (fa) parts.push(`−${10*fa}% ${T('shop')}`);
-  return parts.join(' · ');
-}
-
+// The Sanctum no longer pays out. Every descent now starts on the class's own
+// numbers, so nothing you banked between runs can tilt the one you are in. The
+// stored ranks are left alone rather than wiped, so an existing save is not
+// damaged by the change.
+function applySanctum(p){ /* boons retired — a run is the class and nothing else */ }
+function siphonMult(){ return 1; }
 function recomputeStats(p){
   let hp=p.baseHp, sp=p.baseSp, atk=p.baseAtk, def=p.baseDef, mag=p.baseMag, spd=p.baseSpd;
   // foodMult multiplies hunger drain: below 1 stretches a meal, above 1 burns you out
@@ -2622,13 +2604,13 @@ function renderAlchemistCombat(box, p, myTurn){
   const row = U.make('div','target-row');
   const mk = (key, label) => {
     const t = U.make('button','tbtn' + (G.combat.potTarget===key?' sel':''));
-    t.textContent = label;
+    t.textContent = T(label);
     t.onclick = () => { G.combat.potTarget = key; renderActions(); };
     return t;
   };
   row.appendChild(mk('enemy', 'At the foe'));
   row.appendChild(mk('self', 'On yourself'));
-  if (hasFollower) row.appendChild(mk('follower', 'On ' + p.follower.name.split(' ')[0]));
+  if (hasFollower) row.appendChild(mk('follower', T('On {0}').replace('{0}', p.follower.name.split(' ')[0])));
   box.appendChild(row);
   box.appendChild(U.make('div','line dim', 'Brew potions at the bench (Menu → Inventory). Throw the harmful ones at the foe; pour the good ones on yourself or your follower.'));
 
@@ -2638,14 +2620,15 @@ function renderAlchemistCombat(box, p, myTurn){
   for (const id of order){
     const po = Data.POTIONS[id], good = po.cat === 'buff' || po.cat === 'food';
     const b = Btn('', ()=>applyPotion(id, G.combat.potTarget), 'btn'+(good?' good':''));
-    b.innerHTML = `<span>${po.verb[0].toUpperCase()+po.verb.slice(1)} ${po.name} ×${counts[id]}</span>` +
-      `<span class="cost" style="color:${POT_CAT_COLOR[po.cat]}">${po.cat}</span><span class="sub">${po.desc}</span>`;
+    const verb = T(po.verb[0].toUpperCase() + po.verb.slice(1));
+    b.innerHTML = `<span>${verb} ${po.name} ×${counts[id]}</span>` +
+      `<span class="cost" style="color:${POT_CAT_COLOR[po.cat]}">${T(po.cat)}</span><span class="sub">${po.desc}</span>`;
     b.disabled = !myTurn;
     box.appendChild(b);
   }
   // always available, so an empty pack is never a dead end
   const sp = Btn('', improvisedSplash, 'btn');
-  sp.innerHTML = `<span class="k">✷</span>Improvised Splash<span class="sub">A weak throw of raw reagents at the foe — for when the bottles run dry.</span>`;
+  sp.innerHTML = `<span class="k">✷</span>${T('Improvised Splash')}<span class="sub">${T('A weak throw of raw reagents at the foe — for when the bottles run dry.')}</span>`;
   sp.disabled = !myTurn;
   box.appendChild(sp);
 }
@@ -2767,7 +2750,6 @@ function showTitle(){
       ()=>{ if (!loadRun()) log('That descent could not be taken up again.', 'bad'); }, 'btn center good'));
   }
   row.appendChild(Btn('Begin Descent', showCharSelect, 'btn center'));
-  row.appendChild(Btn('Sanctum ◈', showSanctum, 'btn center'));
   row.appendChild(Btn('Codex', ()=>showCodex(false), 'btn center'));
   row.appendChild(Btn('Settings', ()=>showSettings(showTitle), 'btn center'));
   s.appendChild(row);
@@ -2860,8 +2842,6 @@ function showCharSelect(){
   head.appendChild(U.make('div','sect','Choose Your Doomed'));
   head.appendChild(U.make('div','p dim','Each begins at a different point on the road of honor — and will meet the depths differently for it.'));
   s.appendChild(head);
-  const ss = sanctumSummary();
-  if (ss) s.appendChild(U.make('div','p','<span style="color:#7fb0d0">Sanctum boons active:</span> ' + ss));
 
   const deck = U.make('div','deck');
   const rail = U.make('div','deck-rail');
@@ -2912,6 +2892,13 @@ function showCharSelect(){
   deck.appendChild(rail);
   s.appendChild(deck);
 
+  // pulled down, a card opens its dossier: the full stat line, the passive and
+  // the flavour that no longer fit on the face of the card itself
+  const detail = U.make('div','deck-detail');
+  const detailInner = U.make('div','dd-inner');
+  detail.appendChild(detailInner);
+  s.appendChild(detail);
+
   const nav = U.make('div','deck-nav');
   const prevB = U.make('button', null, '◀');
   const pips = U.make('div','deck-pips');
@@ -2920,7 +2907,7 @@ function showCharSelect(){
   nav.appendChild(prevB); nav.appendChild(pips); nav.appendChild(nextB);
   s.appendChild(nav);
 
-  const hint = U.make('div','deck-hint','Pull the card up to draw it — <b>↑</b> or drag');
+  const hint = U.make('div','deck-hint','Pull the card up to draw it — <b>↑</b> or drag  ·  down for details');
   s.appendChild(hint);
 
   const row = U.make('div','row');
@@ -2932,6 +2919,38 @@ function showCharSelect(){
   let drawing = false, teardown = null;
   // a previous visit's window listeners go before this one installs its own
   if (G.deckTeardown) G.deckTeardown();
+
+  let detailOpen = false;
+  function renderDetail(){
+    const id = ids[cur], c = Data.CLASSES[id], locked = isLocked(id);
+    detailInner.innerHTML = '';
+    if (locked){
+      detailInner.appendChild(U.make('h4', null, '???'));
+      detailInner.appendChild(U.make('div','dd-role', T('Sealed to you')));
+      detailInner.appendChild(U.make('div','dd-flavor',
+        T('Nothing of this one is written down yet. Earn the card, and the page fills in.')));
+      return;
+    }
+    detailInner.appendChild(U.make('h4', null, c.name));
+    detailInner.appendChild(U.make('div','dd-role', c.role));
+    const b = c.base, grid = U.make('div','dd-grid');
+    const rows = [['HP', b.hp], [c.usesInt ? 'INT' : 'SP', b.sp], ['ATK', b.atk],
+                  ['DEF', b.def], ['MAG', b.mag], ['SPD', b.spd]];
+    for (const [label, val] of rows)
+      grid.appendChild(U.make('span', null, `<b>${T(label)}</b><i>${val}</i>`));
+    detailInner.appendChild(grid);
+    const tier = Data.honorTier(c.honor);
+    detailInner.appendChild(U.make('div','dd-line',
+      `Honor start: <span style="color:${tier.color}">${c.honor} (${tier.name})</span>`));
+    for (const pv of (Data.PASSIVES[id] || []))
+      detailInner.appendChild(U.make('div','dd-line', `<em>◈ ${pv.name}</em> — ${pv.desc}`));
+    detailInner.appendChild(U.make('div','dd-flavor', c.flavor));
+  }
+  function setDetail(on){
+    detailOpen = !!on;
+    detail.classList.toggle('open', detailOpen);
+    if (detailOpen) renderDetail();
+  }
 
   function layout(){
     const el = cardEls[cur];
@@ -2945,8 +2964,9 @@ function showCharSelect(){
     if (!isLocked(id)) G.selClass = id;
     hint.innerHTML = isLocked(id)
       ? T('This one is sealed. Earn it, and it will take your hand.')
-      : T('Pull the card up to draw it — <b>↑</b> or drag');
+      : T('Pull the card up to draw it — <b>↑</b> or drag  ·  down for details');
     prevB.disabled = cur <= 0; nextB.disabled = cur >= ids.length - 1;
+    if (detailOpen) renderDetail();
   }
   function go(d){
     if (drawing) return;
@@ -2969,15 +2989,21 @@ function showCharSelect(){
   // One drag at a time, tracked here rather than per card, so the window
   // listeners are a single pair that gets torn down when the deck closes —
   // otherwise every visit to this screen left another twelve behind.
+  const DETAIL_PULL = 34;   // how far down before the dossier commits to opening
   let dragEl = null, startY = null, moved = 0, swallowClick = false;
   const ptrY = (e) => (e.touches && e.touches[0]) ? e.touches[0].clientY : e.clientY;
   const onMove = (e) => {
     if (!dragEl) return;
     moved = startY - ptrY(e);
+    if (e.cancelable && Math.abs(moved) > 4) e.preventDefault();
     if (moved > 0){
-      if (e.cancelable) e.preventDefault();
       dragEl.classList.add('drawing');
       dragEl.style.transform = `translateY(${-Math.min(moved, 90)}px) scale(1)`;
+    } else if (moved < 0){
+      // pulling down peeks at the dossier, and opens it once you commit
+      dragEl.classList.add('drawing');
+      dragEl.style.transform = `translateY(${Math.min(-moved, 26)}px) scale(1)`;
+      if (-moved > DETAIL_PULL && !detailOpen) setDetail(true);
     }
   };
   const onUp = () => {
@@ -2985,13 +3011,15 @@ function showCharSelect(){
     const el = dragEl; dragEl = null;
     // releasing also fires a click; an aborted pull must not draw the card anyway
     if (Math.abs(moved) > 4) swallowClick = true;
-    if (moved > 46){ beginDraw(el); return; }
+    if (moved > 46 && !isLocked(el.dataset.id)){ beginDraw(el); return; }
+    // a downward pull that never reached the threshold closes it again
+    if (moved < 0 && -moved <= DETAIL_PULL) setDetail(false);
     el.classList.remove('drawing');
     el.style.transform = '';
   };
   cardEls.forEach((el, i) => {
     const down = (e) => {
-      if (drawing || i !== cur || isLocked(ids[i])) return;
+      if (drawing || i !== cur) return;
       dragEl = el; startY = ptrY(e); moved = 0;
     };
     el.addEventListener('touchstart', down, { passive:true });
@@ -3018,7 +3046,8 @@ function showCharSelect(){
 
   // arrow keys and Enter drive the deck too (see onKey)
   G.deck = { prev:()=>go(-1), next:()=>go(1),
-             draw:()=>{ if (!isLocked(ids[cur])) beginDraw(cardEls[cur]); } };
+             draw:()=>{ if (!isLocked(ids[cur])) beginDraw(cardEls[cur]); },
+             detail:()=>setDetail(!detailOpen) };
   G.deckTeardown = teardown;
 
   setModal(s);
@@ -3264,7 +3293,7 @@ function guardianConfront(entity){
 const SHOP_RELICS = ['soul_edge','marrow_maul','stormbrand','gravewarden','plate','bloodstone','witch_eye','saints_knuckle','nights_eye','hexed_scythe','ring_of_honor','chainmail','war_pick',
   'wellspring_stave','widowmaker','gluttons_girdle','reapers_tithe','pilgrims_mercy','dread_aegis','ruin_brand'];
 
-function goldPrice(base){ const favor = Save.sanctumLevel('favor'); return Math.max(1, Math.round(base * (1 - 0.1*favor))); }
+function goldPrice(base){ return Math.max(1, Math.round(base)); }
 function gearPriceGold(id){ const it=Data.ITEMS[id]; return goldPrice(14 + statSum(it.mods)*5 + (it.flag?20:0)); }
 function relicPriceSouls(id){ const it=Data.ITEMS[id]; return Math.round(20 + statSum(it.mods)*3 + (it.flag?12:0)); }
 function modStr(m){ m=m||{}; const parts=[]; for (const k of ['atk','def','mag','spd','hp','sp']){ if (m[k]) parts.push(`${m[k]>0?'+':''}${m[k]} ${k.toUpperCase()}`); } return parts.join(' · ') || 'trinket'; }
@@ -3355,33 +3384,9 @@ function renderShop(){
   setModal(s);
 }
 
-// ================= SANCTUM (permanent meta-upgrades) =================
-function showSanctum(){
-  G.state = 'SANCTUM';
-  const s = U.make('div','sheet');
-  s.appendChild(U.make('div','sect','The Sanctum'));
-  s.appendChild(U.make('div','p dim center','A candlelit hall between deaths. Souls bound here echo into <i>every</i> future descent — the dark cannot take what the Sanctum keeps.'));
-  s.appendChild(U.make('div','balance',`<span class="s">◈ ${Save.souls()} Souls</span>`));
-  for (const u of Data.SANCTUM){
-    const lvl = Save.sanctumLevel(u.id), maxed = lvl >= u.max;
-    const cost = sanctumCost(u, lvl + 1);
-    const pips = '<span style="color:#7fb0d0">' + '●'.repeat(lvl) + '</span><span style="color:#3a3350">' + '○'.repeat(u.max - lvl) + '</span>';
-    const priceHTML = maxed ? `<span class="price s">MAX</span>` : `<span class="price s">◈ ${cost}</span>`;
-    s.appendChild(shopLine(`${u.name} &nbsp;${pips}`, u.desc, priceHTML, maxed || Save.souls() < cost, () => buySanctum(u)));
-  }
-  const row = U.make('div','row');
-  row.appendChild(Btn('Back', showTitle, 'btn center'));
-  s.appendChild(row);
-  setModal(s);
-}
-function buySanctum(u){
-  const lvl = Save.sanctumLevel(u.id);
-  if (lvl >= u.max) return;
-  const cost = sanctumCost(u, lvl + 1);
-  if (!Save.spendSouls(cost)) return;
-  Save.incSanctum(u.id);
-  showSanctum();
-}
+// The Sanctum screen is gone with the boons it sold: souls now go to the
+// Reckoning (levels) and to binding and sharpening skills, which are spent
+// inside a run rather than banked against the next one.
 
 // spend Souls to raise a chosen stat; the price climbs with your level
 function buyLevel(statKey){
@@ -3903,8 +3908,15 @@ function showCrafting(){
 }
 
 // ---- Using a potion in a fight: hurled at a foe, poured on an ally, or on you ----
-function potPower(spec, int){ return Array.isArray(spec) ? Math.round(spec[0] + int * spec[1]) : spec; }
-function potionTargetName(tgt){ return tgt === 'enemy' ? (G.combat && G.combat.enemy.name) : tgt === 'follower' ? (G.player.follower && G.player.follower.name) : 'yourself'; }
+// Her whole kit is the bottles, so they answer to her the way steel answers to a
+// knight: everyone else is improvising with someone else's recipe.
+const ALCHEMIST_POTENCY = 1.5;
+function potencyMult(p){ return (p && p.classId === 'alchemist') ? ALCHEMIST_POTENCY : 1; }
+function potPower(spec, int){
+  const base = Array.isArray(spec) ? (spec[0] + int * spec[1]) : spec;
+  return Math.max(1, Math.round(base * potencyMult(G.player)));
+}
+function potionTargetName(tgt){ return tgt === 'enemy' ? (G.combat && G.combat.enemy.name) : tgt === 'follower' ? (G.player.follower && G.player.follower.name) : T('yourself'); }
 function applyPotion(id, tgt){
   if (G.busy || G.state !== 'COMBAT' || !G.combat) return;
   const p = G.player, i = p.inv.indexOf(id);
@@ -3920,7 +3932,7 @@ function applyPotion(id, tgt){
 
   const nm = po.name, who = potionTargetName(tgt);
   // effect magnitudes grow proportionally with the INT you bring over the recipe's tier
-  const effMult = 1 + Math.max(0, int - (po.intReq || 0)) * 0.025;
+  const effMult = (1 + Math.max(0, int - (po.intReq || 0)) * 0.025) * potencyMult(p);
   if (po.dmg){
     let dmg = potPower(po.dmg, int);
     if (T.shield > 0){ const ab = Math.min(T.shield, dmg); T.shield -= ab; dmg -= ab; if (ab>0) log(`${tIsEnemy?T.name+"'s":'the'} shield absorbs ${ab}.`, 'dim'); }
@@ -4021,7 +4033,6 @@ function showGameOver(){
   s.appendChild(U.make('div','p center dim',`Codex discovered: ${Save.discoveredCount()}/${Data.CODEX.length}`));
   const row = U.make('div','row');
   row.appendChild(Btn('Rise Again', showCharSelect, 'btn center'));
-  row.appendChild(Btn('Sanctum ◈', showSanctum, 'btn center'));
   row.appendChild(Btn('Codex', ()=>showCodex(false), 'btn center'));
   row.appendChild(Btn('Title', showTitle, 'btn center'));
   s.appendChild(row);
@@ -4036,7 +4047,6 @@ function showVictory(){
   s.appendChild(U.make('div','p center dim','Try a darker — or purer — soul to uncover the encounters you did not see.'));
   const row = U.make('div','row');
   row.appendChild(Btn('New Descent', showCharSelect, 'btn center'));
-  row.appendChild(Btn('Sanctum ◈', showSanctum, 'btn center'));
   row.appendChild(Btn('Codex', ()=>showCodex(false), 'btn center'));
   s.appendChild(row);
   setModal(s);

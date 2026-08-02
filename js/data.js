@@ -114,7 +114,7 @@ const SKILLS = {
     lv:[{power:16},{power:20,effect:{poison:{dmg:10,turns:3}}},{power:22,effect:{poison:{dmg:15,turns:3}}}] },
   hex: { name:'Hex', type:'magic', cost:2, cls:'mage', open:true, desc:'Curse the foe; its ATK falls.',
     lv:[{power:4,effect:{weaken:{amt:5,turns:3}}},{power:4,effect:{weaken:{amt:15,turns:3}}},{power:4,effect:{weaken:{amt:20,turns:3}}}] },
-  drain: { name:'Life Drain', type:'magic', cost:3, cls:'mage', open:true, desc:"Siphon the foe's vitality.",
+  drain: { name:'Life Drain', type:'magic', cost:20, cls:'mage', open:true, desc:"Siphon the foe's vitality.",
     lv:[{power:14,effect:{lifesteal:1.0}},{power:17,effect:{lifesteal:1.0}},{power:30,effect:{lifesteal:1.0}}] },
   meditate: { name:'Meditate', type:'buff', cost:0, cls:'mage', open:true, desc:'Sacrifice health for focus.',
     lv:[{selfDmg:10,spGain:10},{selfDmg:20,spGain:20},{selfDmg:30,spGain:30}] },

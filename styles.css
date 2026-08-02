@@ -631,3 +631,26 @@ body.touch .touch-controls{display:flex}
 @media (prefers-reduced-motion:reduce){
   .deck-rail,.tcard{ transition:none }
 }
+
+/* ---- pulling a card down opens its dossier ---- */
+.deck-detail{
+  overflow:hidden; max-height:0; opacity:0;
+  transition:max-height .28s cubic-bezier(.22,.61,.36,1), opacity .2s ease;
+  border-top:1px solid transparent;
+}
+.deck-detail.open{ max-height:260px; opacity:1; border-top-color:var(--edge); }
+.deck-detail .dd-inner{ padding:9px 4px 2px }
+.deck-detail h4{ color:var(--gold); font-size:12px; letter-spacing:1px; margin-bottom:2px }
+.deck-detail .dd-role{ color:var(--ink-dim); font-size:10px; margin-bottom:7px }
+.deck-detail .dd-grid{
+  display:grid; grid-template-columns:repeat(3,1fr); gap:4px 10px;
+  margin-bottom:8px; font-size:11px;
+}
+.deck-detail .dd-grid span{ display:flex; justify-content:space-between; gap:8px;
+  border-bottom:1px dotted var(--edge); padding-bottom:2px }
+.deck-detail .dd-grid b{ color:#8ea6d8; font-weight:normal; letter-spacing:1px }
+.deck-detail .dd-grid i{ font-style:normal; color:var(--ink) }
+.deck-detail .dd-line{ font-size:10.5px; color:var(--ink); line-height:1.55; margin-bottom:4px }
+.deck-detail .dd-line em{ color:var(--mag); font-style:normal }
+.deck-detail .dd-flavor{ font-size:10.5px; color:var(--ink-dim); line-height:1.5; font-style:italic }
+@media (prefers-reduced-motion:reduce){ .deck-detail{ transition:none } }
