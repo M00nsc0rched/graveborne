@@ -73,6 +73,21 @@ const Figures = (function(){
     c.fillStyle = g; c.fillRect(0, 0, SIZE, SIZE);
     c.restore();
   }
+  // a fixed speckle over whatever has already been painted, so flat cloth reads
+  // as fabric rather than fill — the traced figures carry their own texture, and
+  // without this the painted ones sit next to them looking like flat colour
+  function grain(c, amt){
+    c.save(); c.globalCompositeOperation = 'source-atop';
+    for (let y = 0; y < SIZE; y++)
+      for (let x = 0; x < SIZE; x++){
+        let h = (x * 374761393 + y * 668265263) | 0;
+        h = (h ^ (h >>> 13)) * 1274126177 | 0;
+        const r = (h ^ (h >>> 16)) & 255;
+        if (r < 40){ c.fillStyle = 'rgba(210,205,225,' + amt + ')'; c.fillRect(x, y, 1, 1); }
+        else if (r > 215){ c.fillStyle = 'rgba(0,0,0,' + (amt * 1.6) + ')'; c.fillRect(x, y, 1, 1); }
+      }
+    c.restore();
+  }
   // and a shadow pass down the right, so the form turns away from the light
   function formShadow(c){
     c.save(); c.globalCompositeOperation = 'source-atop';
@@ -353,46 +368,133 @@ const Figures = (function(){
     formShadow(c);
   }
 
-  // The Gravethief, off the left-hand figure of the sketch: plain mask under a
-  // hood, belted tunic with brass straps, bracers, wrapped shins.
+  // The Gravethief. There is no concept plate for this one to be lifted from,
+  // so it is still painted — but built to the proportions the traced figures
+  // actually have: the head is a seventh of the height, not a third, and the
+  // shoulders are two heads across. None of the shared scaffold is used; a
+  // thief is a narrower build than the plated classes share.
   function rogue(c){
-    const P = { dark:'#100e14', mid:'#221f2a', light:'#3a3644' };
     ground(c);
-    for (let y = 46; y < 84; y++){
-      const w = 32 + Math.round((y - 46) * 0.35);
-      cloth(c, 50 - w/2, y, w, 1, '#0b0a0f', '#1b1924', '#2e2a38', 4);
+
+    // A spine that drifts rather than running dead straight, and one profile
+    // every layer agrees on. Shoulders at 25, belt at 49, knees at 71.
+    const spine = (y) => 50 + Math.round(Math.sin((y - 20) / 34) * 2.4);
+    const body = (y) => y < 25 ? 8 + (y - 20) * 1.0            // into the shoulders
+                      : y < 49 ? 13 - (y - 25) * 0.17          // to the belt
+                      : y < 72 ? 9 + (y - 49) * 0.20           // the coat below it
+                               : 0;
+
+    // ---- legs, behind the coat ----
+    // the weight is on the near leg; the far one is set back and half a step short
+    for (const [dx, sh] of [[-7, 0], [2, 1]]){
+      const top = 64, bot = sh ? 90 : 93;
+      for (let y = top; y < bot; y++){
+        const w = 6 - (y > bot - 10 ? 1 : 0), x = spine(y) + dx;
+        px(c, x, y, w, 1, sh ? '#0c0a11' : '#12101d');
+        px(c, x, y, 1, 1, sh ? '#161421' : '#201c2b');
+      }
+      // the pale shin wraps, tightening toward the ankle
+      for (let i = 0; i < 4; i++)
+        px(c, spine(bot) + dx, bot - 18 + i*4, 6 - i, 2, sh ? '#4e442c' : '#75663f');
+      const fx = spine(bot) + dx;
+      px(c, fx - 2, bot - 2, 10, 4, sh ? '#0a0810' : '#0d0b12');          // boot
+      px(c, fx - 5, bot + 1, 13, 2, sh ? '#0a0810' : '#0d0b12');          // long toe
+      px(c, fx - 2, bot - 2, 10, 1, sh ? '#191623' : '#282434');
     }
-    tatter(c, 26, 82, 48, '#0b0a0f', 4);
-    legs(c, { dark:'#0d0b11', mid:'#1e1b26', light:'#332f3d', bootDark:'#161320' });
-    // shin wraps, the pale bands from the sketch
-    for (let i = 0; i < 5; i++){
-      px(c, 39, 70 + i*4, 10, 2, '#8a7a52');
-      px(c, 51, 70 + i*4, 10, 2, '#8a7a52');
+
+    // ---- the coat ----
+    for (let y = 20; y <= 72; y++){
+      const w = Math.round(body(y) * 2); if (w <= 0) continue;
+      const x = spine(y) - Math.round(w / 2);
+      px(c, x, y, w, 1, y < 49 ? '#191725' : '#141221');
+      px(c, x, y, 2, 1, '#2c2840');
+      px(c, x + w - 2, y, 2, 1, '#09080e');
     }
-    torso(c, P);
-    arms(c, { ...P, gloveDark:'#0d0b11' });
-    // bracers with their buckles
-    for (const ax of [22, 66]){
-      slab(c, ax, 50, 12, 16, '#0d0b11', '#2c2836', '#4a4558');
-      px(c, ax + 1, 53, 10, 2, '#8a7a52');
-      px(c, ax + 1, 59, 10, 2, '#8a7a52');
+    for (const [off, fy, fh, lit] of [[-6,52,20,0],[-1,50,22,1],[5,52,19,0],[-9,58,13,0],[8,58,13,0]])
+      for (let y = fy; y < fy + fh; y++){
+        px(c, spine(y) + off, y, 1, 1, '#0e0c16');
+        if (lit) px(c, spine(y) + off + 1, y, 1, 1, '#292437');
+      }
+    tatter(c, 38, 71, 25, '#0c0a12', 5);
+
+    // ---- arms ----
+    // the near one carried forward with the knife, the far one dropped back
+    for (const dir of [-1, 1]){
+      for (let y = 26; y < (dir < 0 ? 52 : 55); y++){
+        const t = (y - 26) / 28, w = 5 - Math.round(t * 1);
+        const x = dir < 0 ? spine(y) - 11 - w + Math.round(t * 4)
+                          : spine(y) + 10 - Math.round(t * 2);
+        px(c, x, y, w, 1, dir < 0 ? '#1b1927' : '#131120');
+        px(c, dir < 0 ? x : x + w - 1, y, 1, 1, dir < 0 ? '#302b40' : '#0a0810');
+      }
+      // bracer, then the gloved hand
+      const bx = dir < 0 ? 36 : 59, by = dir < 0 ? 40 : 43;
+      px(c, bx, by, 5, 9, dir < 0 ? '#231e2e' : '#191524');
+      px(c, bx, by, 5, 1, dir < 0 ? '#3f3850' : '#2a2537');
+      px(c, bx, by + 2, 5, 1, dir < 0 ? '#75663f' : '#50462c');
+      px(c, bx, by + 6, 5, 1, dir < 0 ? '#75663f' : '#50462c');
+      px(c, dir < 0 ? 37 : 59, dir < 0 ? 51 : 54, 5, 5, '#0d0b13');
+      px(c, dir < 0 ? 37 : 59, dir < 0 ? 51 : 54, 5, 1, '#251f31');
     }
-    // hood, and a cowl wrapped round the throat
-    px(c, 32, 6, 36, 32, '#181620');
-    px(c, 32, 6, 36, 3, '#2e2a38');
-    px(c, 34, 34, 32, 10, '#221f2a');
-    px(c, 34, 34, 32, 2, '#3a3644');
-    head(c, { dark:'#4a4558', mid:'#8a8798', light:'#c2bfd0' });
-    px(c, 40, 18, 20, 14, '#9a97a8');                       // the mask
-    px(c, 43, 22, 5, 4, '#0d0b11'); px(c, 53, 22, 5, 4, '#0d0b11');
-    px(c, 46, 30, 8, 2, '#5a5768');
-    // the belted front: a wide belt and the ladder of brass straps below it
-    strap(c, 30, 48, 40, '#0a0810', '#4a3520', '#8a7a52');
-    for (let i = 0; i < 5; i++){
-      px(c, 44, 55 + i*5, 12, 3, '#8a7a52');
-      px(c, 44, 55 + i*5, 12, 1, '#c2ad76');
+
+    // ---- belt, and the ladder of brass straps under it ----
+    for (let y = 46; y < 51; y++){
+      const w = Math.round(body(y) * 2) - 2, x = spine(y) - Math.round(w / 2);
+      px(c, x, y, w, 1, y === 46 || y === 50 ? '#0a0810' : '#3a2f21');
     }
-    rimLight(c, 'rgba(255,190,120,0.14)');
+    px(c, 48, 46, 5, 5, '#7a6737'); px(c, 50, 48, 2, 2, '#0a0810');
+    for (let i = 0; i < 3; i++){
+      const x = spine(52 + i*5) - 4;
+      px(c, x, 52 + i*5, 8, 2, '#54481f');
+      px(c, x, 52 + i*5, 8, 1, '#7d6c40');
+    }
+    px(c, 38, 50, 6, 7, '#241e2c'); px(c, 38, 50, 6, 1, '#3b3245');       // pouch
+    for (let i = 0; i < 3; i++) px(c, 60 + i*2, 50, 1, 4 + i, '#6f5f34'); // picks
+
+    // ---- hood, one head tall ----
+    for (let y = 5; y <= 26; y++){
+      const hw = y < 14 ? 3 + (y - 5) * 0.72 : 9.5 + (y - 14) * 0.14;
+      const w = Math.round(hw * 2), x = spine(y) - Math.round(w / 2);
+      px(c, x, y, w, 1, '#151321');
+      px(c, x, y, 2, 1, '#2b2739');
+      px(c, x + w - 2, y, 2, 1, '#09080e');
+    }
+    // the opening: a dark well the mask is set back inside
+    for (let y = 10; y < 24; y++){
+      const w = 12 - Math.round(Math.abs(y - 16) * 0.6);
+      px(c, spine(y) - Math.round(w / 2), y, w, 1, '#07060b');
+    }
+
+    // ---- the mask ----
+    // small, dull bone, narrowing at the jaw so it reads as a face in shadow
+    for (let y = 11; y < 23; y++){
+      const w = 10 - Math.round((y - 11) * 0.3), x = spine(y) - Math.round(w / 2);
+      px(c, x, y, w, 1, '#4c4856');
+      px(c, x, y, 1, 1, '#726d7d');
+      px(c, x + w - 1, y, 1, 1, '#2c2936');
+    }
+    px(c, 46, 14, 3, 3, '#07060b'); px(c, 51, 14, 3, 3, '#07060b');      // eye pits
+    px(c, 46, 14, 3, 1, '#26232e'); px(c, 51, 14, 3, 1, '#26232e');
+    px(c, 50, 13, 1, 8, '#3d3947');                                       // centre seam
+    for (let i = 0; i < 3; i++) px(c, 47 + i*2, 20, 1, 1, '#312e3a');     // stitched mouth
+    // the cowl wound round the throat, hiding the hood's seam
+    for (let y = 24; y < 30; y++){
+      const w = 17 - (y - 24), x = spine(y) - Math.round(w / 2);
+      px(c, x, y, w, 1, y === 24 ? '#332d42' : '#1f1b2b');
+      px(c, x, y, 1, 1, '#3a3448');
+    }
+
+    // ---- the knife, carried low in the near hand ----
+    px(c, 38, 50, 2, 6, '#2a2334');                                       // grip
+    px(c, 36, 48, 6, 2, '#7a6737');                                       // guard
+    for (let i = 0; i < 15; i++){
+      const bx = 38 - Math.round(i * 0.4);
+      px(c, bx, 56 + i, 2, 1, '#8f8a9e');
+      px(c, bx, 56 + i, 1, 1, '#c9c4d6');
+    }
+
+    grain(c, 0.06);
+    rimLight(c, 'rgba(255,190,120,0.16)');
     formShadow(c);
   }
 
@@ -401,11 +503,33 @@ const Figures = (function(){
     npc_alchemist: alchemist, hero_necromancer: necromancer, hero_rogue: rogue,
   };
 
+  // ---- traced art ----
+  // Where a character has art carried over from its concept sheet, that is what
+  // it looks like; the painters below are the fallback for the ones that do not
+  // have one. Decoding a data URI still goes through the image's load event, so
+  // the painter covers the first frames and the traced canvas replaces it the
+  // moment it is ready.
+  const ART = (typeof FIGURE_ART === 'object' && FIGURE_ART) || {};
+  const traced = {};
+  for (const name in ART){
+    const img = new Image();
+    img.onload = () => {
+      const cv = document.createElement('canvas');
+      cv.width = SIZE; cv.height = SIZE;
+      const c = cv.getContext('2d');
+      c.imageSmoothingEnabled = false;
+      c.drawImage(img, 0, 0, SIZE, SIZE);
+      traced[name] = cv;
+    };
+    img.src = 'data:image/png;base64,' + ART[name];
+  }
+
   return {
     SIZE,
-    has(name){ return !!PAINTERS[name]; },
+    has(name){ return !!PAINTERS[name] || !!ART[name]; },
     // painted once, then reused — combat redraws every frame
     get(name){
+      if (traced[name]) return traced[name];
       if (!PAINTERS[name]) return null;
       if (cache[name]) return cache[name];
       const cv = document.createElement('canvas');
