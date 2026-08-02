@@ -597,3 +597,393 @@ I18N.addData({
     93:{ title:'Sinclair: A stand', hint:'Egy láda, egy összehajtott köpeny, kenyér érméért, és két kés kéznyújtásnyira.' },
   },
 });
+
+// ---------- Start screens: the class passives ----------
+// PASSIVES is keyed by class and holds a one-entry array, so the index is part
+// of the path. These show on the character-select card for every class.
+I18N.addData({
+  PASSIVES: {
+    knight: { 0:{ name:'Esküvel Kötve',
+      desc:'Élőholtak ellen minden harcot felkészülve kezdesz: pajzzsal és felszított dühvel.' } },
+    rogue: { 0:{ name:'A Gégemetsző Szerencséje',
+      desc:'Minden harcban az érme választ egyet: vagy minden csapásod vérzik, vagy a kritikus találataid sokkal keményebben ütnek.' } },
+    mage: { 0:{ name:'Felhalmozódás',
+      desc:'Minden megnyert harc tanít neki valamit: +5 egy véletlen tulajdonságra és +5 erő egy véletlen képességre, a lemerülés hátralévő részére.' } },
+    warden: { 0:{ name:'Utolsó Virrasztás',
+      desc:'Lemerülésenként egyszer a halálos csapás 1 ÉP-n hagy — utána 2 köröd van végezni az ellenféllel, különben ő végez veled.' } },
+    alchemist: { 0:{ name:'Vas Szájpadlás',
+      desc:'Egy élet, amit a legrosszabb ízek kóstolásával töltöttél, nem hagy semmit, amitől felfordulna a gyomrod. Immunis vagy a méregre, a rothadásra és a vérzésre.' } },
+    necromancer: { 0:{ name:'Az Átkozott Ösvény',
+      desc:'Minden lemerülés elején ösvényt választasz — Támadó vagy Védekező —, és az egész futamon csak annak az irányzatnak a varázslatait tanulhatod meg.' } },
+  },
+});
+
+// ---------- Batch C: encounters 1–10 ----------
+// Each event carries a name, one or two perceived variants (what an honorable
+// eye sees vs. what a ruined one sees), the choice labels, and the outcome
+// prose. Only text is translated; `to`, `effects` and `codex` stay untouched.
+I18N.addData({
+  EVENTS: {
+
+    well: { name:'Az asszony a kútnál',
+      variants:{
+        clear:{ text:'Egy mohával benőtt kútnál szürkébe öltözött asszony húz vizet. Felnéz — előbb riadtan, aztán megenyhülve. „Vándor. Ilyen mélyen ritka az élő. Sérültnek tűnsz.”',
+          choices:{ 0:{label:'Elfogadod a segítségét'}, 1:{label:'Megkérdezed, mi vár odalent'}, 2:{label:'Békén hagyod'} } },
+        warped:{ text:'Egy mohával benőtt kútnál leplekbe burkolt SZILUETT görnyed a fekete víz fölé. Nem mozdul. Minden megmaradt ösztönöd azt üvölti, hogy abban a pillanatban ugrik, amint elfordulsz.',
+          choices:{ 0:{label:'Lecsapsz elsőként'}, 1:{label:'Lassan közelítesz, leengedett pengével'}, 2:{label:'Hátrálsz a sötétbe'} } } },
+      outcomes:{
+        well_help:{ text:'Tiszta ronggyal és suttogott szóval köti be a sebeidet. „Az irgalom lámpás idelent. Ne hagyd kialudni.” Megújultnak érzed magad.' },
+        well_ask:{ text:'„A Csont Őrzője tartja odalent a Gloamtrónt” — mormolja. „Egykor ember volt. Mint mindannyian.” Három érmét nyom a tenyeredbe.' },
+        well_leave:{ text:'Magad mögött hagyod a kutat. A sötét elnyeli a csepegő víz hangját.' },
+        well_attack:{ text:'A pengéd hamarabb ér oda, mint a szemed. A „sziluett” csak egy rémült asszony volt, aki vizet húzott. A vére sötétre festi a kút peremét. Valami megalvad benned — de az erszénye nehéz.' },
+        well_approach:{ text:'Ahogy közelebb érsz, az árnyék úgy hámlik le, mint nedves ruha — egy reszkető asszony, vizestömlőt szorít a mellkasához. Az önuralmad megmentette az életét. „Azt hittem, közülük való vagy” — leheli, és megáld.' } } },
+
+    cage: { name:'A ketrecbe zárt lény',
+      variants:{
+        clear:{ text:'Rozsdás ketrec lóg a mennyezetről. Bent sebesült farkas nyüszít, egyik mancsa leomlott kő alá szorult. A szeme követ téged — félve, nem ellenségesen.',
+          choices:{ 0:{label:'Kiszabadítod a farkast'}, 1:{label:'Véget vetsz a szenvedésének'}, 2:{label:'Hagyod, ahogy van'} } },
+        warped:{ text:'Rozsdás ketrec lóg a mennyezetről. Bent MORGÓ FENEVAD csapkod és habzik, a rácsokat feszíti feléd. Öld meg, mielőtt kiszabadul — biztosan kitépné a torkodat.',
+          choices:{ 0:{label:'Megölöd a rácsokon át'}, 1:{label:'Közelebbről megnézed, mielőtt lecsapsz'}, 2:{label:'Hagyod, ahogy van'} } } },
+      outcomes:{
+        cage_free:{ text:'Félrefeszíted a követ. A farkas kisántikál, egyszer körbejár — aztán melléd szegődik, óvatos őrzőként. Az elszántságod megkeményedik.' },
+        cage_kill:{ text:'Az acél véget vet neki. Bármi is volt, most csendben van. Kifeszítesz pár fogat — a megfelelő vevőnek ér valamit.' },
+        cage_look:{ text:'Leengeded a pengét, és valóban odanézel. Nem szörnyeteg — farkas, félig éhen halva, rettegve. A szégyen lehűti a véred. Kiszabadítod, és hálásan sántikál melléd.' },
+        cage_leave:{ text:'A ketrecében hagyod. A nyüszítése nagyon-nagyon sokáig követ.' } } },
+
+    beggar: { name:'A koldus a sötétben',
+      variants:{
+        clear:{ text:'Rongyos alak kuporog a falnál, kinyújtott kézzel. „Kérlek — egy érmét, egy héjat. Olyan rég eltévedtem, hogy elfelejtettem a nap színét.”',
+          choices:{ 0:{label:'Bőkezűen adsz (10 arany)'}, 1:{label:'Megosztasz egy keveset (4 arany)'}, 2:{label:'Nem veszel róla tudomást'} } },
+        warped:{ text:'Rongyos alak válik le a falról, keze feléd markol. „Adj” — hörgi. „Adj. Adj.” Az ujjai túl hosszúnak tűnnek. Koldul — vagy nyúl valamiért?',
+          choices:{ 0:{label:'Levágod'}, 1:{label:'Adsz neki egy érmét, és figyelsz'}, 2:{label:'Nem veszel róla tudomást'} } } },
+      outcomes:{
+        beg_give:{ text:'Egy marék érmét nyomsz a kezébe. Sír. „Áldjon meg. Tessék — ezt túl régóta hordozom.” Egy kis fiolát csúsztat a tenyeredbe.' },
+        beg_share:{ text:'Megosztod azt a keveset, amit nélkülözni tudsz. Bólint, és valami meleget hajt a kezedbe. „Szerencsére, ahol nincs.”' },
+        beg_ignore:{ text:'Ellépsz mellette. A suttogás követ, míg a sötét fel nem falja.' },
+        beg_attack:{ text:'A pengéd a könyörgés közepén éri. A rongyok alatt: kiéhezett öregember, érmék hullanak a ernyedt kezéből. A „nyúlás” csak szükség volt. Összeszeded az aranyat, amit talán magától is odaadott volna.' } } },
+
+    shrine: { name:'Az elesettek szentélye',
+      variants:{
+        clear:{ text:'Durva szentély rakott koponyákból, egyetlen pislákoló gyertya. Alá vésve: ADJ, ÉS ADATIK. A levegő régi, éhes erőtől zúg.',
+          choices:{ 0:{label:'Felajánlod a becsületed erőért'}, 1:{label:'Megtisztítod a szentélyt (10 arany)'}, 2:{label:'Csendben imádkozol'}, 3:{label:'Meggyalázod ereklyékért'} } } },
+      outcomes:{
+        shr_offer:{ text:'Hangosan kimondod az árat. Hideg ömlik a velődbe — erő, olyasmiért cserébe, amit nem kapsz vissza.' },
+        shr_purify:{ text:'Érmét és lélegzetet költesz arra, hogy minden koponyát megnevezz és nyugalomra helyezz. A gyertya megszilárdul. A zúgás valami békeféleséggé halkul, és felmelegít.' },
+        shr_pray:{ text:'Letérdelsz, és imádkozol azokért, akik itt estek el. Semmi nem válaszol — de kitisztul az elméd, és a tartalékaid visszatérnek.' },
+        shr_desec:{ text:'Feltöröd a koponyákat a bennük rejtett csecsebecsékért. A gyertya kialszik. Gazdagabb vagy, és hidegebb.' } } },
+
+    mirror: { name:'Az igazság tükre',
+      variants:{
+        clear:{ text:'Magas tükör áll lehetetlenül tisztán a rothadás közepén. A tükörképed a szemedbe néz — de nem egészen te vagy.',
+          choices:{ 0:{label:'Belebámulsz'}, 1:{label:'Széttöröd'}, 2:{label:'Elfordulsz'} } } },
+      outcomes:{
+        mir_break:{ text:'Széttöröd a saját arcod. A szilánkok úgy szóródnak szét, mint a fogak. Könnyebbnek — és hidegebbnek — érzed magad, ahogy az ezüstözött üveg megtölti az erszényed.' },
+        mir_leave:{ text:'Elfordulsz. Bármit is akart mutatni, megtartja magának.' } } },
+
+    hanged: { name:'A bitófa',
+      variants:{
+        clear:{ text:'Egy férfi lóg a rozsdás bitófán, rég halott, lassan forog a sötét levegőben. Zarándokmedál csillan a torkánál.',
+          choices:{ 0:{label:'Levágod és szertartást mondasz'}, 1:{label:'Átkutatod, aztán nyugalomra helyezed'}, 2:{label:'A sötétre hagyod'} } },
+        warped:{ text:'Feldagadt alak leng a bitófán, zsebei kövérek a holtak elfeledett érméitől. Senki nem figyel. Idelent soha senki.',
+          choices:{ 0:{label:'Mindent lehúzol a hulláról'}, 1:{label:'Előbb levágod, aztán nézel körül'}, 2:{label:'Ott hagyod'} } } },
+      outcomes:{
+        hang_rite:{ text:'Óvatosan leengeded, és elmondod a temetetlen holtak szavait. A forgás megáll. Különös béke telepszik a mellkasodba.' },
+        hang_search:{ text:'Csak azt veszed el, amire a halottnak már nincs szüksége, aztán laposan lefekteted, összekulcsolt kézzel. A medálja gyertyát vesz az emlékének — és pár érmét az erszényednek.' },
+        hang_leave:{ text:'Meghagyod a lassú forgásának. A kötél nyikorgása végigkísér a folyosón.' },
+        hang_loot:{ text:'Kiüríted a zsebeit, és letéped a medált. Zarándokamulett volt, arra szánva, hogy hazavezessen egy lelket. Most már nem talál haza. Az erszényed viszont nehezebb.' } } },
+
+    child: { name:'Az elveszett gyermek',
+      variants:{
+        clear:{ text:'Egy gyermek, mocskosan és beesett arccal, leomlott kő mögé bújik. Tágra nyílt szemek követnek. „Te… a rosszak közül való vagy?” — suttogja.',
+          choices:{ 0:{label:'Letérdelsz és megosztod az ételed'}, 1:{label:'Elvezeted a felfelé vezető út irányába'}, 2:{label:'Békén hagyod'} } },
+        warped:{ text:'Kis, sovány alak surran a törmelék mögé, nedves, csillogó szemekkel figyel. Túl mozdulatlan. Túl csendes. Ezen a helyen a kicsi dolgok harapnak.',
+          choices:{ 0:{label:'Acéllal elzavarod'}, 1:{label:'Leguggolsz és újra megnézed'}, 2:{label:'Nem veszel róla tudomást'} } } },
+      outcomes:{
+        child_food:{ text:'Megosztod az élelmed. Úgy eszik, mint egy farkas, aztán horpadt bádogdobozt nyom a kezedbe. „Anyám orvossága. Neked jobban kell.” Gyógyító főzet.' },
+        child_guide:{ text:'Elkíséred egy szürke fényű lépcsőig, és nézed, míg a kis alakja ki nem mászik a sötétből. Integet. Semmibe került, és mindenbe.' },
+        child_leave:{ text:'Ellépsz mellette. Apró léptek követnek egy darabig, aztán megállnak.' },
+        child_attack:{ text:'Az acél megvillan — és megdermed. Egy gyermek roskad a kőnek, kapart bádogdoboz gurul ki a kezéből. Nem szörnyeteg. Soha nem volt az. Elveszed az érméket, amiket eldugott, és próbálsz nem az arcára nézni.' },
+        child_approach:{ text:'Leereszkedsz az ő magasságába. Az árnyékok reszkető kislánnyá állnak össze. A türelmed megmentette. Odacsúsztatja neked az anyja orvosságát, és a fény felé menekül.' } } },
+
+    oathblade: { name:'A megkötött lovag',
+      variants:{
+        clear:{ text:'Egy lovag roskad a falnak, hörgő lélegzettel, finom penge a térdén. „Vedd el” — zihálja. „Esküdj meg, hogy soha nem szolgál kegyetlenséget. Aztán engedj el.”',
+          choices:{ 0:{label:'Leteszed az esküt és elveszed a pengét'}, 1:{label:'Előbb megkönnyíted a halálát'}, 2:{label:'Visszautasítod; meghagyod neki a pengét'} } },
+        warped:{ text:'Egy haldokló ember szorongat egy kardot, ami többet ér az életednél, és túl gyenge ahhoz, hogy felemelje. Olyan könnyű lenne. Alig lát téged.',
+          choices:{ 0:{label:'Kiveszed a pengét a kezéből'}, 1:{label:'Vársz — meghallgatod'}, 2:{label:'Ott hagyod'} } } },
+      outcomes:{
+        oath_accept:{ text:'Letérdelsz és esküszöl. A válla ellazul; a hörgés csendbe simul. Az Eskükard meleg a markodban, és mintha helyeselne téged.' },
+        oath_ease:{ text:'Vizet adsz neki és biztos kezet, és ott maradsz a végéig. Utolsó erejével rád erőlteti a pengét. „Felesküdve” — leheli. „Jó.”' },
+        oath_take:{ text:'Kifeszíted a kardot az ujjai közül, mielőtt megszólalhatna. A szeme követ kifelé — nem haragosan, csak… csalódottan. Az acél kiváló. Az elvétel nem volt az.' },
+        oath_wait:{ text:'Vársz, és hallgatod. Csak annyit kér, hogy a penge soha ne szolgáljon kegyetlenséget. Megesküszöl rá, és komolyan gondolod. Mosolyogva hal meg, az Eskükard pedig mostantól neked felel.' },
+        oath_leave:{ text:'Meghagyod neki a pengéjét és a méltóságát. Valahol mögötted egy hosszú lélegzet végre elenged.' } } },
+
+    lightbearer: { name:'A fényhordozó',
+      variants:{
+        clear:{ text:'Sápadt, forrás nélküli fénybe öltözött alak vár a folyosón, teljesen félelem nélkül tőled. „Kevesen jönnek ilyen mélyre tiszta kézzel. Hadd könnyítsem meg, amit hordozol.”',
+          choices:{ 0:{label:'Elfogadsz egy áldást'}, 1:{label:'Az oltalmát kéred'}, 2:{label:'Csak útmutatást kérsz'} } } },
+      outcomes:{
+        light_bless:{ text:'A homlokodra teszi a kezét. Melegség önt el minden sebet; az egész tested újjáépítettnek érződik, egy kicsit erősebbnek, mint azelőtt.' },
+        light_ward:{ text:'Fényjelet rajzol a szíved fölé. Ott megkeményedik, csendes pajzsként az eljövendő sötét ellen.' },
+        light_guide:{ text:'„Akkor tartsd meg a kedvességed — az a legritkább pénz idelent.” A szavai megnyugtatják az elméd, és teljesen helyreállítják az összpontosításod.' } } },
+
+    envoy: { name:'Az Inkvizíció követe',
+      variants:{
+        clear:{ text:'Aranyozott inkvizítor lép ki az árnyékból, hüvelyben a pengéje — egyelőre. „A Kórus megjelölte a lelked, bűnös. De a hívők gyakorlatiasak. Az aranyad haladékot vesz. A véred semmit.”',
+          choices:{ 0:{label:'Fizetsz sarcot (25 arany)'}, 1:{label:'Kardot rántasz és válaszolsz'}, 2:{label:'Az aranyozott lábára köpsz'} } } },
+      outcomes:{
+        envoy_pay:{ text:'Kesztyűs tenyérbe számolod ki az érméket. Az inkvizítor biccent, és a páncélos léptek visszahúzódnak a sötétbe — a hajsza lehűl, egyelőre.' },
+        envoy_fight:{ text:'„Legyen hát, bűnös.” Fény gyúl a pengéje mentén, ahogy előreszökken — és az Inkvizíció zsákmánya a győztesé lesz.' },
+        envoy_scorn:{ text:'A köpésed sisteregve ér az aranyozott acélon. Az inkvizítor szeme összeszűkül. „Akkor annál keményebben hajszolunk.” További páncélos léptek felelnek a sötétből.' } } },
+  },
+});
+
+// ---------- Batch D: encounters 11–20 ----------
+// The grimdark set. Two outcomes here (coin_flip, sin_trade) build their text at
+// runtime and carry none of their own, so they are not listed.
+I18N.addData({
+  EVENTS: {
+
+    butcherdoor: { name:'A Mészáros ajtaja',
+      variants:{
+        clear:{ text:'Vörös ajtó, tapintásra meleg. Odaátról: munka nedves hangja, és egy hang, mint a zsír a hideg serpenyőben. „Ahhh… friss hús.” A résen át kampókat látsz — és az egyiken valamit, ami még mozog.',
+          choices:{ 0:{label:'Betörsz és szembenézel a Mészárossal'}, 1:{label:'Beosonsz és leszeded a kampóról'}, 2:{label:'Húst veszel a kampókról és mész'} } },
+        warped:{ text:'Vörös ajtó, tapintásra meleg. A munka nedves hangja. „Ahhh… friss hús.” A résen át: kampók, és lógó dolgok. A hús az hús, mondja a gyomrod. Ami odabent lóg, azon már úgysem lehet segíteni.',
+          choices:{ 0:{label:'Betörsz és szembenézel a Mészárossal'}, 1:{label:'Húst veszel a kampókról és mész'}, 2:{label:'Elsétálsz a meleg ajtótól'} } } },
+      outcomes:{
+        butcher_fight:{ text:'Vállal mész neki a vörös ajtónak. A bent lévő dolog megfordul — kötény a munkája színében, bárd akkora, mint egy sírkő, mosoly túl kevés foggal. „FRISS. HÚS.”' },
+        butcher_free:{ text:'Beosonsz, míg a munka hangos. A kampón lógó egy ember — épphogy, még. Leveszed; nem sikolt, mert megtanulta, hogy ne. Egyszer az ajtóra mutat, a kezedbe nyomja a kötszereit, és szó nélkül elfut.' },
+        butcher_meat:{ text:'Leemelsz egy nedves csomagot a legközelebbi kampóról, és gyorsan elindulsz. Később, a sötétben, eszel. A melegség úgy terjed szét benned, mint a megbocsátás. Nem kérdezed, mi volt. Ennyi irgalmat engedélyezel magadnak.' },
+        butcher_leave:{ text:'Elsétálsz. Mögötted a nedves munka folytatódik, sietség nélkül. Sosem aggódott, hogy maradnál.' } } },
+
+    namelesscoin: { name:'A Névtelen érméje',
+      variants:{
+        clear:{ text:'Fekete vas oltár, csupasz, egyetlen érmén kívül — régebbi bármely királyság pénzverdéjénél, mindkét oldala kopott. Egy hang szólal meg száj nélkül, mindenhonnan egyszerre: „MINDEN ÍGY DÖNTETIK EL. MONDD KI.”',
+          choices:{ 0:{label:'Feldobod az érmét'}, 1:{label:'Zsebre teszed dobás nélkül'}, 2:{label:'Visszautasítod a játékot és távozol'} } } },
+      outcomes:{
+        coin_pocket:{ text:'Elveszed az érmét, és nem játszol. A hang nem állít meg. Nevet — halkan, türelmesen, ahogy azon nevet az ember, aki élő parazsat tett zsebre. Az érme nehezen ül a zsebedben. Fel akar dobódni. Érzed, ahogy odabent dolgokat dönt el.' },
+        coin_leave:{ text:'Játszatlanul hagyod a játszmát. A hang egyáltalán nem szól semmit, ami valahogy rosszabb.' } } },
+
+    larder: { name:'Az éléskamra',
+      variants:{
+        clear:{ text:'Egy pinceajtó félig nyitva áll, hideg levegőt lélegzik, ami sótól és füsttől szagos. Bent: polcok. Kampók. Elegendő élelem egy helyőrségnek, amely sosem jött vissza. Valaki nagy gonddal töltötte fel ezt az éléskamrát, és az a valaki nincs itt.',
+          choices:{ 0:{label:'Jóllaksz, itt és most'}, 1:{label:'Élelmet viszel az útra'}, 2:{label:'Nem nyúlsz semmihez, ami nem a tiéd'} } },
+        warped:{ text:'Egy pinceajtó félig nyitva áll, hideg levegőt lélegzik, ami sótól és füsttől szagos. Bent: polcok. Kampók. HÚS — rendezett sorokban lógva, gyakorlott kéz szabta. A gyomrod szavaz, mielőtt a szemed végezne a kampók számolásával. Némelyik darab hosszú. Némelyik nagyon hosszú.',
+          choices:{ 0:{label:'Egyél. Az éhező nem válogat'}, 1:{label:'Viszel az útra, nem nézed meg közelről'}, 2:{label:'Kihátrálsz erről a helyről'} } } },
+      outcomes:{
+        lard_feast:{ text:'Leülsz a polcok közé, és úgy eszel, mint aki újra ember — kenyér, sózott hal, valami, ami őszintén körte volt egykor. Az erő visszaköltözik a kezedbe. Kifelé menet két érmét hagysz egy polcon annak, aki ezt a helyet gondozza. Fontosnak érződött.' },
+        lard_gorge:{ text:'A sötétben eszel, gyorsan, állva, ahogy az állatok. A legjobb étel, amit idelent kaptál, és van annyi eszed, hogy ne töprengj azon, miért olyan hosszúak az adagok. Mögötted, a lépcsőn, valami nehéz megtorpan — helyesel — és továbbmegy. Megetettek. A szó úgy ül a fejedben, mint egy kampó: megetettek, ahogy a jószágot etetik.' },
+        lard_take:{ text:'Becsomagolod, ami jól bírja az utat, és megtöltöd a csomagod. Az ajtó magától becsukódik mögötted, finoman, mintha azt mondaná: gyere vissza éhesen.' },
+        lard_leave:{ text:'Becsukod a pinceajtót a füst és a só szagára. A gyomrod hivatalos panaszt nyújt be. A gerinced megköszöni.' } } },
+
+    oathless: { name:'Az eskütlen',
+      variants:{
+        clear:{ text:'Valaki egy oszlopnak vetett háttal ül, élve, és úgy néz rád, ahogy a fuldokló néz a kötélre. „Tudok cipelni. Tudok harcolni, egy kicsit. Nem foglak lassítani.” Szünet. „Inkább halok meg valaki mögött járva, mint itt ülve, egyedül.”',
+          choices:{ 0:{label:'Magaddal viszed'}, 1:{label:'Élelmet adsz és felfelé mutatsz'}, 2:{label:'Nem szólsz semmit és továbbmész'} } },
+        warped:{ text:'Valami egy oszlopnak vetett háttal ül, és téged figyel. Lehet, hogy ember. Azt mondja, tud cipelni, tud harcolni egy kicsit, nem fog lassítani — és minden szó fél ütemmel azután érkezik, hogy a szája megmozdul.',
+          choices:{ 0:{label:'Mégis magaddal viszed'}, 1:{label:'Előbb rendesen megnézed'}, 2:{label:'Továbbmész'} } } },
+      outcomes:{
+        oath_take:{ text:'Fél lépéssel a vállad mögé szegődik, és ott is marad. Etetni kell majd. Gyógyítani kell majd. Saját csomagot cipel, és az nem mély.\n\nÉrtsd meg, mit tettél most: ha idelent meghal, te vezetted oda, és soha többé nem tudod majd mást mondani magadnak.' },
+        oath_send:{ text:'Kenyeret és egy kevés érmét nyomsz a kezébe, és a lépcső felé fordítod, amelyen lejöttél. Elmegy. Hogy a lépcső kedvesebb-e a sötétnél, azt sosem tudod meg — ami a maga módján irgalom, neked.' },
+        oath_look:{ text:'Rendesen megnézed, ahogy idelent mindent meg kellett volna nézned. Csak egy ember: mocskos, rémült, és lélegzik. A szégyen úgy fut át rajtad, mint a hideg víz. Összerezzen attól, amit az arcod csinál, és mégis követ.' },
+        oath_leave:{ text:'Továbbmész. A hang, amit kiad, nem szó. Messzebb követ, mint ő tudott volna.' } } },
+
+    sinclair: { name:'Eliza Sinclair',
+      variants:{
+        clear:{ text:'Egy vasládika fölé görnyed, tolvajkulcsai már benne, és nem rezzen össze, amikor a fényed megtalálja — csak felnéz, és ott van az a szája, ami azt csinálja, amit szokott.\n\n„Ráértél.” A zár kattanva enged, oda sem néz. „Két napja értem ide. Vakon rabolom ki e hely halottait, és egyszer sem kellett megmenteni, úgyhogy töröld le azt az arcodról.”\n\nFeláll, és felfelé fordított tenyérrel nyújtja a kezét, ahogy akkor szokta, amikor azt jelenti: <i>dolgozunk, vagy beszélgetünk?</i>',
+          choices:{ 0:{label:'Megfogod a kezét — együtt dolgozzátok meg a sötétet'}, 1:{label:'Mondod neki, menjen fel, míg még tud'}, 2:{label:'Kereskedsz azzal, amije felesleges'} } },
+        stranger:{ text:'Egy asszony standot csinált egy felfordított ládából és egy összehajtott köpenyből, és olyan nyugodtan ül mögötte, mint egy halaskofa a piacon. Olyan módon szép, ami nyilvánvalóan hasznos volt már neki. Két kés fekszik kéznyújtásnyira, és nem tesz úgy, mintha nem.\n\n„Nem vagyok felbérelhető, nem vagyok harcra való, és nem tévedtem el” — mondja. „Van kenyerem, meg egy kevés más, és érmét kérek érte. Ennyi az egész kínálat.”',
+          choices:{ 0:{label:'Kereskedsz vele'}, 1:{label:'Meghagyod a standjánál'} } } },
+      outcomes:{
+        sin_take:{ text:'„Rendben hát” — mondja, és a válladhoz szegődik — nem mögé, hanem mellé, és ezt a különbséget már hangosan tisztázta.\n\nA saját csomagjából eszik, a saját vágásait varrja, és a saját harcait válogatja. És amikor egy harc elég rosszra fordul, eltűnik, mielőtt megfordulnál: ki azon a résen, amit már megtalált, mert Eliza Sinclair nem hal meg ilyen lyukakban. Ez a megállapodás. Mindig is az volt.' },
+        sin_send:{ text:'Félrebillentett fejjel végighallgat, egészen a végéig, ami több udvariasság, mint amit az érvelés megérdemelt.\n\n„Nem” — mondja kedvesen, megcsókol, és visszaindul azon a folyosón, amelyet még nem jártál végig. Egy perccel később az erszényét a kezedben találod, mert ő az, aki.' },
+        sin_pass:{ text:'Továbbmész. Mögötted már újra hajtogatja a köpenyt, zavartalanul; olyan asszony, akit egyáltalán nem lep meg, hogy két késsel egyedül hagyták.' } } },
+
+    hollowprince: { name:'Az üreges herceg',
+      variants:{
+        clear:{ text:'Egy alak megfakult udvari pompában tökéletes kecsességgel hajol meg. „Láttad őt? A menyasszonyomat. Haja, mint a font arany. Az esküvő— az esküvő volt—” Mögötte porból való csarnok nyúlik el: lakoma, száz éve halott vendégeknek terítve, és egy kis lefátyolozott batyu a főasztal élén.',
+          choices:{ 0:{label:'Megmondod neki az igazat'}, 1:{label:'Vendéget játszol — koccintasz a boldog napra'}, 2:{label:'Kihátrálsz a csarnokból'} } },
+        warped:{ text:'Egy GROTESZK alak rothadt pompában dúdol egy menyasszonyi fátyolba csavart csontkupac fölött, gyengéden ringatva. A lakomacsarnoka por és annál rosszabb. Az ilyesmi nem gyászol. Az ilyesmi csalogat.',
+          choices:{ 0:{label:'Levágod dúdolás közben'}, 1:{label:'Figyeled még egy darabig a dúdolást'}, 2:{label:'Kihátrálsz a csarnokból'} } } },
+      outcomes:{
+        prince_truth:{ text:'„Ő por, uram. Száz évnyi por.” Nagyon mozdulatlanná válik. „Por. Igen. Most már emlékszem. Emlékszem a tűzre. Emlékszem, mit tettem—” A kecsessége összeomlik, mint a hazugság, ami volt, és ő vele együtt, sírva, hálát adva neked. Ahol térdelt, izzó vörös szilánk hever, végre mozdulatlanul.' },
+        prince_feast:{ text:'Helyet foglalsz a porban, és üres kupát emelsz a boldog párra. Felragyog. Egy órán át a csarnok meleg és arany és tele zenével, amit csak ő hall — és a hazugságában ülve jobban megpihensz, mint napok óta bármikor.' },
+        prince_leave:{ text:'Meghajolsz és visszavonulsz. Mögötted folytatja a körútját az üres asztalok között, kérdezve, kérdezve.' },
+        prince_slay:{ text:'Levágod a dúdoló lényt. Nem védekezik. Estében a fátyolos batyu köré csavarodik, az utolsó pillanatig védve — és a batyu csont, apró csontok, szárított csokrot ölelve. Nem csalétek. Gyászoló. A gyűrűi legalább aranyból vannak.' },
+        prince_watch:{ text:'Leengeded a pengéd, és hallgatod. A dúdolás nászdallá áll össze, cérnavékonyra kopott hangon énekelve — vőlegény, aki száz éve halott menyasszonya fölött virraszt. Meglát, és meghajol. Te is meghajolsz. Van, aminek inkább tanú kell, mint irgalom.' } } },
+
+    seamparlor: { name:'A Varrónő szalonja',
+      variants:{
+        clear:{ text:'Szalon, tele kész munkával: kabátok, kesztyűk, egy menyasszonyi ruha — mind olyan puha és olyan sápadt bőrből, amiről jobb nem kérdezni. A padjánál hosszú ujjú asszony néz fel a tűk fölött, amelyeket sosem szövetre szántak. „Ülj le, kedvesem. Szétesel a varrásoknál. Idelent mindenki. Be tudlak venni.”',
+          choices:{ 0:{label:'Visszautasítod őt — és az áruját'}, 1:{label:'Eladsz neki egy csík bőrt magadból'}, 2:{label:'Örökre véget vetsz a szabászatának'} } },
+        warped:{ text:'BABÁK szalonja — sorokban ülnek, felöltöztetve, üvegszemmel. Némelyikük lélegzik. A hosszú ujjú lény a padnál felnézés nélkül megveregeti az üres széket. „Fenntartottam neked egy helyet, kedvesem. Három emelettel ezelőtt mértelek le.”',
+          choices:{ 0:{label:'Elfoglalod a széket'}, 1:{label:'Felgyújtod a szalont, paddal együtt'}, 2:{label:'Lassan kihátrálsz'} } } },
+      outcomes:{
+        seam_refuse:{ text:'Megtartod a bőröd és a távolságot. Ahogy az ajtó becsukódik, zavartalanul utánad szól: „Semmi sietség, kedvesem. Előbb-utóbb szétesel. Mindenki. Végzek átalakítást is.”' },
+        seam_trade:{ text:'A tűje gyorsan és kegyetlenség nélkül dolgozik, ami valahogy rosszabb. Egy tenyérnyit vesz el a hátadból, bólint az anyag szálirányára, és érmével meg egy varrott áldással fizet — a seb minden hegnél finomabb varrássá záródik. Kevesebb vagy, mint voltál, és rendezettebb.' },
+        seam_fight:{ text:'Megmozdulsz — és a szalon minden tűje felemelkedik vele. „Milyen kár, kedvesem” — sóhajtja, és valami vöröset fűz az elsőbe. „Téli kabátnak néztelek ki téged.”' } } },
+
+    banquet: { name:'Az Éhenkórász Király lakomája',
+      variants:{
+        clear:{ text:'Lakomacsarnok, ahol a szag ér oda előbb. Az élén sárgás bőrű, kiálló csontú óriás ül, koronával, amely a koponyájába nőtt. Körülötte véget nem érő lakoma — és minden fogás csont, tisztára szopogatva, csemegeként elrendezve. „ÜLJ LE” — mondja az Éhenkórász Király, kegyesen, üresen. „EGYÉL. AZ ÉN ASZTALOMTÓL SEMMI NEM TÁVOZIK JÓLLAKVA. MÉG ÉN SEM.”',
+          choices:{ 0:{label:'Leülsz, és megeszed, amit felszolgálnak'}, 1:{label:'Felajánlod a saját élelmed a Királynak'}, 2:{label:'Felborítod az asztalát'} } },
+        warped:{ text:'Lakomacsarnok, és PÁRATLANUL illatozik. Sült hús, meleg kenyér, bor. Az élén kiéhezett óriás ül koronában, és semmit nem eszik belőle. A gyomrod ökölként rándul össze. Csak egy tányért. Biztosan tartozik neked egy tányérral.',
+          choices:{ 0:{label:'Ráveted magad a lakomára és zabálsz'}, 1:{label:'Nézd meg az ételt. Igazán nézd meg'}, 2:{label:'Felborítod az asztalát'} } } },
+      outcomes:{
+        banq_eat:{ text:'Eszel. Csont és sírpor, és életed legpompásabb étele; sírsz, miközben rágsz, és nem tudod abbahagyni. A Király valami szeretetfélével néz. „JÓ” — mondja. „MOST MÁR ÉRTESZ ENGEM.” Az éhség elmúlik. Nagy része.' },
+        banq_offer:{ text:'Elé teszed az élelmed. A csarnok elcsendesedik. A Király ereklyeként emeli fel a száraz kenyeret, és egy pillanatra a tönkretett arca emlékszik rá, milyen arcnak lenni. „SENKI” — mondja lassan — „NEM ETETETT MEG ENGEM. NAGYON RÉG ÓTA.” Nem eszi meg. Az asztal élére teteti, és királyi áldással enged tovább.' },
+        banq_look:{ text:'Rákényszeríted magad, hogy nézz — igazán nézz. A sült egy bordakosár. A kenyér csigolyák. A bor semmi olyasmi, amit akár magadnak is megneveznél. Az éhséged tisztánlátássá alvad, és a Király bólint, szinte helyeslően. „BÖLCS” — mondja. „ÉHEZZ ÁLLVA.”' },
+        banq_fight:{ text:'Egy évszázadnyi elrendezett csontba rúgsz bele. A Király feláll — és emelkedik, és emelkedik — az ízületei úgy roppannak, mint a zöld fa. „KIRÁLYSÁGOKAT ETTEM MEG” — mondja harag nélkül. „TE ALIG VAGY EGY FALAT.”' } } },
+
+    velvetchapel: { name:'A bársonykápolna',
+      variants:{
+        clear:{ text:'Vörös bársonnyal kárpitozott oldalkápolna, meleg, mint egy test, gyertyákkal, amelyek nem lobognak. Az oltár lépcsőjén lehetetlen kecsességű lefátyolozott alak hever. „Zarándok” — mondja, és a szó úgy ér, mint kéz a nyakadon. „Olyan sokat cipeltél, olyan messzire. Tedd le. Pihenj velem egy kicsit. Csak egy keveset kérek a melegedből.”',
+          choices:{ 0:{label:'Elfogadod a vigaszát'}, 1:{label:'Inkább az oltárnál imádkozol — bármi máshoz'}, 2:{label:'Letéped a fátylat'} } },
+        warped:{ text:'Vörös bársony kápolnája, és Ő vár benne — rád, mindig is csak rád, mindig is rád várt. Nem látod az arcát a fátylon át. Nem is kell. Minden lépés felé olyan, mintha megbocsátanának.',
+          choices:{ 0:{label:'Odamész hozzá'}, 1:{label:'Úgy szorítod a fegyvered, hogy fájjon'}, 2:{label:'Letéped a fátylat'} } } },
+      outcomes:{
+        velvet_yield:{ text:'Leteszed a terheid. Ami következik, az melegség és éhség, és utána nem beszélsz róla. Egyedül ébredsz a kápolna lépcsőjén, olyan kipihenten, ahogy évek óta nem — és olyan módon könnyebben, aminek semmi köze a csomagodhoz. Két gyertya kialudt. Elég biztos vagy benne, hogy a tieid voltak.' },
+        velvet_pray:{ text:'Térdre ereszkedsz mellette, a bársony alatti hideg kőhöz, és bármihez imádkozol, ami régebbi a vigasznál. A melegség úgy húzódik vissza, mint a megérintett csiga. Mögötted a hangja egyetlen szótagra elveszíti a zenéjét — és az a szótag nagyon, nagyon régi.' },
+        velvet_resist:{ text:'Addig szorítod a fegyvered, míg az ujjaid roppannak, és a fájdalom átvágja a parfümöt. A kápolna hideg. Mindig is hideg volt. A gyertyák faggyúból, a bársony molyrágta, és Ő még mindig a lépcsőn van — de most látod, hogy a fátyol rosszul mozdul, mint szöveten át a lélegzet, amikor nincs mögötte semmi. Megtartod a melegedet, és a nevedet.' },
+        velvet_fight:{ text:'Ökölbe fogod a fátylat, és rántasz. Ami alatta van, az nem arc. Száj, és elég sokáig volt hozzád türelmes. „HÁLÁTLAN” — mondja a kápolna, minden varratából egyszerre.' } } },
+
+    sporewife: { name:'A spóraasszony',
+      variants:{
+        clear:{ text:'Félig a micéliumfalba nőve egy asszony kalapok és lemezek kertjét gondozza. Spórafény száll a hajából, mint lassú hó. „Ülj le, vándor. A Mély gondoskodik, ha hagyod.”',
+          choices:{ 0:{label:'Elfogadod az orvosságát'}, 1:{label:'Spóraoltványt kérsz'}, 2:{label:'Visszautasítod és továbbmész'} } },
+        warped:{ text:'Női alakot viselő gomba-TÖMEG leng a falnál, indák nyúlnak onnan, ahol a hajának kellene lennie. Zümmög. Ami idelent zümmög, az hív valamit.',
+          choices:{ 0:{label:'Levágod, mielőtt szétterjed'}, 1:{label:'Figyeled még egy darabig'}, 2:{label:'Hátrálsz'} } } },
+      outcomes:{
+        spore_remedy:{ text:'Lemezekből és árnyékból főz teát, amely régi fán megülő eső ízű. A sebeid összeforrnak, ahogy iszod. „A Mély megtartja azt, aki megtartja őt” — mormolja, és egy fiolát dug a csomagodba.' },
+        spore_graft:{ text:'Élő kalapot nyom a sebedhez, és suttog neki. A hús magába issza. Több vagy, mint voltál — és egy kicsit kevésbé a sajátod.' },
+        spore_leave:{ text:'Meghagyod a türelmes kertjének. A spórafény elhalványul mögötted.' },
+        spore_slay:{ text:'Szétvágod a zümmögő lényt — és egy asszonyt találsz a virág belsejében, gyógynövényes tarsolyából orvosságok hullanak, amiket utazóknak nevelt. A Mély nagyon elcsendesedik körülötted.' },
+        spore_watch:{ text:'Vársz, leengedett pengével. Az „indák” száradó gyógynövényekkel felfűzött hajjá állnak össze; a zümmögés altatódal. Kinyitja a szemét, rád mosolyog a türelmedért — és meggyógyít érte.' } } },
+  },
+});
+
+// ---------- Batch E: encounters 21–29 ----------
+// The biome-gated set — the ferry, the forge, the choir, and the rest of the
+// Weald and the flood. With these the event narratives are fully translated.
+I18N.addData({
+  EVENTS: {
+
+    ferryman: { name:'A révész',
+      variants:{
+        clear:{ text:'Csónak siklik ki a fekete vízből, csuklyás alak tolja rúddal, lámpással az orrán. „Érme az átkelésért, kedvesség a vámért” — mondja, kövön átfolyó víz hangján.',
+          choices:{ 0:{label:'Megfizeted a vámot (8 arany)'}, 1:{label:'Megkérdezed, mi alszik a vízben'}, 2:{label:'Továbbinted'} } },
+        warped:{ text:'Egy VÍZBE FÚLT LÉNY összekötözött csontokból álló tutajt tol a sekélyesben. Kis pénzesláda csillan a lábánál. Nem vett észre. A víz elnyelne minden hangot.',
+          choices:{ 0:{label:'Elveszed a pénzesládát'}, 1:{label:'Nyíltan megszólítod'}, 2:{label:'Elhagyod a partot'} } } },
+      outcomes:{
+        ferry_toll:{ text:'Nedves bőrtenyérbe ejted az érméket. A révész elárasztott csarnokok mellett tol el, amelyeken sosem tudtál volna átgyalogolni, és kipihenten tesz le egy távoli száraz lépcsőn.' },
+        ferry_ask:{ text:'„A város imádkozva fulladt meg” — mondja. „Az imák még mindig odalent úsznak.” Elmondja, hol sekély a víz; a térképtől kitisztul az elméd.' },
+        ferry_leave:{ text:'A csónak fodrozódás nélkül csúszik vissza a sötét vízbe.' },
+        ferry_rob:{ text:'Leemeled a pénzesládát a tutajról. A „vízbe fúlt lény” megfordul — révész, lehullott csuklyával, barázdált, fáradt arccal. Nem szól semmit. Csak néz rád, és ellöki magát. A láda nehéz mások viteldíjától.' },
+        ferry_hail:{ text:'Átkiáltasz a vízen. Az alak kiegyenesedik — csuklyás révész, tutaján a mély ellen fűzött csontamulettekkel. „Ez itt becsületes” — hörgi, és ingyen visz át.' } } },
+
+    forgewidow: { name:'A kovácsözvegy',
+      variants:{
+        clear:{ text:'Egy haldokló kovácstűznél, amely a szakadékfalba ékelődik, koromtól csíkos kovács pengét munkál a parázsban. „A Kórus elvitte a férjemet a háborúiba” — mondja fel sem nézve. „Becsületes munkát még mindig elvállalok.”',
+          choices:{ 0:{label:'Megedzeted a fegyvered (12 arany)'}, 1:{label:'Megrakod a kohót (8 arany)'}, 2:{label:'Meghagyod a munkájának'} } },
+        warped:{ text:'Egy KÓRUS-KOVÁCS acélt kalapál a vörös sötétben — nyilván a vadászaidat fegyverzi fel. A kohó fénye bearanyozza a kalapácsát. Egyetlen csapásod százat érne az övéiből.',
+          choices:{ 0:{label:'Megölöd a kovácsot'}, 1:{label:'Előbb figyeled, hogyan dolgozik'}, 2:{label:'Elhaladsz a füstben'} } } },
+      outcomes:{
+        forge_temper:{ text:'Áthúzza a pengéd a parázson, valami sötétben edzi le, és zúgva adja vissza. Most mélyebbre harap.' },
+        forge_gift:{ text:'Érmével és szénnel eteted a kohóját. Hosszan méreget. „Kedvesség, idelent.” Mesterjegyet üt a felszerelésedbe szerencsére — a régi fajtából, ami működik.' },
+        forge_leave:{ text:'A kalapácsének végigkísér a szakadékon, egyenletesen, mint egy szív.' },
+        forge_blood:{ text:'A pengéd csapás közben vet véget a kalapácséneknek. A padján: ekevasak, ajtózsanérok, gyerekjáték-kard. Kórus-acél semmi. Elveszed a jó munkáit, és mész.' },
+        forge_watch:{ text:'A füstből figyeled. Befejezi — főzőedény, ajtózsanér, játékkard valami odafenti gyereknek. Egyetlen fegyver sincs az állványon. Szégyellve a bizonyosságodat, kilépsz; szó nélkül megedzi a pengédet.' } } },
+
+    bonechoir: { name:'A csontkórus',
+      variants:{
+        clear:{ text:'Kilenc csontváz térdel körben, állkapcsuk nyitva egy hallásküszöb alatti himnuszban. A levegő a fogaidban rezeg. Aranyozott miseruhájuk száz éve tartja a színét.',
+          choices:{ 0:{label:'Letérdelsz és hozzáadod a hangod'}, 1:{label:'Megkérdezed, mit gyászolnak'}, 2:{label:'Meghagyod nekik az énekük'} } },
+        warped:{ text:'Kilenc zörgő HOLT sikolt hangtalanul egy fekete oltár körül, aranyozott díszek csillognak a csontjaikon. Az ilyen arany bárhol ugyanannyit ér.',
+          choices:{ 0:{label:'Szétvered őket az ereklyéikért'}, 1:{label:'Hallgatózol, mielőtt lecsapsz'}, 2:{label:'Visszavonulsz'} } } },
+      outcomes:{
+        choir_hymn:{ text:'Letérdelsz a körben, és a lélegzeted a himnuszhoz adod. Egyetlen kitartott hang erejéig a Fehérvelő nem sír, hanem katedrális. Könnyebben állsz fel, mint ahogy letérdeltél.' },
+        choir_ask:{ text:'A legközelebbi koponya meghajol. Az elmédbe menet költözik: egy város, egy pestis, kilenc kántor, akik énekelve maradtak, míg mindenki más menekült. Mindenkit gyászolnak, akinek nem jutott ének. Beleértve, előre, téged is. Különösen melengető.' },
+        choir_leave:{ text:'Töretlenül hagyod a himnuszt. Végigkísér a csontcsarnokokon, mint egy áldás, amely még nem döntötte el magát.' },
+        choir_smash:{ text:'Kilenc énekest törsz szét az aranyfonalukért és aranyozott csatjaikért. A himnusz elhallgat. Nem tudtad, mennyire az az ének tartott vissza valamit a Fehérvelő csendjéből.' },
+        choir_listen:{ text:'Leengeded a fegyvered, és hallgatsz. A „sikoltozás” harmóniává áll össze — óvó himnusz, olyan régi, mint a körülötte lévő csontok. Az egyik kántor feléd fordítja a koponyáját, és valahogyan helyesel.' } } },
+
+    lamplighter: { name:'A vak lámpagyújtó',
+      variants:{
+        clear:{ text:'Öregember csoszog a kővé vált gyökerek között, magasra tartott lámpással, pedig a szeme tejfehér. „Van ott valaki? A sötét megette az utamat, és még van lámpám gyújtani.”',
+          choices:{ 0:{label:'Átvezeted a gyökereken'}, 1:{label:'Kérdezel tőle az Erdőről'}, 2:{label:'Csendben elsurransz'} } },
+        warped:{ text:'Sápadt FÉNY táncol a gyökerek között, egyre mélyebbre sodródva — ahogy a fények szoktak, amikor azt akarják, hogy kövesd. Talán kincs felé. Vagy fogak felé.',
+          choices:{ 0:{label:'Kioltod a fényt és elveszed a lámpást'}, 1:{label:'Óvatosan követed'}, 2:{label:'Nem veszel róla tudomást'} } } },
+      outcomes:{
+        lamp_guide:{ text:'Gyökértől gyökérig vezeted, kezével a válladon, míg a sötét el nem vékonyodik. „Kedves szemek” — mondja. „Kölcsönözd az enyéimet.” A kezedbe nyomja a lámpását — olaj nélkül ég, és az Erdő hátrahúzódik előle.' },
+        lamp_ask:{ text:'„Az Erdő egy olyan rengetegből nőtt, amely nem volt hajlandó udvariasan meghalni” — mondja. „Tartsd alacsonyan a fényed és állj a szavadnak — a gyökerek emlékeznek az ígéretekre.” Az útmutatásától megnyugszik az elméd.' },
+        lamp_slip:{ text:'Elsurransz a sötétben. Mögötted az öregember egyszer utánad szól, reménykedve, a senkinek.' },
+        lamp_snuff:{ text:'Egy csapással kioltod a fényt — és egy öregember roskad össze az ütésed körül, a lámpás csörömpölve esik le. Vak. Vak volt, és másoknak tartotta magasra a lámpását. A lámpás még mindig ég neked. Nem kellene, hogy még mindig égjen neked.' },
+        lamp_follow:{ text:'Óvatos távolságból követed — és nem fogakat találsz, hanem egy vak öreg lámpagyújtót, aki tapogatózva jár a lámpái között. Nevet, amikor megszólalsz. „Úgy követtél, mint egy lepke! Tessék — járj fényben.” Kölcsönadja a lámpása tüzét.' },
+        lamp_leave:{ text:'Hagyod, hogy a fény eltáncoljon a gyökerek közé. A sötét bezárul mögötte.' } } },
+
+    overgrown: { name:'A benőtt katona',
+      variants:{
+        clear:{ text:'Egy katona áll a törött boltív alatt, páncélját taplógomba hasította fel, moha ott, ahol a szeme volt. Évekkel a halála után is tartja ezt a posztot. „Jelszót, vándor” — nyikorogja, rosszindulat nélkül.',
+          choices:{ 0:{label:'Kedvesen válaszolsz neki'}, 1:{label:'Megkérdezed, mit őriz'}, 2:{label:'Megkerülöd'} } },
+        warped:{ text:'CSOSZOGÓ HÜVELY rozsdás vértben állja el a boltívet, gomba tör elő minden eresztékén. Már a pajzsát is megérné lefeszíteni — amint a viselője abbahagyja a mozgást.',
+          choices:{ 0:{label:'Szétvered a hüvelyt'}, 1:{label:'Előbb megszólítod'}, 2:{label:'Megkerülöd'} } } },
+      outcomes:{
+        sold_pass:{ text:'„Régóta nem válaszolt senki kedvesen” — mondja, és félreáll. Ahogy elhaladsz, lecsatolja mohás pajzsát, és rád erőlteti. „A poszt mostantól a tiéd, valahol odébb.”' },
+        sold_ask:{ text:'„Már nem emlékszem” — ismeri be, és valami megroskad a páncélban. „Csak arra, hogy megígértem.” Egy darabig mellette állsz őrt, és a pihenő jót tesz.' },
+        sold_leave:{ text:'Másik utat találsz a gyökerek között. Mögötted a katona tartja a posztját.' },
+        sold_loot:{ text:'Ledöntöd a hüvelyt, és lefeszíted a pajzsot. A gomba alatt: egy katona arca, még mindig kötelességbe merevedve. Egyetlenegyszer sem emelt rád fegyvert. A pajzs jó acél, és nehezebb, mint lennie kellene.' },
+        sold_speak:{ text:'„Jelszót” — nyikorogja a hüvely — és leesik a pengéd. Egy katona, halott és benőve, még mindig olyan posztot tart, amelyre senki nem emlékszik. Adsz neki egy régi menetszót; elfogadja, és tisztelegve átenged.' } } },
+
+    bride: { name:'A vízbe fúlt menyasszony',
+      variants:{
+        clear:{ text:'Sápadt asszony átázott menyasszonyi ruhában gázol a sekélyesben, keresgélve. „A gyűrűm” — suttogja. „Nem tudok átkelni a gyűrűm nélkül. Oda esett, ahova a fény nem ér el.”',
+          choices:{ 0:{label:'Lemerülsz a gyűrűért'}, 1:{label:'Megvigasztalod'}, 2:{label:'A vízre hagyod'} } },
+        warped:{ text:'JAJGATÓ BANYA rothadt csipkében járkál a víz szélén, egy iszapba félig süllyedt kis hozományláda körül. Elterelődött a figyelme. A láda nincs messze.',
+          choices:{ 0:{label:'Felkapod a hozományládát'}, 1:{label:'Odakiáltasz neki'}, 2:{label:'Elosonsz'} } } },
+      outcomes:{
+        bride_ring:{ text:'Belegázolsz, ahol már nem érsz le. A hideg megveszi a magáét — de az ujjaid vékony aranykarikára zárulnak az iszapban. Amikor a kezébe nyomod, egy pillanatra meleg, fiatal és ragyogó. „A hozzád hasonló kedvesség vitt át” — mondja, és megáldja a véred, mielőtt a víz hazaviszi.' },
+        bride_comfort:{ text:'Nem találod a gyűrűjét, ezért azt adod, amid van: társaságot, és egy ígéretet, hogy nem felejtették el. Sós vízzel sír, és a csarnokok egy pillanatra kevésbé tűnnek elárasztottnak.' },
+        bride_leave:{ text:'Ott hagyod, ahogy ugyanazt a sötét tócsát kerülgeti. Addig keres majd, míg a víz el nem felejti.' },
+        bride_dowry:{ text:'Kirántod a ládát az iszapból, míg a „banya” a víznek jajgat. Bent: hozomány, érméről érmére gyűjtve egy esküvőre, amely a várossal együtt fulladt meg. A kiáltása, amikor meglát vele, három csarnokon át követ.' },
+        bride_call:{ text:'Odakiáltasz — és a jajgatás abbamarad. Egy menyasszony, ruhájában megfulladva, iszapszürke szemmel fordul feléd. „Szóltál” — csodálkozik. „A legtöbben csak elvesznek.” Nedves érmét nyom a tenyeredbe: a szerencsepénzét, önként.' } } },
+
+    cindermonk: { name:'A parázsszerzetes',
+      variants:{
+        clear:{ text:'Egy szerzetes törökülésben ül eleven parázságyban, bőre kormos, de éretlen, lassan lélegzik. Egyik szeme kinyílik, ahogy közeledsz. „A tűz csak azt őrzi meg, amivel eteted. Ülj le, ha mersz melegedni.”',
+          choices:{ 0:{label:'Csatlakozol a virrasztásához a parázsban'}, 1:{label:'A tanítását kéred'}, 2:{label:'Meghajolsz és továbbmész'} } },
+        warped:{ text:'ÉGŐ ALAK guggol a parázsban, lángok nyaldossák a vállát, a tűzbe motyog. Ami idelent a tűzhöz beszél, az kér tőle valamit. A parázsszívéért fizetnének.',
+          choices:{ 0:{label:'Kioltod és elveszed a parazsat'}, 1:{label:'Leülsz vele szemben'}, 2:{label:'A hűvös fal mellett maradsz'} } } },
+      outcomes:{
+        monk_vigil:{ text:'Beleülsz a parázsba. A tűz próbára tesz — megveszi a magáét bőrben — aztán becsületesnek találva úgy telepszik a kezedbe, mint egy szelídített állat. A csapásaid hőt hordoznak ennek az életnek a végéig.' },
+        monk_teach:{ text:'„Etesd a tüzet gyásszal, és nőni fog. Etesd céllal, és melegíteni fog.” A szavai valami szilárdat raknak le a mellkasodban. Könnyebben távozol, és tisztán ég az elméd.' },
+        monk_leave:{ text:'Meghajolsz a parázsban ülő ember előtt. Bólint, a szeme már megint csukva.' },
+        monk_quench:{ text:'Szétszórod a parazsat, és levágod az égő alakot. A lángok kihunynak — és egy kormos öreg szerzetes fekszik a hamuban, nyitott tenyérrel, olyan fegyvertelenül, amilyen mindig is volt. A parázsszív a kezedben csak egy meleg kő. Meleg marad. Sosem szűnik meg melegnek lenni.' },
+        monk_sit:{ text:'Leülsz az égő lénnyel szemben a parázs túloldalán. Percek telnek. A lángok alábbhagynak, és egy szerzetes néz rád a füstön át. „Türelem, ebben a gödörben? Ritka tüzelő.” Megtanít a széllélegzetre, és a tűz beleegyezik, hogy ismerjen téged.' } } },
+
+    saint: { name:'A befejezetlen szent',
+      variants:{
+        clear:{ text:'Márványlapon félig összeállított csontváz fekszik, aranydrót fűzi az ízületeit — szent, akit a csontmívesek sosem fejeztek be. Szétszórt ujjereklyéi a terem fülkéiből csillannak.',
+          choices:{ 0:{label:'Összegyűjtöd és visszahelyezed az ereklyéket'}, 1:{label:'Imádkozol a lapnál'}, 2:{label:'Nem zavarsz meg semmit'} } },
+        warped:{ text:'RITUÁLIS HULLA fekszik aranydróttal felfűzve egy lapon, ereklyecsontok szórva körülötte, mint fizetség. Aranydrót. Ereklyecsontok. Odafent a gyűjtők egy évnyi kenyeret adnának egyetlen ujjpercért.',
+          choices:{ 0:{label:'Zsebre vágod az ereklyéket'}, 1:{label:'Visszahelyezel egyetlen csontot'}, 2:{label:'Kihátrálsz a teremből'} } } },
+      outcomes:{
+        saint_relics:{ text:'Fülkéről fülkére összegyűjtöd az apró csontokat, és mindegyiket a helyére teszed. Amikor az utolsó ujjperc a helyére kattan, a csontváz felsóhajt — hosszú, százéves kifújás —, és melegség árad a lapról, mint a fejedre tett kéz.' },
+        saint_pray:{ text:'Letérdelsz a befejezetlen dolog előtt, és imádkozol azért, akinek szánták. A csendnek tapintása van, mint a figyelemnek. A tartalékaid visszatérnek.' },
+        saint_leave:{ text:'Meghagyod a szentet a hosszú összeállásának. Az aranydrót csillan, míg az ajtó be nem csukódik.' },
+        saint_theft:{ text:'A csomagodba söpröd az ereklyéket, elpattintva az aranydrótot, ahol tartja őket. Mögötted a félkész szent leülepszik a lapján, olyan hanggal, mint egy elejtett hangszer. Az ereklyék minden érmét megérnek — a gyűjtők nem kérdezik, honnan jött egy ujjperc.' },
+        saint_return:{ text:'Kíváncsian visszaillesztesz egy szétszórt csontot az aranydrótba. A csontváz állkapcsa ellazul, mintha visszatartott lélegzet engedett volna el — és megérted: nem rítus, hanem mentés, egy évszázaddal ezelőtt félbeszakítva. Befejezed, amit tudsz, és a lap melege megköszöni.' } } },
+
+    wolfmother: { name:'A farkasanya',
+      variants:{
+        clear:{ text:'Kővé vált gyökerek üregében szekér méretű nőstényfarkas szoptat egy csomó kölyköt. A szeme megtalál a sötétben — mérlegelve, nem ellenségesen. Egyelőre.',
+          choices:{ 0:{label:'Felajánlod az élelmed'}, 1:{label:'Távolról nézed a kölyköket'}, 2:{label:'Csendben visszavonulsz'} } },
+        warped:{ text:'SZÖRNYETEG FARKASLÉNY tanyázik a gyökerek közt, apró alakok fészkelődnek a hasánál. Egy ilyen prém — és bármi, amit ellett — egy hónapot venne a felszínen. Nem vett észre.',
+          choices:{ 0:{label:'Megtámadod az odút'}, 1:{label:'Leengeded a pengéd és vársz'}, 2:{label:'Visszavonulsz'} } } },
+      outcomes:{
+        wolf_offer:{ text:'Az üreg szélére teszed az élelmed, és hátralépsz. Hosszan méreget, mielőtt enne. Amikor elindulsz, falkaszag tapad rád — és az Erdő kisebb fogai kétszer is meggondolják majd. Most úgy mozogsz, mint az övéi.' },
+        wolf_watch:{ text:'Nézed, ahogy a kölykök bukfenceznek a gyökérüregben — ügyetlenül, morogva, élve. Idelent, pont itt. A legmelegebb dolog, amit napok óta láttál, és megnyugtat.' },
+        wolf_leave:{ text:'Kihátrálsz az üregből, amerről jöttél. A szeme végigkísér a sötétig.' },
+        wolf_den:{ text:'Az odúra emeled a pengéd — és a „farkaslény” feláll, hogy fogadjon, minden szőrszála lándzsa. Bármit is ér a prém, az anya megdolgoztat érte.' },
+        wolf_wait:{ text:'Leengeded a pengéd, és mozdulatlanul állsz. A szörnyeteg kirajzolódik a homályban: anya, kölykökkel a hasánál, figyeli, mi vagy. Úgy dönt, nem vagy fenyegetés — és hagyja, hogy igyál a tiszta tócsából az üreg szélén, mielőtt elmész.' } } },
+  },
+});
