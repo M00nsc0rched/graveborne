@@ -81,6 +81,12 @@ const I18N = (function(){
       'A többiek készen érkeznek. Ő adóssággal jön, és abból szedi be a különbséget, amit megöl.',
     '<i>No points to spend. Every fight you win gives her one instead — and she chooses no better than the dark does.</i>':
       '<i>Nincs elkölthető pont. Helyette minden megnyert harc ad neki egyet — és nem választ jobban, mint a sötét.</i>',
+    // — the deck —
+    'Pull the card up to draw it — <b>↑</b> or drag': 'Húzd fel a kártyát a felhúzáshoz — <b>↑</b> vagy húzás',
+    'This one is sealed. Earn it, and it will take your hand.': 'Ez le van pecsételve. Érdemeld ki, és megfogja a kezed.',
+    'Sealed to you': 'Előtted lepecsételve',
+    'LOCKED': 'ZÁROLVA',
+    '???': '???',
     'Spread them evenly': 'Oszd el egyenletesen',
     'Clear': 'Törlés',
     'Begin Descent': 'Lemerülés indítása',
