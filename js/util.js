@@ -27,7 +27,9 @@ const U = {
   make(tag, cls, html){
     const e = document.createElement(tag);
     if (cls) e.className = cls;
-    if (html != null) e.innerHTML = html;
+    // nearly every visible string reaches the DOM through here, so this is where
+    // localisation hooks in; untranslated text passes straight through as English
+    if (html != null) e.innerHTML = (typeof T === 'function') ? T(html) : html;
     return e;
   }
 };

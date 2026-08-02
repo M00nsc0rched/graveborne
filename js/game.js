@@ -1,7 +1,7 @@
 // ================= GRAVEBORNE — main engine =================
 // shown on the title screen; keep in step with CACHE in sw.js — the game is
 // served from that cache, so the number you see is the build you're running
-const GAME_VERSION = 31;
+const GAME_VERSION = 32;
 let VW = 21, VH = 13;                 // viewport in tiles — reshaped to the stage on phones
 const TS = 16;                        // tile size in canvas pixels
 const FINAL_DEPTH = 5;
@@ -361,6 +361,7 @@ function init(){
   window.addEventListener('keydown', onKey);
   initTouchControls();
   initTuner();
+  applyLanguage();                       // before the first paint, so nothing flashes English
   applyDisplayOpts();
   // the rotated layout is sized in real pixels, so it has to be re-measured
   // whenever the viewport moves — rotation, toolbars sliding, keyboard, all of it
@@ -392,6 +393,35 @@ function applyDisplayOpts(){
   if (typeof fitViewport === 'function') fitViewport();
 }
 
+// ---- Language: swap the content tables and repaint anything already on screen ----
+// The static chrome in index.html is not built through U.make, so it is refreshed
+// by hand here; everything else re-renders on its next paint.
+const STATIC_TEXT = {
+  'hint': 'Move: WASD / Arrows &nbsp;·&nbsp; Inventory: I &nbsp;·&nbsp; Wait: Space',
+};
+function applyLanguage(){
+  const want = Save.opts().lang || 'en';
+  if (I18N.lang !== want){
+    I18N.setLang(want);
+    // an enemy already in the ring copied its name when the fight began
+    if (G.combat && G.combat.enemy){
+      const src = Data.ENEMIES[G.combat.enemy.id];
+      if (src) G.combat.enemy.name = src.name;
+    }
+  }
+  for (const id in STATIC_TEXT){
+    const el = U.el(id); if (el) el.innerHTML = T(STATIC_TEXT[id]);
+  }
+  const th = document.querySelector('.touch-hint');
+  if (th) th.innerHTML = T('Hold to repeat · ● waits');
+  // HUD labels live in the markup, so they are relabelled by selector
+  for (const [sel, en] of [['.honor .lbl','HONOR'], ['.bounty .lbl','BOUNTY'], ['.lbl-depth','DEPTH']]){
+    const el = document.querySelector(sel); if (el) el.textContent = T(en);
+  }
+  if (G.player) updateHUD();
+  if (G.state === 'COMBAT') updateEnemyPanel();
+}
+
 function showSettings(back){
   const o = Save.opts();
   const s = U.make('div','sheet');
@@ -414,6 +444,17 @@ function showSettings(back){
     const on = (o.orient || 'auto') === key;
     s.appendChild(shopLine(`${on ? '◈ ' : ''}${label}`, sub, '', false,
       ()=>{ Save.setOpt('orient', key); applyDisplayOpts(); showSettings(back); }));
+  }
+
+  s.appendChild(U.make('div','sect','Language'));
+  s.appendChild(U.make('div','p dim','The language the game speaks. Names, items and the chronicle follow your choice; anything not yet translated stays in English.'));
+  for (const [key, label, sub] of [
+    ['en','English','The original text, as written.'],
+    ['hu','Magyar','Magyar nyelvű szöveg. Ami még nincs lefordítva, angolul marad.'],
+  ]){
+    const on = (o.lang || 'en') === key;
+    s.appendChild(shopLine(`${on ? '◈ ' : ''}${label}`, sub, '', false,
+      ()=>{ Save.setOpt('lang', key); applyLanguage(); showSettings(back); }));
   }
 
   s.appendChild(U.make('div','sect','Movement'));
@@ -2155,12 +2196,12 @@ function updateStageBtn(){
   document.body.classList.toggle('in-combat', G.state === 'COMBAT');
   const b = U.el('stage-btn'); if (!b) return;
   if (G.state === 'EXPLORE' && !G.busy){
-    b.classList.remove('hidden','flee'); b.textContent = '☰ Menu';
+    b.classList.remove('hidden','flee'); b.textContent = T('☰ Menu');
     b.disabled = false; b.onclick = showMenu;
   } else if (G.state === 'COMBAT' && G.combat){
     const en = G.combat.enemy, canFlee = !G.combat.boss && !en.guardian;
     if (!canFlee){ b.classList.add('hidden'); return; }
-    b.classList.remove('hidden'); b.classList.add('flee'); b.textContent = 'Flee';
+    b.classList.remove('hidden'); b.classList.add('flee'); b.textContent = T('Flee');
     b.disabled = G.busy || G.combat.turn !== 'player';
     b.onclick = flee;
   } else {
@@ -2692,7 +2733,7 @@ function renderActions(){
 
 function Btn(label, fn, cls, key){
   const b = U.make('button', cls||'btn');
-  if (label) b.innerHTML = (key?`<span class="k">${key}</span>`:'') + label;
+  if (label) b.innerHTML = (key?`<span class="k">${key}</span>`:'') + T(label);
   b.onclick = fn;
   return b;
 }
@@ -2954,6 +2995,7 @@ function openShop(){ G.state='SHOP'; G.shop = rollShopStock(G.depth+1); renderSh
 
 function shopLine(labelHTML, subHTML, priceHTML, disabled, onBuy){
   const b = U.make('button', 'btn shop-item'+(disabled?' sold':''));
+  labelHTML = T(labelHTML); subHTML = subHTML ? T(subHTML) : subHTML;
   b.innerHTML = `<span>${labelHTML}${priceHTML}</span>${subHTML?`<span class="sub">${subHTML}</span>`:''}`;
   b.disabled = disabled; b.onclick = onBuy;
   return b;
@@ -3481,7 +3523,7 @@ function showInventory(){
       const cost = skillUpgradeCost(p, id);
       const b = Btn(`Sharpen ${sk.name} → tier ${lv+1}`, ()=>upgradeSkill(id), 'btn');
       b.disabled = Save.souls() < cost;
-      b.innerHTML = `<span class="k">◈</span>Sharpen ${sk.name} → tier ${lv+1}<span class="cost">◈ ${cost}</span>`;
+      b.innerHTML = `<span class="k">◈</span>${T(`Sharpen ${sk.name} → tier ${lv+1}`)}<span class="cost">◈ ${cost}</span>`;
       b.style.marginBottom = '6px';
       s.appendChild(b);
     }

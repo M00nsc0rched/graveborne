@@ -50,7 +50,8 @@ const Save = {
   // ---- Display options: how much screen the game takes, and which way up ----
   // fill: 0.80–1.00 of the phone's viewport · orient: 'auto' | 'landscape'
   // motion: 'smooth' slides between tiles (+ a faint trail) · 'instant' snaps, as it used to
-  opts(){ return this._read(this.KEY_OPTS, { fill: 1, orient: 'auto', motion: 'smooth' }); },
+  // lang: 'en' source text · 'hu' Hungarian, falling back to English where untranslated
+  opts(){ return this._read(this.KEY_OPTS, { fill: 1, orient: 'auto', motion: 'smooth', lang: 'en' }); },
   setOpt(k, v){ const o = this.opts(); o[k] = v; this._write(this.KEY_OPTS, o); return o; },
 
   wipe(){
