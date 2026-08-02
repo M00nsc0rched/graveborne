@@ -81,10 +81,22 @@ const I18N = (function(){
       'A többiek készen érkeznek. Ő adóssággal jön, és abból szedi be a különbséget, amit megöl.',
     '<i>No points to spend. Every fight you win gives her one instead — and she chooses no better than the dark does.</i>':
       '<i>Nincs elkölthető pont. Helyette minden megnyert harc ad neki egyet — és nem választ jobban, mint a sötét.</i>',
+    // — potions: target row, verbs, category badges —
+    'At the foe': 'Az ellenfélre', 'On yourself': 'Magadra', 'On {0}': '{0} felé',
+    'yourself': 'magadra',
+    'Hurl': 'Hajítsd', 'Pour': 'Öntsd', 'Serve': 'Tálald',
+    'Improvised Splash': 'Rögtönzött löttyintés',
+    'A weak throw of raw reagents at the foe — for when the bottles run dry.':
+      'Nyers alapanyagok gyenge hajítása az ellenfélre — ha kifogytak az üvegek.',
+    'offense': 'támadó', 'debuff': 'gyengítő', 'buff': 'erősítő', 'food': 'étel',
     // — the deck —
     'Pull the card up to draw it — <b>↑</b> or drag': 'Húzd fel a kártyát a felhúzáshoz — <b>↑</b> vagy húzás',
     'This one is sealed. Earn it, and it will take your hand.': 'Ez le van pecsételve. Érdemeld ki, és megfogja a kezed.',
     'Sealed to you': 'Előtted lepecsételve',
+    'Nothing of this one is written down yet. Earn the card, and the page fills in.':
+      'Erről még semmi nincs feljegyezve. Érdemeld ki a kártyát, és kitöltődik a lap.',
+    'Pull the card up to draw it — <b>↑</b> or drag  ·  down for details':
+      'Húzd fel a kártyát a felhúzáshoz — <b>↑</b> vagy húzás  ·  lefelé a részletekért',
     'LOCKED': 'ZÁROLVA',
     '???': '???',
     'Spread them evenly': 'Oszd el egyenletesen',
@@ -348,7 +360,7 @@ const I18N = (function(){
   const PATTERNS_HU = [
     [/^You descend into the Graveborne depths as the (.+)\.$/,
       'Leereszkedsz a Graveborne mélyébe, mint $1.'],
-    [/^— (.+) —$/, '— $1 —'],
+    [/^— ([^—!]+) —$/, '— $1 —'],   // biome banner only; keep clear of the combat opener
     [/^You take the stairs down\. Depth (\d+)\. The descent yields (\d+) Souls\.$/,
       'Lemész a lépcsőn. Mélység $1. A leereszkedés $2 lelket hoz.'],
     [/^You pry open a chest — (\d+) gold\.$/, 'Felfeszítesz egy ládát — $1 arany.'],
@@ -427,7 +439,19 @@ const I18N = (function(){
     [/^Runs: (\d+) · Deepest: (\d+) · Wins: (\d+) · Codex: (\d+)\/(\d+)$/,
       'Futamok: $1 · Legmélyebb: $2 · Győzelmek: $3 · Kódex: $4/$5'],
     [/^(.+) is wracked with rot \((\d+)\/turn\)\.$/, '$1 rothadástól gyötrődik ($2/kör).'],
-    [/^You (.+) a (.+) at (.+) — (\d+) damage\.$/, '$1 egy $2-t erre: $3 — $4 sebzés.'],
+    // the verb comes from the data in English, so each gets its own rule; the
+    // arrow form sidesteps having to decline the potion and target names
+    [/^You hurl a (.+) at (.+) — (\d+) damage\.$/,  'Hajítás: $1 → $2 — $3 sebzés.'],
+    [/^You pour a (.+) at (.+) — (\d+) damage\.$/,  'Öntés: $1 → $2 — $3 sebzés.'],
+    [/^You serve a (.+) at (.+) — (\d+) damage\.$/, 'Tálalás: $1 → $2 — $3 sebzés.'],
+    [/^(.+) is weakened \(−(\d+) ATK\)\.$/, '$1 legyengült (−$2 TÁM).'],
+    [/^(.+): \+(\d+) ATK for 3 turns\.$/, '$1: +$2 TÁM 3 körre.'],
+    [/^(.+): regenerating (\d+)\/turn\.$/, '$1: regenerálódik $2/kör.'],
+    [/^(.+): \+(\d+) shield\.$/, '$1: +$2 pajzs.'],
+    [/^(.+) eats — FOOD restored\.$/, '$1 eszik — ÉLELEM feltöltve.'],
+    [/^You drink the (.+) \(\+(\d+) FOOD\)\.$/, 'Megiszod: $1 (+$2 ÉLELEM).'],
+    [/^The tonic steadies you \(\+(\d+) HP\)\.$/, 'A tonik megerősít (+$1 ÉP).'],
+    [/^the shield absorbs (\d+)\.$/, 'a pajzs elnyel $1 sebzést.'],
   ];
 
   // ---- inline labels inside otherwise-dynamic HTML ----
