@@ -1,7 +1,7 @@
 // ================= GRAVEBORNE — main engine =================
 // shown on the title screen; keep in step with CACHE in sw.js — the game is
 // served from that cache, so the number you see is the build you're running
-const GAME_VERSION = 40;
+const GAME_VERSION = 41;
 let VW = 21, VH = 13;                 // viewport in tiles — reshaped to the stage on phones
 const TS = 32;                        // tile size in canvas pixels
 const TU = TS / 16;                   // old design unit -> new, for art not yet re-authored
@@ -3816,22 +3816,147 @@ function showFollowers(){
   setModal(s);
 }
 
+// ---- the ornate plate everything in the sheet sits on ----
+function ornate(node, lit){
+  node.classList.add('orn');
+  if (lit) node.classList.add('lit');
+  for (const k of ['tl','tr','bl','br']) node.appendChild(U.make('i', 'k ' + k));
+  return node;
+}
+function ornRule(label){
+  const r = U.make('div','orn-rule');
+  r.appendChild(U.make('i')); r.appendChild(U.make('b'));
+  r.appendChild(U.make('span', null, T(label)));
+  r.appendChild(U.make('b')); r.appendChild(U.make('i'));
+  return r;
+}
+// a framed cell: glyph, an optional count, an optional caption under it
+function slotCell(opts){
+  const el = U.make('div','slot' + (opts.filled ? ' filled' : '') + (opts.onClick ? ' usable' : ''));
+  for (const k of ['tl','tr','bl','br']) el.appendChild(U.make('i','k ' + k));
+  el.appendChild(U.make('div','glyph', opts.glyph || ''));
+  if (opts.count > 1) el.appendChild(U.make('div','cnt', '×' + opts.count));
+  if (opts.tag) el.appendChild(U.make('div','tag', T(opts.tag)));
+  if (opts.title) el.title = opts.title;
+  if (opts.onClick){ el.onclick = opts.onClick; }
+  return el;
+}
+// what a thing looks like in a slot — the game has no item icons, so each kind
+// gets a glyph that reads at a glance
+const SLOT_GLYPH = {
+  weapon:'⚔', armor:'⛊', trinket:'◈',
+  potion_heal:'❤', potion_focus:'✦', ration:'⌂', strange_meat:'☙',
+};
+function packGlyph(id){
+  if (SLOT_GLYPH[id]) return SLOT_GLYPH[id];
+  if (Data.POTIONS[id]) return '⚗';
+  if (Data.ITEMS[id]) return '⚔';
+  return '•';
+}
+
+// ================= Inventory =================
+// Laid out as the sketch asks: the figure in the middle with its equipment down
+// one side and its numbers down the other, the pack as a grid of framed cells,
+// and a bar along the bottom. Everything the old sheet did still happens — the
+// Reckoning, skills, the bench — it is only arranged rather than listed.
 function showInventory(){
   if (G.state !== 'EXPLORE') return;
   const p = G.player;
   const s = U.make('div','sheet');
   s.appendChild(U.make('div','sect', p.name + ' — Depth ' + G.depth));
-  const tier = Data.honorTier(p.honor);
-  const hs = hungerStage(p);
+
+  // ---- the paper doll ----
+  const dollWrap = ornate(U.make('div'), true);
+  const doll = U.make('div','doll');
+
+  const left = U.make('div','doll-col');
+  for (const slot of ['weapon','armor','trinket']){
+    const id = p.equip[slot], it = id ? Data.ITEMS[id] : null;
+    const rar = it ? (Data.RARITY[itemRarity(it)] || Data.RARITY.common) : null;
+    const cell = slotCell({
+      glyph: SLOT_GLYPH[slot], filled: !!it, tag: slot,
+      title: it ? `${it.name} — ${modStr(it.mods)}` : T('empty'),
+    });
+    if (it) cell.querySelector('.glyph').style.color = rar.color;
+    left.appendChild(cell);
+  }
+
+  const mid = U.make('div','doll-art');
+  const cv = U.make('canvas'); cv.width = 100; cv.height = 100;
+  mid.appendChild(cv);
+  // the painted combat figure if the class has one, else its floor sprite
+  if (!Figures.draw(cv.getContext('2d'), p.sprite, 0, 0, 100)){
+    const c2 = cv.getContext('2d'); c2.imageSmoothingEnabled = false;
+    Sprites.drawFit(c2, p.sprite, 26, 26, 48);
+  }
+  mid.appendChild(U.make('div','doll-lvl', `${T('LEVEL')} ${p.level || 1}`));
+
+  const right = U.make('div','doll-col');
+  for (const [label, val] of [['ATK', p.atk], ['DEF', p.def], ['MAG', p.mag]]){
+    const q = U.make('div','plaque');
+    q.appendChild(U.make('em', null, T(label)));
+    q.appendChild(U.make('strong', null, String(val)));
+    right.appendChild(q);
+  }
+
+  doll.appendChild(left); doll.appendChild(mid); doll.appendChild(right);
+  dollWrap.appendChild(doll);
+
+  // the vitals, under the figure and inside the same plate
+  const tier = Data.honorTier(p.honor), hs = hungerStage(p);
   const spTxt = usesInt(p) ? `<b>INT</b> ${p.maxsp}` : `<b>SP</b> ${p.sp}/${p.maxsp}`;
-  s.appendChild(U.make('div','p',
-    `<b>HP</b> ${p.hp}/${p.maxhp} · ${spTxt} · <b>Gold</b> <span style="color:#d0a84e">${p.gold}</span><br>` +
-    `<b>ATK</b> ${p.atk} · <b>DEF</b> ${p.def} · <b>MAG</b> ${p.mag} · <b>SPD</b> ${p.spd}<br>` +
-    `<b>Honor</b> <span style="color:${tier.color}">${p.honor} (${tier.name})</span> · ` +
-    `<b>FOOD</b> <span style="color:${hs>=2?'#c05030':'#a87e34'}">${Math.round(p.food)}/${FOOD_MAX}${hs?' — '+HUNGER_NAMES[hs]:''}</span>`));
+  const vit = U.make('div','p');
+  vit.style.cssText = 'padding:0 10px 10px;font-size:11px';
+  vit.innerHTML = T(`<b>HP</b> ${p.hp}/${p.maxhp} · ${spTxt} · ` +
+    `<b>SPD</b> ${p.spd} · <b>Honor</b> <span style="color:${tier.color}">${p.honor} (${tier.name})</span> · ` +
+    `<b>FOOD</b> <span style="color:${hs>=2?'#c05030':'#a87e34'}">${Math.round(p.food)}/${FOOD_MAX}${hs?' — '+HUNGER_NAMES[hs]:''}</span>`);
+  dollWrap.appendChild(vit);
+
+  // souls toward the next level, and the coin — the sketch's bottom bar
+  const lvlCost = levelUpCost(p), souls = Save.souls();
+  const foot = U.make('div','inv-foot');
+  const xp = U.make('div','xpbar');
+  const fill = U.make('div','fill');
+  fill.style.width = U.clamp(souls / lvlCost * 100, 0, 100) + '%';
+  xp.appendChild(fill);
+  xp.appendChild(U.make('span', null, `◈ ${souls} / ${lvlCost}`));
+  foot.appendChild(xp);
+  foot.appendChild(U.make('div','inv-coin', `✦ ${p.gold}`));
+  dollWrap.appendChild(foot);
+  s.appendChild(dollWrap);
+
+  // ---- the pack ----
+  s.appendChild(ornRule('The Pack'));
+  const packWrap = ornate(U.make('div'));
+  const pack = U.make('div','pack');
+  const counts = {};
+  for (const id of p.inv) counts[id] = (counts[id] || 0) + 1;
+  for (const id in (p.plants || {})) if (p.plants[id] > 0) counts['plant:' + id] = p.plants[id];
+  const ids = Object.keys(counts);
+  const CELLS = Math.max(12, Math.ceil(ids.length / 6) * 6);
+  for (let i = 0; i < CELLS; i++){
+    const id = ids[i];
+    if (!id){ pack.appendChild(slotCell({})); continue; }
+    if (id.startsWith('plant:')){
+      const pl = Data.PLANTS[id.slice(6)];
+      pack.appendChild(slotCell({ glyph:'❀', filled:true, count:counts[id], title: pl ? pl.name : '' }));
+      continue;
+    }
+    const cons = Data.CONSUMABLES[id], po = Data.POTIONS[id], it = Data.ITEMS[id];
+    const def = cons || po || it;
+    const cell = slotCell({
+      glyph: packGlyph(id), filled:true, count:counts[id],
+      title: def ? (def.name + (def.desc ? ' — ' + def.desc : '')) : id,
+      onClick: cons ? () => { (cons.food ? eatFood : usePotion)(id); hideModal(); showInventory(); } : null,
+    });
+    if (po) cell.querySelector('.glyph').style.color = '#7fae3a';
+    pack.appendChild(cell);
+  }
+  packWrap.appendChild(pack);
+  s.appendChild(packWrap);
 
   // ---- The Reckoning: spend Souls on this run's power ----
-  const lvlCost = levelUpCost(p), souls = Save.souls();
+  // lvlCost and souls are already in hand from the footer bar above
   s.appendChild(U.make('div','sect', `The Reckoning — Level ${p.level || 1}`));
   s.appendChild(U.make('div','p dim',
     `You hold <span style="color:#7fb0d0">◈ ${souls} Souls</span>. Feed them to your flesh to grow — but they are the same Souls the Sanctum keeps, and the dark takes what you fail to bank. These gains last only this descent.`));
@@ -3855,21 +3980,6 @@ function showInventory(){
     s.appendChild(learnRow);
   }
 
-  s.appendChild(U.make('div','sect','Equipment'));
-  for (const slot of ['weapon','armor','trinket']){
-    const id = p.equip[slot]; const it = id ? Data.ITEMS[id] : null;
-    if (!it){
-      s.appendChild(U.make('div','p dim', `<b style="color:#8ea6d8;text-transform:uppercase">${slot}</b>: <i>empty</i>`));
-      continue;
-    }
-    const pa = passiveText(it.passive || it.flag);
-    const line = U.make('div','p dim',
-      `<b style="color:#8ea6d8;text-transform:uppercase">${slot}</b>: ` +
-      `<span style="color:${(Data.RARITY[itemRarity(it)]||Data.RARITY.common).color}">${it.name}</span> ` +
-      `<span style="font-size:10px">${rarityTag(it)}</span> — ${modStr(it.mods)}` +
-      (pa ? `<br><span style="color:#d0a84e">Passive:</span> ${pa}` : ''));
-    s.appendChild(line);
-  }
   if (p.setsActive && p.setsActive.length){
     for (const key of p.setsActive){
       const set = Data.SETS[key];
@@ -3941,7 +4051,6 @@ function showInventory(){
   if (focuses) provParts.push(`Draught of Focus ×${focuses}`);
   if (breads) provParts.push(`Grave-Bread ×${breads}`);
   if (meats) provParts.push(`Strange Meat ×${meats}`);
-  s.appendChild(U.make('div','p dim', provParts.length ? provParts.join(' · ') : '<i>none</i>'));
 
   const row = U.make('div','row');
   if (potions && p.hp < p.maxhp) row.appendChild(Btn('Drink Draught (+26 HP)', ()=>{ usePotion('potion_heal'); hideModal(); }, 'btn good'));
