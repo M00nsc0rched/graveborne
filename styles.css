@@ -454,7 +454,12 @@ body.touch .touch-controls{display:flex}
   #stage{aspect-ratio:auto}
   body:not(.in-combat) #stage{flex:1 1 auto;height:auto;min-height:0}
   body:not(.in-combat) #dock{display:none}
-  body.in-combat #stage{flex:0 0 auto;height:21vh}
+  /* In combat the stage takes exactly the height its 336x208 picture needs at
+     full width. At a fixed vh it was shorter than that, and `object-fit:contain`
+     answered by shrinking the scene until it fit — black bars down both sides
+     and a smaller fight than the space allowed. The cap is only a guard for
+     viewports too short to afford the whole picture. */
+  body.in-combat #stage{flex:0 0 auto;height:auto;aspect-ratio:336/208;max-height:40vh}
 
   /* dock takes the rest; in exploration the log fills it, in combat the skills do */
   #dock{flex:1 1 auto;flex-direction:column;min-height:0;gap:5px}
@@ -462,16 +467,45 @@ body.touch .touch-controls{display:flex}
   /* the event log is the main readout in exploration: let it grow into the
      whole dock (the desktop 120px cap must not apply here) */
   .log{flex:1 1 auto;min-height:120px;max-height:none;font-size:12.5px}
-  body.in-combat .log{flex:0 0 auto;height:56px;min-height:0}
+  /* the combat log scales with the viewport: a fixed 56px was affordable next
+     to a short stage, but the stage is now as tall as its picture and a small
+     phone cannot pay for both */
+  body.in-combat .log{flex:0 0 auto;height:clamp(38px, 6vh, 58px);min-height:0}
   body.in-combat .actions{flex:1 1 auto;min-height:0;overflow-y:auto}
   body.in-combat #actions::-webkit-scrollbar{width:6px}
   body.in-combat #actions::-webkit-scrollbar-thumb{background:var(--edge);border-radius:3px}
+  /* The skills reach the bottom of the screen instead of stacking at the top of
+     a column that was already full-height. They share the slack, so four fat
+     buttons fill it and a long list keeps its floor and scrolls as before.
+     Wrapping flex lines are what let a taller button centre its contents while
+     the label, its cost and its description keep the arrangement they had.
+     The ceiling is for the short lists — an Alchemist carrying two bottles
+     would otherwise get two 200px slabs. */
+  body.in-combat #actions > .btn{
+    flex:1 1 auto;min-height:44px;max-height:120px;
+    display:flex;flex-wrap:wrap;align-items:center;align-content:center;
+  }
+  body.in-combat #actions > .btn .cost{float:none;margin-left:auto}
+  body.in-combat #actions > .btn .sub{width:100%;margin-top:3px}
+  /* a flex line trims the space at the end of a text run, and the skill name
+     ends in one — without this the tier pips butt straight up against it */
+  body.in-combat #actions > .btn .pips{margin-left:5px}
 
   /* compact combat buttons so all four skills fit without scrolling */
   .btn{padding:9px 11px;font-size:12.5px;min-height:40px}
   .btn .sub{font-size:9.5px;margin-top:1px}
-  .target-row{gap:4px;margin-bottom:5px}
+  .target-row{gap:5px;margin-bottom:6px}
   .stage-btn{font-size:13px;padding:8px 12px}
+
+  /* the enemy's readout is the thing you actually fight against — on a phone it
+     was set at desktop sizes and read as a caption */
+  .enemy-panel{top:7px;left:7px;max-width:70%;padding:7px 9px;border-radius:4px}
+  .en-name{font-size:13px}
+  .en-hpbar{height:16px;margin-top:5px}
+  .en-hptxt{font-size:11px}
+  .en-limbs{gap:9px;margin-top:6px}
+  .tbtn{padding:9px 8px;font-size:11.5px;min-width:66px}
+  .tbtn .lhp{font-size:10px;margin-top:2px}
 
   .sheet{padding:14px 12px}
   .title-big{font-size:26px;letter-spacing:5px}
@@ -497,7 +531,10 @@ body.touch .touch-controls{display:flex}
 /* ---------- Short viewports (landscape phones): trim the stage further ---------- */
 @media (max-width:900px) and (max-height:520px){
   #stage{height:38vh}
-  body.in-combat #stage{height:30vh}
+  /* height is the scarce thing here: the stage stays width-stretched and keeps
+     its fixed height, so the portrait rule that sizes it from its picture must
+     not reach in and cap it */
+  body.in-combat #stage{height:30vh;max-height:none}
   .dpad{grid-template-columns:repeat(3,44px);grid-template-rows:repeat(3,44px)}
 }
 
