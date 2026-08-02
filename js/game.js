@@ -1,7 +1,7 @@
 // ================= GRAVEBORNE — main engine =================
 // shown on the title screen; keep in step with CACHE in sw.js — the game is
 // served from that cache, so the number you see is the build you're running
-const GAME_VERSION = 34;
+const GAME_VERSION = 35;
 let VW = 21, VH = 13;                 // viewport in tiles — reshaped to the stage on phones
 const TS = 16;                        // tile size in canvas pixels
 const FINAL_DEPTH = 5;
@@ -705,11 +705,11 @@ function sanctumCost(u, rank){ return Math.round(u.base + u.growth * (rank - 1))
 function sanctumSummary(){
   const S = Save, parts = [];
   const map = [['vigor','HP',6],['whet','ATK',1],['ward','DEF',1],['arcane','MAG',1],['focus','SP',1],['pockets','Gold',15],['oath','Honor',8]];
-  for (const [id,label,per] of map){ const l = S.sanctumLevel(id); if (l) parts.push(`+${per*l} ${label}`); }
-  const prov = S.sanctumLevel('provision'); if (prov) parts.push(`${prov} Draught${prov>1?'s':''}`);
-  const lard = S.sanctumLevel('larder'); if (lard) parts.push(`${lard} Grave-Bread`);
-  const si = S.sanctumLevel('siphon'); if (si) parts.push(`+${20*si}% Souls`);
-  const fa = S.sanctumLevel('favor'); if (fa) parts.push(`−${10*fa}% shop`);
+  for (const [id,label,per] of map){ const l = S.sanctumLevel(id); if (l) parts.push(`+${per*l} ${T(label)}`); }
+  const prov = S.sanctumLevel('provision'); if (prov) parts.push(`${prov} ${T(prov>1?'Draughts':'Draught')}`);
+  const lard = S.sanctumLevel('larder'); if (lard) parts.push(`${lard} ${T('Grave-Bread')}`);
+  const si = S.sanctumLevel('siphon'); if (si) parts.push(`+${20*si}% ${T('Souls')}`);
+  const fa = S.sanctumLevel('favor'); if (fa) parts.push(`−${10*fa}% ${T('shop')}`);
   return parts.join(' · ');
 }
 

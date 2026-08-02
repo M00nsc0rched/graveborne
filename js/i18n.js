@@ -42,6 +42,9 @@ const I18N = (function(){
     'Skills': 'Képességek', 'Recipes known': 'Ismert receptek',
     'Hungry': 'Éhes', 'STARVING': 'ÉHEZIK', 'STARVED': 'KIÉHEZETT',
     'none': 'nincs', 'empty': 'üres', '(free)': '(ingyenes)',
+    // sanctum boon summary fragments (assembled in sanctumSummary)
+    'HP': 'ÉP', 'SP': 'FP', 'ATK': 'TÁM', 'DEF': 'VÉD', 'MAG': 'MÁG', 'Gold': 'arany',
+    'Honor': 'becsület', 'Draught': 'főzet', 'Draughts': 'főzet', 'Souls': 'lélek', 'shop': 'bolt',
     '☰ Menu': '☰ Menü', 'Flee': 'Menekülés',
     'Movement': 'Mozgás',
     'Smooth glides the view a step at a time, with a faint trail behind you — easier on the eyes over a long descent. Instant snaps tile to tile, the old way.':
@@ -406,11 +409,17 @@ const I18N = (function(){
     [/^The wound will not close — (\d+) a turn\.$/, 'A seb nem záródik be — $1 körönként.'],
     // ---- codex screen ----
     [/^Codex of Encounters — (\d+)\/(\d+)$/, 'Találkozások kódexe — $1/$2'],
+    [/^Descend to Depth (\d+)$/, 'Leereszkedés a(z) $1. mélységbe'],
     [/^<i>Undiscovered\. ([\s\S]+)<\/i>$/, '<i>Felfedezetlen. $1</i>'],
     [/^\?\?\? — a mercy$/, '??? — egy irgalom'],
     [/^\?\?\? — a cruelty$/, '??? — egy kegyetlenség'],
     [/^\?\?\? — a mystery$/, '??? — egy rejtély'],
     [/^\?\?\? — unknown$/, '??? — ismeretlen'],
+    // ---- title & character select ----
+    [/^<span style="color:#7fb0d0">◈ (\d+) Souls<\/span> &nbsp;—&nbsp; your stable coin, kept across every death\.$/,
+      '<span style="color:#7fb0d0">◈ $1 lélek</span> &nbsp;—&nbsp; a stabil pénzed, amit minden halál után megtartasz.'],
+    [/^Runs: (\d+) · Deepest: (\d+) · Wins: (\d+) · Codex: (\d+)\/(\d+)$/,
+      'Futamok: $1 · Legmélyebb: $2 · Győzelmek: $3 · Kódex: $4/$5'],
     [/^(.+) is wracked with rot \((\d+)\/turn\)\.$/, '$1 rothadástól gyötrődik ($2/kör).'],
     [/^You (.+) a (.+) at (.+) — (\d+) damage\.$/, '$1 egy $2-t erre: $3 — $4 sebzés.'],
   ];
@@ -428,6 +437,12 @@ const I18N = (function(){
     ['(rises each level):', '(szintenként nő):'],
     ['Souls</span>', 'lélek</span>'],
     ['<i>empty — they have nothing to fall back on</i>', '<i>üres — nincs mire támaszkodniuk</i>'],
+    ['Sanctum boons active:', 'Aktív szentélyáldások:'],
+    [' — tap to inspect and compare', ' — koppints a megtekintéshez és összehasonlításhoz'],
+    [' · passive', ' · passzív'],
+    ['<span style="color:#c05070">Locked.</span> Finish the potion-maker\'s quest — <i>“One drink and the pain goes away.”</i> — to earn this class.',
+     '<span style="color:#c05070">Zárolva.</span> Teljesítsd a főzetkészítő küldetését — <i>„Egy korty, és a fájdalom elmúlik.”</i> — hogy megszerezd ezt a kasztot.'],
+    ['Honor start:', 'Kezdő becsület:'],
     ['<i>none</i>', '<i>nincs</i>'], ['(free)', '(ingyenes)'], [' SP)', ' FP)'],
     ['>weapon</b>', '>fegyver</b>'], ['>armor</b>', '>páncél</b>'], ['>trinket</b>', '>ereklye</b>'],
     ['· borrowed, 40% strength, cannot sharpen', '· kölcsönzött, 40% erő, nem élezhető'],
