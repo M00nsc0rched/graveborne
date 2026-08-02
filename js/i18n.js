@@ -261,6 +261,14 @@ const I18N = (function(){
     'It needs feeding like anything else that walks — and if it dies, that is on you.':
       'Etetni kell, mint bármi mást, ami jár — és ha meghal, az a te lelkeden szárad.',
     'You are stunned and lose your turn!': 'Kábult vagy, elveszíted a köröd!',
+    'You are stunned!': 'Kábult vagy!',
+    'You are afflicted!': 'Megfertőződtél!',
+    'Your strength wanes.': 'Az erőd fogyatkozik.',
+    'You are hunted the harder': 'Annál keményebben hajszolnak',
+    "Cutthroat's Luck: the coin says blood. Every cut you land this fight will keep bleeding.":
+      'A Gégemetsző Szerencséje: az érme vért mond. Minden vágásod ebben a harcban tovább vérzik majd.',
+    "Cutthroat's Luck: the coin says precision. Your critical blows bite deeper this fight.":
+      'A Gégemetsző Szerencséje: az érme pontosságot mond. A kritikus csapásaid mélyebbre harapnak ebben a harcban.',
     'The two turns are spent and it is still standing. The light withdraws, and takes you with it.':
       'A két kör letelt, és még mindig áll. A fény visszahúzódik, és magával visz téged is.',
     'Your focus is spent and there is nothing left to reach for — the assault comes anyway.':
@@ -364,7 +372,7 @@ const I18N = (function(){
       'Egy legenda elesik. +$1 lélek — és az alatta lévő lépcső szabaddá vált.'],
     [/^The Gloamlord's death releases (\d+) Souls\.$/, 'A Gloamlord halála $1 lelket szabadít fel.'],
     [/^The guardian's hoard yields a Draught of Mending\.$/, 'Az őrző kincse egy Gyógyító főzetet ad.'],
-    [/^You equip (.+)\.$/, 'Felszereled: $1.'],
+    [/^You equip (?:the )?(.+)\.$/, 'Felszereled: $1.'],
     [/^You take (.+)\.$/, 'Elveszed: $1.'],
     [/^You eat (.+)\.$/, 'Megeszed: $1.'],
     [/^You drink (.+)\.$/, 'Megiszod: $1.'],
@@ -383,6 +391,21 @@ const I18N = (function(){
     [/^MAG \+(\d+)$/, 'MÁG +$1'],
     [/^SPD \+(\d+)$/, 'GYO +$1'],
     [/^Inventory & Skills {2}◈ Level Up ready$/, 'Készlet és képességek  ◈ Szintlépés kész'],
+    [/^◆ (.+) — Guardian of the Stair$/, '◆ $1 — A Lépcső Őrzője'],
+    // ---- combat lines the sweep found still speaking English ----
+    [/^Poison courses through you — (\d+) HP\.$/, 'Méreg járja át a tested — $1 ÉP.'],
+    [/^You open a vein — (\d+) HP\.$/, 'Eret nyitsz magadon — $1 ÉP.'],
+    [/^(.+) bleeds itself — (\d+) HP\.$/, '$1 megvágja magát — $2 ÉP.'],
+    [/^The focus floods back \(\+(\d+) SP\)\.$/, 'Az összpontosítás visszaárad (+$1 FP).'],
+    [/^You loose (.+) — (\d+) of (\d+) land for (\d+)\.$/, 'Kilövöd: $1 — $3-ből $2 talál, $4 sebzés.'],
+    [/^(.+) looses (.+) — (\d+) of (\d+) land for (\d+)\.$/, '$1 kilövi: $2 — $4-ből $3 talál, $5 sebzés.'],
+    [/^(.+) drains (\d+) HP\.$/, '$1 elszív $2 ÉP-t.'],
+    [/^Oathbound: the dead are your old business\. You open braced — shield (\d+), and your fury already up\.$/,
+      'Esküvel kötve: a holtak a te régi ügyed. Felkészülve kezdesz — pajzs $1, és a dühöd már fent.'],
+    [/^(.+) shrugs off the rot\.$/, '$1 lerázza magáról a rothadást.'],
+    [/^The wound will not close — (\d+) a turn\.$/, 'A seb nem záródik be — $1 körönként.'],
+    [/^(.+) is wracked with rot \((\d+)\/turn\)\.$/, '$1 rothadástól gyötrődik ($2/kör).'],
+    [/^You (.+) a (.+) at (.+) — (\d+) damage\.$/, '$1 egy $2-t erre: $3 — $4 sebzés.'],
   ];
 
   // ---- inline labels inside otherwise-dynamic HTML ----
@@ -427,6 +450,16 @@ const I18N = (function(){
         if (!(k in store)) store[k] = tv;
         target[k] = pv;
       }
+    }
+  }
+  // grow the translation table without clobbering sibling keys already in it
+  function deepMerge(dst, src){
+    for (const k in src){
+      const sv = src[k];
+      if (isPlainObject(sv)){
+        if (!isPlainObject(dst[k])) dst[k] = Array.isArray(sv) ? [] : {};
+        deepMerge(dst[k], sv);
+      } else dst[k] = sv;
     }
   }
   function restore(target, store){
@@ -495,14 +528,13 @@ const I18N = (function(){
       applyData(lang === 'hu');
       return lang;
     },
-    // merge another block of content translations (called by i18n-data.js)
+    // merge another block of content translations (called by the i18n-data files).
+    // Deep, so a later batch can add moves/dialogue to an enemy an earlier batch
+    // already named, instead of replacing it.
     addData(block){
       const wasOn = !!backup;
       if (wasOn) applyData(false);         // lift the old overlay before growing it
-      for (const k in block){
-        if (!DATA_HU[k]) DATA_HU[k] = block[k];
-        else Object.assign(DATA_HU[k], block[k]);
-      }
+      deepMerge(DATA_HU, block);
       if (wasOn) applyData(true);
     },
     addUI(block){ Object.assign(UI_HU, block); },
