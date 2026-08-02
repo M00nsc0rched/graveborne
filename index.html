@@ -45,7 +45,7 @@
       <div class="pills">
         <span class="pill gold">✦ <span id="gold-txt">0</span></span>
         <span class="pill souls">◈ <span id="souls-txt">0</span></span>
-        <span class="pill depth">DEPTH <span id="depth-txt">1</span></span>
+        <span class="pill depth"><span class="lbl-depth">DEPTH</span> <span id="depth-txt">1</span></span>
       </div>
     </div>
   </div>
@@ -87,6 +87,9 @@
 <script src="js/save.js"></script>
 <script src="js/sprites.js"></script>
 <script src="js/data.js"></script>
+<!-- localisation loads after data.js (it writes onto those tables) and before game.js -->
+<script src="js/i18n.js"></script>
+<script src="js/i18n-data.js"></script>
 <script src="js/dungeon.js"></script>
 <script src="js/game.js"></script>
 <script>
