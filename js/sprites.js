@@ -1050,13 +1050,30 @@ const Sprites = {
     }
     if (alpha !== 1) ctx.globalAlpha = 1;
   },
+  // ---- mixed resolutions ----
+  // Sprites are being redrawn from 12x12 to 24x24 a batch at a time. Callers ask
+  // for the size they want on screen and get an integer scale either way, so an
+  // old sprite and a new one occupy exactly the same box and neither is blurred.
+  nativeSize(name){
+    const s = SPR[name];
+    if (!s) return 12;
+    let w = 0; for (const row of s) if (row.length > w) w = row.length;
+    return Math.max(w, s.length);
+  },
+  // draw so the sprite fills targetPx, snapping to a whole-pixel scale
+  drawFit(ctx, name, px, py, targetPx, opts){
+    const n = this.nativeSize(name);
+    const scale = Math.max(1, Math.round(targetPx / n));
+    this.draw(ctx, name, px, py, scale, opts);
+    return n * scale;
+  },
   // render a sprite centered onto a small canvas (used for cards/art)
   toCanvas(canvas, name, scale, opts){
     const ctx = canvas.getContext('2d');
     ctx.imageSmoothingEnabled = false;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    const s = SPR[name];
-    const w = 12 * scale, h = 12 * scale;
+    const n = this.nativeSize(name);
+    const w = n * scale, h = n * scale;
     const ox = Math.floor((canvas.width - w) / 2);
     const oy = Math.floor((canvas.height - h) / 2);
     this.draw(ctx, name, ox, oy, scale, opts);

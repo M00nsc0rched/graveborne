@@ -1,9 +1,18 @@
 // ================= GRAVEBORNE — main engine =================
 // shown on the title screen; keep in step with CACHE in sw.js — the game is
 // served from that cache, so the number you see is the build you're running
-const GAME_VERSION = 37;
+const GAME_VERSION = 38;
 let VW = 21, VH = 13;                 // viewport in tiles — reshaped to the stage on phones
-const TS = 16;                        // tile size in canvas pixels
+const TS = 32;                        // tile size in canvas pixels
+const TU = TS / 16;                   // old design unit -> new, for art not yet re-authored
+const SPRITE_PX = 24;                 // how much of a tile a creature fills
+const SPRITE_OFF = (TS - SPRITE_PX) >> 1;
+// deterministic per-tile noise, so stonework varies but never flickers
+function tileHash(x, y, salt){
+  let h = (x * 374761393 + y * 668265263 + (salt || 0) * 2147483647) | 0;
+  h = (h ^ (h >>> 13)) * 1274126177 | 0;
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}
 const FINAL_DEPTH = 5;
 
 // ---- Movement animation: the step used to teleport a whole tile every keypress,
@@ -2155,7 +2164,7 @@ function fitViewport(){
   // combat scenes are composed for the fixed 336x208 frame; desktop already fits
   if (G.state === 'COMBAT' || window.innerWidth > 700 || cw < 40 || ch < 40){
     if (VW !== 21 || VH !== 13){
-      VW = 21; VH = 13; canvas.width = 336; canvas.height = 208; ctx.imageSmoothingEnabled = false;
+      VW = 21; VH = 13; canvas.width = 21*TS; canvas.height = 13*TS; ctx.imageSmoothingEnabled = false;
     }
     return;
   }
@@ -2219,76 +2228,148 @@ function updateEnemyPanel(){
   }
 }
 
+// Tiles are authored for the 32px grid rather than scaled up from the old 16px
+// art, so the extra room buys real detail: masonry in three courses with each
+// stone shaded on its own, bevelled flagstones, grain in the doors.
 function drawTile(t, sx, sy, x, y){
   const pal = curBiome().pal;
+
   if (t === TILE.WALL){
-    // coursed stone: a lit cap on top, a brick face, a shadowed base
     ctx.fillStyle = pal.wallFace; ctx.fillRect(sx, sy, TS, TS);
-    ctx.fillStyle = pal.wallTop;  ctx.fillRect(sx, sy, TS, 4);
-    ctx.fillStyle = 'rgba(255,255,255,0.05)'; ctx.fillRect(sx, sy, TS, 1);       // catch-light on the cap
-    // mortar: a horizontal course and staggered vertical joints, so it reads as brick
-    ctx.fillStyle = pal.wallDark;
-    ctx.fillRect(sx, sy+9, TS, 1);
-    const stag = (y % 2) ? 0 : 8;
-    ctx.fillRect(sx + 4 + stag, sy+4, 1, 5);
-    ctx.fillRect(sx + (stag ? 4 : 12), sy+10, 1, 4);
-    // deep base shadow and hard block edges give the wall its thickness
-    ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fillRect(sx, sy+TS-2, TS, 2);
-    ctx.fillStyle = '#0a0a0f'; ctx.fillRect(sx, sy, 1, TS); ctx.fillRect(sx+TS-1, sy, 1, TS);
+    // three courses, each offset from the one above so the joints never line up
+    const COURSE = [0, 11, 22], H = [11, 11, 10];
+    for (let c = 0; c < 3; c++){
+      const top = sy + COURSE[c], h = H[c];
+      const stag = ((y * 3 + c) % 2) ? 0 : 16;
+      // each stone in the course gets its own tone, which is what reads as masonry
+      for (let sxi = -16; sxi < TS; sxi += 16){
+        const bx = sx + sxi + stag, bw = 16;
+        const n = tileHash(x * 4 + ((sxi + stag) >> 4), y * 4 + c, 1);
+        // biased dark: the stones vary, but the wall stays the deep tone the
+        // palette asks for rather than creeping toward grey as highlights stack
+        ctx.fillStyle = `rgba(${n > 0.72 ? '255,255,255' : '0,0,0'},${(0.03 + n * 0.10).toFixed(3)})`;
+        const cx0 = Math.max(sx, bx), cx1 = Math.min(sx + TS, bx + bw);
+        if (cx1 > cx0) ctx.fillRect(cx0, top, cx1 - cx0, h);
+        // a lit top edge and a shadowed foot give each stone its thickness
+        if (cx1 > cx0){
+          ctx.fillStyle = 'rgba(255,255,255,0.028)'; ctx.fillRect(cx0, top, cx1 - cx0, 1);
+          ctx.fillStyle = 'rgba(0,0,0,0.42)'; ctx.fillRect(cx0, top + h - 2, cx1 - cx0, 2);
+        }
+        // the vertical joint between stones
+        if (bx > sx && bx < sx + TS){
+          ctx.fillStyle = pal.wallDark; ctx.fillRect(bx - 1, top, 2, h);
+          ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(bx - 1, top, 1, h);
+        }
+      }
+      ctx.fillStyle = pal.wallDark; ctx.fillRect(sx, top + h - 1, TS, 1);   // the course line
+    }
+    // the lit cap along the top of the whole wall
+    ctx.fillStyle = pal.wallTop; ctx.fillRect(sx, sy, TS, 5);
+    ctx.fillStyle = 'rgba(255,255,255,0.05)'; ctx.fillRect(sx, sy, TS, 1);
+    ctx.fillStyle = 'rgba(0,0,0,0.34)'; ctx.fillRect(sx, sy + 5, TS, 2);
+    // wear: a chipped corner or a hairline crack on some stones
+    const w = tileHash(x, y, 7);
+    if (w > 0.86){
+      ctx.fillStyle = 'rgba(0,0,0,0.35)';
+      const cx = sx + 6 + Math.floor(w * 14), cy = sy + 12;
+      ctx.fillRect(cx, cy, 2, 7); ctx.fillRect(cx + 1, cy + 7, 2, 6);
+    } else if (w < 0.09){
+      ctx.fillStyle = 'rgba(0,0,0,0.30)';
+      ctx.fillRect(sx + 2, sy + TS - 9, 5, 4);
+    }
+    ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(sx, sy + TS - 3, TS, 3);
+    ctx.fillStyle = '#0a0a0f'; ctx.fillRect(sx, sy, 1, TS); ctx.fillRect(sx + TS - 1, sy, 1, TS);
+
   } else if (t === TILE.DOOR){
-    // floor underfoot, then a stone frame and a wooden leaf standing ajar
     const alt = (x + y) % 2 === 0;
     ctx.fillStyle = alt ? pal.floorA : pal.floorB; ctx.fillRect(sx, sy, TS, TS);
-    ctx.fillStyle = pal.wallTop;  ctx.fillRect(sx, sy, 2, TS); ctx.fillRect(sx+TS-2, sy, 2, TS);   // jambs
-    ctx.fillStyle = pal.wallFace; ctx.fillRect(sx+2, sy, TS-4, 3);                                  // lintel
-    ctx.fillStyle = '#3a2a18'; ctx.fillRect(sx+3, sy+3, TS-6, TS-4);                                // leaf
-    ctx.fillStyle = '#241a10'; ctx.fillRect(sx+7, sy+3, 1, TS-4);                                   // plank seam
-    ctx.fillStyle = '#5a4020'; ctx.fillRect(sx+3, sy+7, TS-6, 1);                                   // iron band
-    ctx.fillStyle = '#c9a24a'; ctx.fillRect(sx+TS-6, sy+8, 1, 2);                                   // handle
+    ctx.fillStyle = pal.wallTop;  ctx.fillRect(sx, sy, 4, TS); ctx.fillRect(sx + TS - 4, sy, 4, TS);
+    ctx.fillStyle = 'rgba(255,255,255,0.05)'; ctx.fillRect(sx, sy, 1, TS); ctx.fillRect(sx + TS - 4, sy, 1, TS);
+    ctx.fillStyle = pal.wallFace; ctx.fillRect(sx + 4, sy, TS - 8, 6);
+    ctx.fillStyle = '#3a2a18'; ctx.fillRect(sx + 5, sy + 6, TS - 10, TS - 8);
+    // planks with grain, so the leaf is not a flat brown slab
+    for (let i = 0; i < 3; i++){
+      const px = sx + 5 + i * 7;
+      ctx.fillStyle = '#241a10'; ctx.fillRect(px + 6, sy + 6, 1, TS - 8);
+      ctx.fillStyle = 'rgba(255,255,255,0.03)'; ctx.fillRect(px + 1, sy + 8, 1, TS - 12);
+    }
+    ctx.fillStyle = '#5a4020'; ctx.fillRect(sx + 5, sy + 11, TS - 10, 3); ctx.fillRect(sx + 5, sy + 22, TS - 10, 3);
+    ctx.fillStyle = '#7a5a30';                                        // rivets on the bands
+    for (const bx of [sx + 7, sx + TS - 10]){ ctx.fillRect(bx, sy + 12, 2, 2); ctx.fillRect(bx, sy + 23, 2, 2); }
+    ctx.fillStyle = '#c9a24a'; ctx.fillRect(sx + TS - 12, sy + 16, 3, 3);
+    ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fillRect(sx + 5, sy + TS - 3, TS - 10, 2);
+
   } else if (t === TILE.HAZARD){
     const hz = curBiome().hazard;
     ctx.fillStyle = pal.floorB; ctx.fillRect(sx, sy, TS, TS);
-    ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(sx, sy, TS, 1); ctx.fillRect(sx, sy, 1, TS);
-    // pulsing biome-colored scatter so danger reads at a glance
+    ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(sx, sy, TS, 2); ctx.fillRect(sx, sy, 2, TS);
     const pulse = 0.55 + 0.45 * Math.sin(G.time / 320 + x * 7 + y * 13);
     ctx.globalAlpha = pulse;
-    ctx.fillStyle = hz.color;
-    const s1 = (x*31 + y*17) % 9, s2 = (x*13 + y*29) % 7;
-    ctx.fillRect(sx + 3 + s1 % 5, sy + 4 + s2 % 4, 3, 3);
-    ctx.fillRect(sx + 9 - (s2 % 3), sy + 9 + (s1 % 3), 2, 2);
+    // more scatter than the old tile could hold, in two tones and two sizes
+    for (let i = 0; i < 7; i++){
+      const n1 = tileHash(x, y, 20 + i), n2 = tileHash(x, y, 40 + i);
+      ctx.fillStyle = i % 2 ? hz.accent : hz.color;
+      const sz = n1 > 0.6 ? 4 : 3;
+      ctx.fillRect(sx + 3 + Math.floor(n1 * (TS - 9)), sy + 3 + Math.floor(n2 * (TS - 9)), sz, sz);
+    }
+    ctx.globalAlpha = pulse * 0.5;
     ctx.fillStyle = hz.accent;
-    ctx.fillRect(sx + 5 + (s2 % 4), sy + 3 + (s1 % 5), 2, 2);
-    ctx.fillRect(sx + 11 - (s1 % 4), sy + 11 - (s2 % 4), 2, 2);
+    for (let i = 0; i < 5; i++){
+      const n1 = tileHash(x, y, 60 + i), n2 = tileHash(x, y, 80 + i);
+      ctx.fillRect(sx + 2 + Math.floor(n1 * (TS - 5)), sy + 2 + Math.floor(n2 * (TS - 5)), 2, 2);
+    }
     ctx.globalAlpha = 1;
+
   } else {
+    // ---- flagstone floor ----
     const alt = (x + y) % 2 === 0;
     ctx.fillStyle = alt ? pal.floorA : pal.floorB; ctx.fillRect(sx, sy, TS, TS);
-    ctx.fillStyle = 'rgba(0,0,0,0.22)'; ctx.fillRect(sx, sy, TS, 1); ctx.fillRect(sx, sy, 1, TS);
-    // cobble edging where floor meets wall — lines the one-wide corridors and
-    // frames the rooms, without needing to know which is which
+    // each slab gets its own tone and a bevel: lit along the top-left, sunk at
+    // the bottom-right, which is what makes a floor read as laid rather than painted
+    const tone = tileHash(x, y, 3);
+    ctx.fillStyle = `rgba(${tone > 0.5 ? '255,255,255' : '0,0,0'},${(0.015 + tone * 0.035).toFixed(3)})`;
+    ctx.fillRect(sx + 2, sy + 2, TS - 4, TS - 4);
+    ctx.fillStyle = 'rgba(255,255,255,0.04)'; ctx.fillRect(sx + 2, sy + 2, TS - 4, 1); ctx.fillRect(sx + 2, sy + 2, 1, TS - 4);
+    ctx.fillStyle = 'rgba(0,0,0,0.26)';       ctx.fillRect(sx + 2, sy + TS - 3, TS - 4, 1); ctx.fillRect(sx + TS - 3, sy + 2, 1, TS - 4);
+    ctx.fillStyle = 'rgba(0,0,0,0.24)';       ctx.fillRect(sx, sy, TS, 2); ctx.fillRect(sx, sy, 2, TS);
+
     const f = G.floor;
     if (f){
       const wN = f.tileAt(x,y-1)===TILE.WALL, wS = f.tileAt(x,y+1)===TILE.WALL,
             wW = f.tileAt(x-1,y)===TILE.WALL, wE = f.tileAt(x+1,y)===TILE.WALL;
       if (wN || wS || wW || wE){
-        ctx.fillStyle = 'rgba(0,0,0,0.30)';
-        if (wN) ctx.fillRect(sx, sy, TS, 2);
-        if (wW) ctx.fillRect(sx, sy, 2, TS);
-        if (wS) ctx.fillRect(sx, sy+TS-2, TS, 2);
-        if (wE) ctx.fillRect(sx+TS-2, sy, 2, TS);
-        ctx.fillStyle = 'rgba(255,255,255,0.05)';           // a faint cobble highlight just inside the shadow
-        if (wN) ctx.fillRect(sx, sy+2, TS, 1);
-        if (wW) ctx.fillRect(sx+2, sy, 1, TS);
-        if (wS) ctx.fillRect(sx, sy+TS-3, TS, 1);
-        if (wE) ctx.fillRect(sx+TS-3, sy, 1, TS);
+        // a cobbled verge where the floor meets stone, laid as small blocks
+        ctx.fillStyle = 'rgba(0,0,0,0.32)';
+        if (wN) ctx.fillRect(sx, sy, TS, 4);
+        if (wW) ctx.fillRect(sx, sy, 4, TS);
+        if (wS) ctx.fillRect(sx, sy + TS - 4, TS, 4);
+        if (wE) ctx.fillRect(sx + TS - 4, sy, 4, TS);
+        ctx.fillStyle = 'rgba(255,255,255,0.05)';
+        for (let i = 0; i < TS; i += 6){
+          if (wN) ctx.fillRect(sx + i, sy + 4, 4, 1);
+          if (wS) ctx.fillRect(sx + i, sy + TS - 5, 4, 1);
+          if (wW) ctx.fillRect(sx + 4, sy + i, 1, 4);
+          if (wE) ctx.fillRect(sx + TS - 5, sy + i, 1, 4);
+        }
       }
     }
-    // deterministic detail: biome speckle, and the occasional cracked flagstone
-    const seed = (x*928371 + y*1237) % 97;
-    if (seed < 7){ ctx.fillStyle = pal.speck; ctx.fillRect(sx + (seed%TS), sy + ((seed*3)%TS), 2, 2); }
-    else if (seed > 91){
-      ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.moveTo(sx+3, sy+3); ctx.lineTo(sx+7, sy+8); ctx.lineTo(sx+6, sy+13); ctx.stroke();
+    // scattered grit, cracked slabs, and the odd damp patch
+    const seed = tileHash(x, y, 11);
+    if (seed < 0.10){
+      ctx.fillStyle = pal.speck;
+      for (let i = 0; i < 3; i++){
+        const a = tileHash(x, y, 100 + i), b = tileHash(x, y, 120 + i);
+        ctx.fillRect(sx + 4 + Math.floor(a * (TS - 10)), sy + 4 + Math.floor(b * (TS - 10)), 2, 2);
+      }
+    } else if (seed > 0.93){
+      ctx.strokeStyle = 'rgba(0,0,0,0.38)'; ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(sx + 7, sy + 6); ctx.lineTo(sx + 15, sy + 17); ctx.lineTo(sx + 12, sy + 27);
+      ctx.stroke();
+    } else if (seed > 0.86){
+      ctx.fillStyle = 'rgba(0,0,0,0.14)';
+      ctx.fillRect(sx + 8, sy + 10, 13, 9);
+      ctx.fillRect(sx + 11, sy + 8, 7, 3);
     }
   }
 }
@@ -2305,15 +2386,15 @@ function ensureFloorMeta(f){
 // a double frame with corner keys, echoing the fret borders of a ritual floor
 function drawSanctumFret(f, SX, SY){
   const r = f._sanctum; if (!r) return;
-  const x0 = SX(r.x) + 3,          y0 = SY(r.y) + 3;
-  const x1 = SX(r.x + r.w) - 3,    y1 = SY(r.y + r.h) - 3;
-  ctx.strokeStyle = 'rgba(208,168,78,0.20)'; ctx.lineWidth = 1;
+  const x0 = SX(r.x) + 3*TU,        y0 = SY(r.y) + 3*TU;
+  const x1 = SX(r.x + r.w) - 3*TU,  y1 = SY(r.y + r.h) - 3*TU;
+  ctx.strokeStyle = 'rgba(208,168,78,0.20)'; ctx.lineWidth = TU;
   ctx.strokeRect(x0, y0, x1-x0, y1-y0);
-  ctx.strokeRect(x0+3, y0+3, x1-x0-6, y1-y0-6);
+  ctx.strokeRect(x0+3*TU, y0+3*TU, x1-x0-6*TU, y1-y0-6*TU);
   // little inward keys at the corners
   for (const [cx,cy,dx,dy] of [[x0,y0,1,1],[x1,y0,-1,1],[x0,y1,1,-1],[x1,y1,-1,-1]]){
     ctx.beginPath();
-    ctx.moveTo(cx+dx*7, cy+dy*3); ctx.lineTo(cx+dx*7, cy+dy*7); ctx.lineTo(cx+dx*3, cy+dy*7);
+    ctx.moveTo(cx+dx*7*TU, cy+dy*3*TU); ctx.lineTo(cx+dx*7*TU, cy+dy*7*TU); ctx.lineTo(cx+dx*3*TU, cy+dy*7*TU);
     ctx.stroke();
   }
 }
@@ -2363,7 +2444,7 @@ function renderExplore(){
   for (const e of f.entities){
     if (!(e.type === 'prop' && e.ritual)) continue;
     const i = f.idx(e.x, e.y); if (!f.explored[i]) continue;
-    drawRitual(SX(e.x)+8, SY(e.y)+8, f.visible[i]);
+    drawRitual(SX(e.x)+TS/2, SY(e.y)+TS/2, f.visible[i]);
   }
   // static entities (remembered) + dynamic (visible only)
   for (const e of f.entities){
@@ -2371,28 +2452,28 @@ function renderExplore(){
     const vis = f.visible[i], seen = f.explored[i];
     const sx = SX(e.x), sy = SY(e.y);
     if (sx < -TS || sy < -TS || sx > canvas.width || sy > canvas.height) continue;
-    if (e.type === 'enemy'){ if (!vis) continue; Sprites.draw(ctx, Data.ENEMIES[e.enemyId].sprite, sx+2, sy+2, 1);
-      if (e.elite){ ctx.fillStyle='#d0a84e'; ctx.fillRect(sx+5,sy,1,2); ctx.fillRect(sx+7,sy-1,2,3); ctx.fillRect(sx+10,sy,1,2); } }
-    else if (e.type === 'guardian'){ if (!seen) continue; Sprites.draw(ctx, Data.ENEMIES[e.enemyId].sprite, sx+2, sy+2, 1);
+    if (e.type === 'enemy'){ if (!vis) continue; Sprites.drawFit(ctx, Data.ENEMIES[e.enemyId].sprite, sx+SPRITE_OFF, sy+SPRITE_OFF, SPRITE_PX);
+      if (e.elite){ ctx.fillStyle='#d0a84e'; ctx.fillRect(sx+10,sy+1,2,4); ctx.fillRect(sx+14,sy-2,4,6); ctx.fillRect(sx+20,sy+1,2,4); } }
+    else if (e.type === 'guardian'){ if (!seen) continue; Sprites.drawFit(ctx, Data.ENEMIES[e.enemyId].sprite, sx+SPRITE_OFF, sy+SPRITE_OFF, SPRITE_PX);
       const gp = 0.6+0.4*Math.sin(G.time/250);
       ctx.globalAlpha = gp; ctx.fillStyle='#ffcf5a';
-      ctx.fillRect(sx+7,sy-2,2,2); ctx.fillRect(sx+6,sy-1,1,1); ctx.fillRect(sx+9,sy-1,1,1);
+      ctx.fillRect(sx+14,sy-4,4,4); ctx.fillRect(sx+12,sy-2,2,2); ctx.fillRect(sx+18,sy-2,2,2);
       ctx.globalAlpha = 1; }
     else if (e.type === 'event'){ if (!seen) continue;
       const ic = Data.EVENT_ICONS[e.eventId] || { g:'!', c:'#c8a24a' };
       drawMarker(sx, sy, ic.g, ic.c); }
-    else if (e.type === 'chest'){ if (!seen) continue; Sprites.draw(ctx, 'obj_chest', sx+2, sy+2, 1); }
-    else if (e.type === 'npc'){ if (!seen) continue; Sprites.draw(ctx, 'npc_alchemist', sx+2, sy+2, 1);
+    else if (e.type === 'chest'){ if (!seen) continue; Sprites.drawFit(ctx, 'obj_chest', sx+SPRITE_OFF, sy+SPRITE_OFF, SPRITE_PX); }
+    else if (e.type === 'npc'){ if (!seen) continue; Sprites.drawFit(ctx, 'npc_alchemist', sx+SPRITE_OFF, sy+SPRITE_OFF, SPRITE_PX);
       // a quest glyph floats over the potion-maker: ? to offer, … while you gather
       if (e.quest && e.quest.stage !== 'done'){
         const g = e.quest.stage === 'active' ? '…' : '?';
-        drawMarker(sx, sy-7, g, e.quest.stage === 'active' ? '#7fae3a' : '#c8a24a'); } }
+        drawMarker(sx, sy-14, g, e.quest.stage === 'active' ? '#7fae3a' : '#c8a24a'); } }
     else if (e.type === 'plant'){ if (!seen) continue;
-      const bob = Math.sin(G.time/260 + e.x*2) > 0.4 ? 1 : 0;
-      Sprites.draw(ctx, 'obj_herb', sx+2, sy+2 - bob, 1); }
-    else if (e.type === 'stairs'){ if (!seen) continue; Sprites.draw(ctx, 'obj_stairs', sx+2, sy+2, 1); }
-    else if (e.type === 'prop'){ if (!seen) continue; Sprites.draw(ctx, e.sprite, sx+2, sy+2, 1); }
-    else if (e.type === 'torch'){ if (!vis) continue; const fl = Math.sin(G.time/120 + e.x)*0.5+0.5; Sprites.draw(ctx, 'obj_torch', sx+2, sy+2 - (fl>0.6?1:0), 1); }
+      const bob = Math.sin(G.time/260 + e.x*2) > 0.4 ? 2 : 0;
+      Sprites.drawFit(ctx, 'obj_herb', sx+SPRITE_OFF, sy+SPRITE_OFF - bob, SPRITE_PX); }
+    else if (e.type === 'stairs'){ if (!seen) continue; Sprites.drawFit(ctx, 'obj_stairs', sx+SPRITE_OFF, sy+SPRITE_OFF, SPRITE_PX); }
+    else if (e.type === 'prop'){ if (!seen) continue; Sprites.drawFit(ctx, e.sprite, sx+SPRITE_OFF, sy+SPRITE_OFF, SPRITE_PX); }
+    else if (e.type === 'torch'){ if (!vis) continue; const fl = Math.sin(G.time/120 + e.x)*0.5+0.5; Sprites.drawFit(ctx, 'obj_torch', sx+SPRITE_OFF, sy+SPRITE_OFF - (fl>0.6?2:0), SPRITE_PX); }
   }
   // player — while a slide runs, a couple of fading afterimages trail behind the
   // step, the "motion blur" that reads the movement without smearing the pixels
@@ -2403,11 +2484,11 @@ function renderExplore(){
     for (const [back, a] of [[0.34, 0.22], [0.62, 0.11]]){
       const t = Math.max(0, slideEase(k) - back);
       ctx.globalAlpha = a * fade;
-      Sprites.draw(ctx, p.sprite, SX(s.fromX + dx*t)+2, SY(s.fromY + dy*t)+2, 1);
+      Sprites.drawFit(ctx, p.sprite, SX(s.fromX + dx*t)+SPRITE_OFF, SY(s.fromY + dy*t)+SPRITE_OFF, SPRITE_PX);
     }
     ctx.globalAlpha = 1;
   }
-  Sprites.draw(ctx, p.sprite, SX(p.rx)+2, SY(p.ry)+2, 1);
+  Sprites.drawFit(ctx, p.sprite, SX(p.rx)+SPRITE_OFF, SY(p.ry)+SPRITE_OFF, SPRITE_PX);
 
   // fog: darken explored-not-visible
   for (let vy = 0; vy <= VH; vy++){
@@ -2421,44 +2502,47 @@ function renderExplore(){
   // torch + player light (colors follow the biome)
   const pal = curBiome().pal;
   ctx.globalCompositeOperation = 'lighter';
-  radial(SX(p.rx)+8, SY(p.ry)+8, 70, `rgba(${pal.ambient},0.30)`);
+  radial(SX(p.rx)+TS/2, SY(p.ry)+TS/2, 70*TU, `rgba(${pal.ambient},0.30)`);
   for (const e of f.entities){ if (e.type==='torch' && f.visible[f.idx(e.x,e.y)]){
     const fl = Math.sin(G.time/120 + e.x)*0.2+0.8;
-    radial(SX(e.x)+8, SY(e.y)+8, 46, `rgba(${pal.torch},${0.28*fl})`); } }
+    radial(SX(e.x)+TS/2, SY(e.y)+TS/2, 46*TU, `rgba(${pal.torch},${0.28*fl})`); } }
   // the sanctum's shard casts its own cold arcane glow
   for (const e of f.entities){ if (e.type==='prop' && e.ritual && f.visible[f.idx(e.x,e.y)]){
     const fl = Math.sin(G.time/300)*0.15+0.85;
-    radial(SX(e.x)+8, SY(e.y)+8, 52, `rgba(154,92,192,${0.22*fl})`); } }
+    radial(SX(e.x)+TS/2, SY(e.y)+TS/2, 52*TU, `rgba(154,92,192,${0.22*fl})`); } }
   // a quest herb glows faintly so a needed sprig can be spotted across a lit room
   for (const e of f.entities){ if (e.type==='plant' && f.visible[f.idx(e.x,e.y)]){
     const fl = Math.sin(G.time/220 + e.x)*0.2+0.8;
-    radial(SX(e.x)+8, SY(e.y)+8, 26, `rgba(120,200,120,${0.26*fl})`); } }
+    radial(SX(e.x)+TS/2, SY(e.y)+TS/2, 26*TU, `rgba(120,200,120,${0.26*fl})`); } }
   ctx.globalCompositeOperation = 'source-over';
   vignette();
 }
 
 function drawMarker(sx, sy, chr, color){
   // a dark disc so the glyph reads against any floor, then the sign itself
+  const cx = sx + TS/2, cy = sy + TS/2, r = 7 * TU;
   ctx.fillStyle = 'rgba(8,6,14,0.85)';
-  ctx.beginPath(); ctx.arc(sx+8, sy+8, 7, 0, 7); ctx.fill();
-  ctx.strokeStyle = color; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.arc(sx+8, sy+8, 7, 0, 7); ctx.stroke();
-  ctx.fillStyle = color; ctx.font = 'bold 11px monospace';
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7); ctx.fill();
+  ctx.strokeStyle = color; ctx.lineWidth = TU;
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7); ctx.stroke();
+  // a second, fainter ring — room the 16px tile never had
+  ctx.globalAlpha = 0.35; ctx.beginPath(); ctx.arc(cx, cy, r + 3 * TU, 0, 7); ctx.stroke(); ctx.globalAlpha = 1;
+  ctx.fillStyle = color; ctx.font = `bold ${Math.round(11 * TU)}px monospace`;
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText(chr, sx+8, sy+9);
+  ctx.fillText(chr, cx, cy + TU);
 }
 // a ritual sigil on the sanctum floor: two rings and a slowly turning rune band
 function drawRitual(cx, cy, bright){
   const a = bright ? 0.8 : 0.35;
-  ctx.strokeStyle = `rgba(154,92,192,${a})`; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.arc(cx, cy, 21, 0, 7); ctx.stroke();
-  ctx.beginPath(); ctx.arc(cx, cy, 14, 0, 7); ctx.stroke();
+  ctx.strokeStyle = `rgba(154,92,192,${a})`; ctx.lineWidth = TU;
+  ctx.beginPath(); ctx.arc(cx, cy, 21*TU, 0, 7); ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx, cy, 14*TU, 0, 7); ctx.stroke();
   ctx.strokeStyle = `rgba(208,168,78,${a})`;
   for (let i = 0; i < 8; i++){
     const ang = i/8 * Math.PI*2 + G.time/2600;
     ctx.beginPath();
-    ctx.moveTo(cx + Math.cos(ang)*21, cy + Math.sin(ang)*21);
-    ctx.lineTo(cx + Math.cos(ang)*25, cy + Math.sin(ang)*25);
+    ctx.moveTo(cx + Math.cos(ang)*21*TU, cy + Math.sin(ang)*21*TU);
+    ctx.lineTo(cx + Math.cos(ang)*25*TU, cy + Math.sin(ang)*25*TU);
     ctx.stroke();
   }
 }
@@ -2467,14 +2551,23 @@ function radial(cx, cy, r, color){
   g.addColorStop(0,color); g.addColorStop(1,'rgba(0,0,0,0)');
   ctx.fillStyle=g; ctx.beginPath(); ctx.arc(cx,cy,r,0,7); ctx.fill();
 }
-function vignette(){
-  const g = ctx.createRadialGradient(canvas.width/2,canvas.height/2,60,canvas.width/2,canvas.height/2,200);
+function vignette(){ vignetteIn(canvas.width, canvas.height); }
+// takes its size explicitly, so the combat scene can vignette its design space
+// rather than the doubled canvas it is being scaled onto
+function vignetteIn(w, h){
+  const inner = 60 * (w / 336), outer = 200 * (w / 336);
+  const g = ctx.createRadialGradient(w/2, h/2, inner, w/2, h/2, outer);
   g.addColorStop(0,'rgba(0,0,0,0)'); g.addColorStop(1,'rgba(0,0,0,0.55)');
-  ctx.fillStyle=g; ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle=g; ctx.fillRect(0,0,w,h);
 }
 
 function renderCombat(){
   const en = G.combat.enemy, p = G.player;
+  // The scene is composed in the original 336x208 space and drawn onto the
+  // doubled canvas through a scale, so every coordinate below still reads in
+  // design units while the text and the curves gain real resolution.
+  ctx.save(); ctx.scale(TU, TU);
+  const canvas = { width: ctxCanvasW(), height: ctxCanvasH() };
   // backdrop
   const grd = ctx.createLinearGradient(0,0,0,canvas.height);
   grd.addColorStop(0,'#140d1e'); grd.addColorStop(1,'#080610');
@@ -2492,15 +2585,19 @@ function renderCombat(){
   // its name / HP / limbs / statuses are drawn crisply in the DOM enemy panel.
   const es = (en.boss || en.elite || en.guardian) ? 7 : 6;
   const ex = Math.round(canvas.width*0.60), ey = 34;
-  Sprites.draw(ctx, en.sprite, ex, ey, es);
+  Sprites.drawFit(ctx, en.sprite, ex, ey, 12*es);
 
   // player sprite (left/lower)
-  Sprites.draw(ctx, p.sprite, 40, canvas.height-84, 5);
+  Sprites.drawFit(ctx, p.sprite, 40, canvas.height-84, 60);
   drawStatusIcons(p, 40, canvas.height-20);
   if (p.shield>0){ ctx.fillStyle='#8ab0e0'; ctx.font='8px monospace'; ctx.fillText(`⛊${p.shield}`, 92, canvas.height-70); }
 
-  vignette();
+  vignetteIn(canvas.width, canvas.height);
+  ctx.restore();
 }
+// the combat scene's design-space size (the real canvas divided by the scale)
+function ctxCanvasW(){ return U.el('game').width / TU; }
+function ctxCanvasH(){ return U.el('game').height / TU; }
 function bar(x,y,w,h,frac,c1,c2){
   ctx.fillStyle='#000'; ctx.fillRect(x-1,y-1,w+2,h+2);
   ctx.fillStyle='#1a1526'; ctx.fillRect(x,y,w,h);
