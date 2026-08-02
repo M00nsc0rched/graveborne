@@ -1,7 +1,7 @@
 // ================= GRAVEBORNE — main engine =================
 // shown on the title screen; keep in step with CACHE in sw.js — the game is
 // served from that cache, so the number you see is the build you're running
-const GAME_VERSION = 38;
+const GAME_VERSION = 39;
 let VW = 21, VH = 13;                 // viewport in tiles — reshaped to the stage on phones
 const TS = 32;                        // tile size in canvas pixels
 const TU = TS / 16;                   // old design unit -> new, for art not yet re-authored
@@ -2902,7 +2902,10 @@ function paintCardArt(cv, c){
   const rg = ctx.createRadialGradient(W/2, H*0.62, 2, W/2, H*0.62, W*0.5);
   rg.addColorStop(0, 'rgba(208,168,78,0.13)'); rg.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = rg; ctx.fillRect(0, 0, W, H);
-  Sprites.draw(ctx, c.sprite, Math.round(W/2 - 24), Math.round(H*0.62 - 44), 4);
+  // 48px suits both resolutions exactly (12x4 and 24x2), so a redrawn class and
+  // one still on the old art stand the same height on their cards
+  const art = 48;
+  Sprites.drawFit(ctx, c.sprite, Math.round(W/2 - art/2), Math.round(H*0.88 - art), art);
   ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(0, H - 3, W, 3);
 }
 
