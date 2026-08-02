@@ -1,7 +1,7 @@
 // ================= GRAVEBORNE — main engine =================
 // shown on the title screen; keep in step with CACHE in sw.js — the game is
 // served from that cache, so the number you see is the build you're running
-const GAME_VERSION = 39;
+const GAME_VERSION = 40;
 let VW = 21, VH = 13;                 // viewport in tiles — reshaped to the stage on phones
 const TS = 32;                        // tile size in canvas pixels
 const TU = TS / 16;                   // old design unit -> new, for art not yet re-authored
@@ -2585,10 +2585,12 @@ function renderCombat(){
   // its name / HP / limbs / statuses are drawn crisply in the DOM enemy panel.
   const es = (en.boss || en.elite || en.guardian) ? 7 : 6;
   const ex = Math.round(canvas.width*0.60), ey = 34;
-  Sprites.drawFit(ctx, en.sprite, ex, ey, 12*es);
+  if (!Figures.draw(ctx, en.sprite, ex - 6, ey - 8, 12*es + 16))
+    Sprites.drawFit(ctx, en.sprite, ex, ey, 12*es);
 
   // player sprite (left/lower)
-  Sprites.drawFit(ctx, p.sprite, 40, canvas.height-84, 60);
+  if (!Figures.draw(ctx, p.sprite, 34, canvas.height-92, 76))
+    Sprites.drawFit(ctx, p.sprite, 40, canvas.height-84, 60);
   drawStatusIcons(p, 40, canvas.height-20);
   if (p.shield>0){ ctx.fillStyle='#8ab0e0'; ctx.font='8px monospace'; ctx.fillText(`⛊${p.shield}`, 92, canvas.height-70); }
 
