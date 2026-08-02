@@ -9,23 +9,40 @@ const PAL = {
   e:'#2f6b3f', E:'#6fbf6a', c:'#4e9e92', C:'#7fd0c2',
   n:'#3a2a1a', N:'#6a4a2a', t:'#eef0e0', x:'#14101c', v:'#7fae3a',
   h:'#101018', // eye-shadow
+  // ---- added for the 24x24 hero redraw, straight off the concept sketches ----
+  i:'#22202f', I:'#6e6e82', j:'#43414f',   // plate: shadow, lit steel, mid
+  V:'#b6ff5a',                              // alchemical glow
+  q:'#0f2e2c', Q:'#a8ede0',                 // warden/necromancer teal, deep and pale
+  z:'#2b1b10',                              // deep leather
 };
 
 const SPR = {
   // ---- Heroes ----
   hero_knight: [
-    "    KKKK    ",
-    "   KFFFFK   ",
-    "   KsSSsK   ",
-    "   KdhhdK   ",
-    "   KssssK   ",
-    "  KKssssKK  ",
-    "  SsssssSS  ",
-    "  KsSFFSsK  ",
-    "  KssssssK  ",
-    "   Ks  sK   ",
-    "   Kd  dK   ",
-    "   KK  KK   ",
+    "       K        K       ",
+    "       dK      Kd       ",
+    "        jd    dj        ",
+    "        KKKKKKKK        ",
+    "        KijjjjiK        ",
+    "        KjIIIIjK        ",
+    "        KjhhhhjK        ",
+    "        KjIIIIjK        ",
+    "        KijjjjiK        ",
+    "       KKiijjiiKK       ",
+    "      KIIIijjjiIIIK     ",
+    "  KFFFKjIijjiIjK KnnnnK ",
+    "   KyyKjIijFFjiIjKnNNNnK",
+    "   KSSKKjIjFyyFjIKnNIINn",
+    "   KSSKKjIijFFjiIKnNIINn",
+    "   KSSKKjIijjjjiIKnNNNnK",
+    "   KSSKKjIijjjjiIKnnNnK ",
+    "   KSSK KijjjjiK  KnnnK ",
+    "   KSSK KijjjjiK   KnK  ",
+    "   KSSK KijKKijK        ",
+    "   KSSK KjK  KjK        ",
+    "   KSSK KIK  KIK        ",
+    "    KK KKjjKKKKjjKK     ",
+    "       KKKK  KKKK       ",
   ],
   hero_rogue: [
     "    KKK     ",
@@ -42,52 +59,88 @@ const SPR = {
     "  KK  KK    ",
   ],
   hero_mage: [
-    "     K      ",
-    "    KpK     ",
-    "   KpppK    ",
-    "  KppppppK  ",
-    "   KgllgK   ",
-    "   Kh  hK   ",
-    "   KpPPpK  M",
-    "  KpPPPPpKPM",
-    "  KpPPPPpKM ",
-    "  KppppppK  ",
-    "   Kp  pK   ",
-    "   KK  KK   ",
+    "         KKKK           ",
+    "        KWWWWK          ",
+    "       KWwWWwWK         ",
+    "       KWwwwwWK         ",
+    "       KhhhhhhK         ",
+    "       KWlllLWK         ",
+    "       KWllllWK         ",
+    "        KlllK           ",
+    "      KKKgggKKK         ",
+    "     KggGdddGggK        ",
+    "    KgGgdFFFdgGgK       ",
+    "    KgGdddFdddGgK       ",
+    "    KgGdddFdddGgK       ",
+    "    KgGdddFdddGgK       ",
+    "     KGdddFdddGK        ",
+    "     KGddFFFddGK        ",
+    "     KGdddFdddGK        ",
+    "     KdddFFFdddK        ",
+    "    KKdddFFFdddKK       ",
+    "   KgKddFFFFFddKgK      ",
+    "  KgGKdFFFFFFFdKGgK     ",
+    " KgG KddFFFFFddK GgK    ",
+    " KG  KKdddddddKK  GK    ",
+    "      KKKKKKKKK         ",
   ],
   // The torso and legs used to sit one pixel left of the head, and the legs one
   // left of where every other hero's stand — he read as lopsided next to them.
   // Squared up: hood centred, robe symmetrical, feet on the same columns as the
   // Knight's, staff outside the silhouette where it belongs.
   hero_warden: [
-    "    KKKK    ",
-    "   KwwwwK   ",
-    "   KwFFwK   ",
-    "  KwllllwK  ",
-    "  Kwh  hwK  ",
-    "  KwwwwwwK  ",
-    "  KcFccFcK  ",
-    " FKccccccK  ",
-    " FKcFFFFcK  ",
-    " FKccccccK  ",
-    "   Kc  cK   ",
-    "   KK  KK   ",
+    "     K  KtK  KtK  K     ",
+    "    KRK KtRtK KRK       ",
+    "     Kt  KtK  tK        ",
+    "      KQQQQQQK          ",
+    "      KQcccccQK         ",
+    "      KQcQQQcQK         ",
+    "      KQhQQQhQK         ",
+    "      KQclllcQK         ",
+    "       KQlllQK          ",
+    "    KKKKQQQQQKKKK       ",
+    "  KCQK KQtttQK KQCK     ",
+    " KCQ K KQtQtQK K QCK    ",
+    "KCQ  K KQtQtQK K  QCK   ",
+    "KQ   K KQtQtQK K   QK   ",
+    "KQ  KCK KQtQK KCK  QK   ",
+    " K  KQK KQtQK KQK  K    ",
+    "     KCK KQK KCK        ",
+    "    KQ K KQK K QK       ",
+    "   KC  K KQK K  CK      ",
+    "   KQ    KQK    QK      ",
+    "    K    KQK    K       ",
+    "         KQK            ",
+    "         KtK            ",
+    "       KKqqqKK          ",
   ],
 
   // The Necromancer — hooded dark robe, green witch-light in the hood
   hero_necromancer: [
-    "    KKKK    ",
-    "   KxxxxK   ",
-    "  KxxvvxxK  ",
-    "  KxxxxxxK  ",
-    "  KxxxxxxK  ",
-    "  KxGxxGxK  ",
-    "  KxxxxxxK  ",
-    "  KxxxxxxK  ",
-    "  Kxx  xxK  ",
-    "  Kx    xK  ",
-    "  KK    KK  ",
-    "            ",
+    "         KKKKKK         ",
+    "       KKjjjjjjKK       ",
+    "   KKjjjjjjjjjjjjjjjjKK ",
+    "    KKKKKKKKKKKKKKKK    ",
+    "         KxxxxxK        ",
+    "         KxQxxQK        ",
+    "         KxxxxxK        ",
+    "          KxxxK         ",
+    " KNNNNNNNNNNNNNNNNNNNNNK",
+    " K       KqqqqK       K ",
+    "KQK     Kddxxddk     KQK",
+    "KQQK   Kdxxxxxxdk   KQQK",
+    "KQQK   Kdxxxxxxxdk  KQQK",
+    "KQQK  Kdxxxxxxxxdk  KQQK",
+    " KQK  Kxxxxxxxxxxk   KQK",
+    "  K   Kxxxxxxxxxxk   K  ",
+    "      Kxxxxxxxxxxk      ",
+    "      Kxxxxxxxxxxk      ",
+    "      Kxxxxxxxxxxk      ",
+    "      KxxKxxxxKxxk      ",
+    "      KxK KxxK KxK      ",
+    "      KxK KxxK KxK      ",
+    "       K  KxxK  K       ",
+    "         KKKKKK         ",
   ],
 
   // ---- Enemies ----
@@ -982,18 +1035,30 @@ const SPR = {
   ],
   // the potion-maker: a hooded figure hunched over a glowing vial
   npc_alchemist: [
-    "    KKKK    ",
-    "   KppppK   ",
-    "  KpMllMpK  ",
-    "  KpllllpK  ",
-    "  KppllppK  ",
-    "  KppppppK  ",
-    "  KpGCCGpK  ",
-    " BKpGCCGpK  ",
-    " CKppppppK  ",
-    "  Kpp  ppK  ",
-    "  KK    KK  ",
-    "            ",
+    "        KKKKKK          ",
+    "       KzzzzzzK         ",
+    "      KzjjjjjjzK        ",
+    "      KzjQQQQjzK        ",
+    "      KzjQVVQjzK        ",
+    "   KWWWjQQQQjzK         ",
+    "  KWWKKzjjjjzK          ",
+    "   KK  KzzzzK           ",
+    "      KKzzzzKK          ",
+    "    KKzzzVVzzzKK        ",
+    "   KzzzzzVVzzzzzK       ",
+    "  KzNzzzzVVzzzzNzK      ",
+    "  KzNzzKzzzzKzzzNzK     ",
+    " KVzzzKzNVVNzKzzzVK     ",
+    " KVVzKzzNVVNzzKzVVK     ",
+    "  KzzKzNVVVVNzKzzK      ",
+    "   KKKzNVVVVNzKKK       ",
+    "     KzzNVVNzzK         ",
+    "     KzzzzzzzzK         ",
+    "     KzzKzzKzzK         ",
+    "     KzK KzK KzK        ",
+    "     KzK KzK KzK        ",
+    "    KKzKKKzKKKzK        ",
+    "    KKK  KKK  KK        ",
   ],
   // a quest herb — a little sprig you gather off the floor
   obj_herb: [
@@ -1068,14 +1133,22 @@ const Sprites = {
     return n * scale;
   },
   // render a sprite centered onto a small canvas (used for cards/art)
+  // `scale` is still read the way every call site meant it — a multiplier on the
+  // original 12-unit sprite — so the art comes out the same size on screen
+  // whatever its native resolution, and it is clamped so a 24x24 sprite can
+  // never overflow a canvas that was measured for a 12x12 one.
   toCanvas(canvas, name, scale, opts){
     const ctx = canvas.getContext('2d');
     ctx.imageSmoothingEnabled = false;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     const n = this.nativeSize(name);
-    const w = n * scale, h = n * scale;
+    const target = 12 * scale;
+    let sc = Math.max(1, Math.round(target / n));
+    const fit = Math.floor(Math.min(canvas.width, canvas.height) / n);
+    if (fit >= 1 && sc > fit) sc = fit;
+    const w = n * sc, h = n * sc;
     const ox = Math.floor((canvas.width - w) / 2);
     const oy = Math.floor((canvas.height - h) / 2);
-    this.draw(ctx, name, ox, oy, scale, opts);
+    this.draw(ctx, name, ox, oy, sc, opts);
   }
 };
