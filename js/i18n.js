@@ -404,6 +404,13 @@ const I18N = (function(){
       'Esküvel kötve: a holtak a te régi ügyed. Felkészülve kezdesz — pajzs $1, és a dühöd már fent.'],
     [/^(.+) shrugs off the rot\.$/, '$1 lerázza magáról a rothadást.'],
     [/^The wound will not close — (\d+) a turn\.$/, 'A seb nem záródik be — $1 körönként.'],
+    // ---- codex screen ----
+    [/^Codex of Encounters — (\d+)\/(\d+)$/, 'Találkozások kódexe — $1/$2'],
+    [/^<i>Undiscovered\. ([\s\S]+)<\/i>$/, '<i>Felfedezetlen. $1</i>'],
+    [/^\?\?\? — a mercy$/, '??? — egy irgalom'],
+    [/^\?\?\? — a cruelty$/, '??? — egy kegyetlenség'],
+    [/^\?\?\? — a mystery$/, '??? — egy rejtély'],
+    [/^\?\?\? — unknown$/, '??? — ismeretlen'],
     [/^(.+) is wracked with rot \((\d+)\/turn\)\.$/, '$1 rothadástól gyötrődik ($2/kör).'],
     [/^You (.+) a (.+) at (.+) — (\d+) damage\.$/, '$1 egy $2-t erre: $3 — $4 sebzés.'],
   ];
