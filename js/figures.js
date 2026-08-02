@@ -368,139 +368,507 @@ const Figures = (function(){
     formShadow(c);
   }
 
-  // The Gravethief. There is no concept plate for this one to be lifted from,
-  // so it is still painted — but built to the proportions the traced figures
-  // actually have: the head is a seventh of the height, not a third, and the
-  // shoulders are two heads across. None of the shared scaffold is used; a
-  // thief is a narrower build than the plated classes share.
+  // The Gravethief, off the reference sheet: a low hood with a gold-trimmed
+  // edge, a beaked steel mask set back inside it, a blackened breastplate over
+  // striated leather, and a dagger carried low. Planted wide — the reference
+  // stands in a fighting crouch, not to attention.
   function rogue(c){
     ground(c);
+    const spine = (y) => 50 + Math.round(Math.sin((y - 20) / 40) * 1.6);
 
-    // A spine that drifts rather than running dead straight, and one profile
-    // every layer agrees on. Shoulders at 25, belt at 49, knees at 71.
-    const spine = (y) => 50 + Math.round(Math.sin((y - 20) / 34) * 2.4);
-    const body = (y) => y < 25 ? 8 + (y - 20) * 1.0            // into the shoulders
-                      : y < 49 ? 13 - (y - 25) * 0.17          // to the belt
-                      : y < 72 ? 9 + (y - 49) * 0.20           // the coat below it
-                               : 0;
+    // ---- the cloak, hung behind the near shoulder ----
+    for (let y = 26; y < 82; y++){
+      const t = (y - 26) / 56, w = 8 + Math.round(t * 8);
+      px(c, 34 - Math.round(t * 7), y, w, 1, '#0a0910');
+      px(c, 34 - Math.round(t * 7), y, 1, 1, '#1d1a26');
+    }
+    tatter(c, 27, 81, 16, '#0a0910', 3);
 
-    // ---- legs, behind the coat ----
-    // the weight is on the near leg; the far one is set back and half a step short
-    for (const [dx, sh] of [[-7, 0], [2, 1]]){
-      const top = 64, bot = sh ? 90 : 93;
-      for (let y = top; y < bot; y++){
-        const w = 6 - (y > bot - 10 ? 1 : 0), x = spine(y) + dx;
-        px(c, x, y, w, 1, sh ? '#0c0a11' : '#12101d');
-        px(c, x, y, 1, 1, sh ? '#161421' : '#201c2b');
+    // ---- legs, splayed into the reference's wide stance ----
+    for (const dir of [-1, 1]){
+      for (let y = 58; y < 92; y++){
+        const t = (y - 58) / 34;
+        const x = spine(y) + dir * (3 + Math.round(t * 9)) - (dir < 0 ? 6 : 0);
+        const w = 7 - (t > 0.6 ? 1 : 0);
+        px(c, x, y, w, 1, dir < 0 ? '#2b2620' : '#221e19');
+        px(c, x, y, 1, 1, dir < 0 ? '#463d31' : '#332c24');
+        px(c, x + w - 1, y, 1, 1, '#100e0c');
       }
-      // the pale shin wraps, tightening toward the ankle
-      for (let i = 0; i < 4; i++)
-        px(c, spine(bot) + dx, bot - 18 + i*4, 6 - i, 2, sh ? '#4e442c' : '#75663f');
-      const fx = spine(bot) + dx;
-      px(c, fx - 2, bot - 2, 10, 4, sh ? '#0a0810' : '#0d0b12');          // boot
-      px(c, fx - 5, bot + 1, 13, 2, sh ? '#0a0810' : '#0d0b12');          // long toe
-      px(c, fx - 2, bot - 2, 10, 1, sh ? '#191623' : '#282434');
+      // shin plates, and the turned-out boot
+      const bx = spine(88) + dir * 12 - (dir < 0 ? 6 : 0);
+      for (let i = 0; i < 3; i++) px(c, bx, 74 + i*5, 6, 3, '#3b342b');
+      for (let i = 0; i < 3; i++) px(c, bx, 74 + i*5, 6, 1, '#5c5142');
+      px(c, bx - 2, 89, 11, 5, '#2a231b');
+      px(c, bx + (dir < 0 ? -5 : 4), 92, 7, 2, '#2a231b');
+      px(c, bx - 2, 89, 11, 1, '#463c2f');
     }
 
-    // ---- the coat ----
-    for (let y = 20; y <= 72; y++){
+    // ---- the coat: striated leather, layered in panels ----
+    // it has a waist — the first pass ran shoulder to knee at one width and
+    // read as a crate with a head on it
+    const body = (y) => y < 26 ? 8 + (y - 20) * 0.83
+                      : y < 46 ? 13 - (y - 26) * 0.17
+                      : y < 70 ? 9.6 + (y - 46) * 0.11
+                               : 0;
+    for (let y = 20; y <= 70; y++){
       const w = Math.round(body(y) * 2); if (w <= 0) continue;
       const x = spine(y) - Math.round(w / 2);
-      px(c, x, y, w, 1, y < 49 ? '#191725' : '#141221');
-      px(c, x, y, 2, 1, '#2c2840');
-      px(c, x + w - 2, y, 2, 1, '#09080e');
+      cloth(c, x, y, w, 1, '#15120f', '#2e2820', '#463d31', 4);
     }
-    for (const [off, fy, fh, lit] of [[-6,52,20,0],[-1,50,22,1],[5,52,19,0],[-9,58,13,0],[8,58,13,0]])
-      for (let y = fy; y < fy + fh; y++){
-        px(c, spine(y) + off, y, 1, 1, '#0e0c16');
-        if (lit) px(c, spine(y) + off + 1, y, 1, 1, '#292437');
-      }
-    tatter(c, 38, 71, 25, '#0c0a12', 5);
+    // the panel edges the reference layers down the skirt
+    for (const hy of [55, 62, 68]){
+      const w = Math.round(body(hy) * 2), x = spine(hy) - Math.round(w / 2);
+      px(c, x, hy, w, 1, '#100e0b'); px(c, x, hy + 1, w, 1, '#40372c');
+    }
+    tatter(c, 39, 69, 23, '#100e0b', 5);
+
+    // ---- the breastplate ----
+    for (let y = 26; y < 45; y++){
+      const w = 16 - Math.round(Math.abs(y - 33) * 0.45), x = spine(y) - Math.round(w / 2);
+      px(c, x, y, w, 1, '#20202a');
+      px(c, x, y, 2, 1, '#3c3c4c');
+      px(c, x + w - 2, y, 2, 1, '#0c0c11');
+    }
+    px(c, 50, 27, 1, 17, '#3a3a49');                                     // centre seam
+    px(c, 47, 25, 6, 3, '#7d6a3c'); px(c, 49, 26, 2, 1, '#c0a558');      // collar clasp
 
     // ---- arms ----
-    // the near one carried forward with the knife, the far one dropped back
+    // carried clear of the ribs, so they read as limbs and not as coat
     for (const dir of [-1, 1]){
-      for (let y = 26; y < (dir < 0 ? 52 : 55); y++){
-        const t = (y - 26) / 28, w = 5 - Math.round(t * 1);
-        const x = dir < 0 ? spine(y) - 11 - w + Math.round(t * 4)
-                          : spine(y) + 10 - Math.round(t * 2);
-        px(c, x, y, w, 1, dir < 0 ? '#1b1927' : '#131120');
-        px(c, dir < 0 ? x : x + w - 1, y, 1, 1, dir < 0 ? '#302b40' : '#0a0810');
+      for (let y = 26; y < (dir < 0 ? 52 : 56); y++){
+        const t = (y - 26) / 30, w = 6 - Math.round(t * 1);
+        const x = dir < 0 ? spine(y) - 14 - w + Math.round(t * 3)
+                          : spine(y) + 13 + Math.round(t * 2);
+        px(c, x, y, w, 1, dir < 0 ? '#332c23' : '#241f19');
+        px(c, x, y, 1, 1, dir < 0 ? '#4e4436' : '#382f26');
+        px(c, x + w - 1, y, 1, 1, '#0f0d0b');
       }
-      // bracer, then the gloved hand
-      const bx = dir < 0 ? 36 : 59, by = dir < 0 ? 40 : 43;
-      px(c, bx, by, 5, 9, dir < 0 ? '#231e2e' : '#191524');
-      px(c, bx, by, 5, 1, dir < 0 ? '#3f3850' : '#2a2537');
-      px(c, bx, by + 2, 5, 1, dir < 0 ? '#75663f' : '#50462c');
-      px(c, bx, by + 6, 5, 1, dir < 0 ? '#75663f' : '#50462c');
-      px(c, dir < 0 ? 37 : 59, dir < 0 ? 51 : 54, 5, 5, '#0d0b13');
-      px(c, dir < 0 ? 37 : 59, dir < 0 ? 51 : 54, 5, 1, '#251f31');
+      // buckled bracer, then the glove
+      const bx = dir < 0 ? 32 : 64, by = dir < 0 ? 39 : 43;
+      px(c, bx, by, 6, 11, dir < 0 ? '#3a3229' : '#2b251e');
+      px(c, bx, by, 6, 1, dir < 0 ? '#5c5142' : '#443a2f');
+      for (let i = 0; i < 3; i++) px(c, bx, by + 2 + i*4, 6, 1, '#15120f');
+      px(c, dir < 0 ? 32 : 64, dir < 0 ? 50 : 54, 6, 6, '#181410');
+      px(c, dir < 0 ? 32 : 64, dir < 0 ? 50 : 54, 6, 1, '#332b23');
     }
 
-    // ---- belt, and the ladder of brass straps under it ----
-    for (let y = 46; y < 51; y++){
-      const w = Math.round(body(y) * 2) - 2, x = spine(y) - Math.round(w / 2);
-      px(c, x, y, w, 1, y === 46 || y === 50 ? '#0a0810' : '#3a2f21');
+    // ---- belt, and the straps slung off it ----
+    for (let y = 46; y < 52; y++){
+      const w = Math.round(body(y) * 2) - 1, x = spine(y) - Math.round(w / 2);
+      px(c, x, y, w, 1, y === 46 || y === 51 ? '#100e0b' : '#4a3d2c');
     }
-    px(c, 48, 46, 5, 5, '#7a6737'); px(c, 50, 48, 2, 2, '#0a0810');
-    for (let i = 0; i < 3; i++){
-      const x = spine(52 + i*5) - 4;
-      px(c, x, 52 + i*5, 8, 2, '#54481f');
-      px(c, x, 52 + i*5, 8, 1, '#7d6c40');
-    }
-    px(c, 38, 50, 6, 7, '#241e2c'); px(c, 38, 50, 6, 1, '#3b3245');       // pouch
-    for (let i = 0; i < 3; i++) px(c, 60 + i*2, 50, 1, 4 + i, '#6f5f34'); // picks
+    px(c, 47, 46, 7, 6, '#6d5c38'); px(c, 49, 48, 3, 2, '#100e0b');
+    for (let i = 0; i < 8; i++) px(c, 43 + i, 52 + i, 2, 1, '#4a3d2c');  // diagonal strap
+    for (let i = 0; i < 6; i++) px(c, 57 - i, 52 + i, 2, 1, '#3b3122');
+    px(c, 39, 50, 5, 8, '#332b21'); px(c, 39, 50, 5, 1, '#4e4436');      // hip pouch
+    px(c, 58, 55, 4, 4, '#6d5c38'); px(c, 59, 56, 2, 2, '#100e0b');      // ring
 
-    // ---- hood, one head tall ----
+    // ---- hood, and the mantle across the shoulders ----
     for (let y = 5; y <= 26; y++){
-      const hw = y < 14 ? 3 + (y - 5) * 0.72 : 9.5 + (y - 14) * 0.14;
+      const hw = y < 15 ? 3.5 + (y - 5) * 0.75 : 11 + (y - 15) * 0.25;
       const w = Math.round(hw * 2), x = spine(y) - Math.round(w / 2);
-      px(c, x, y, w, 1, '#151321');
-      px(c, x, y, 2, 1, '#2b2739');
-      px(c, x + w - 2, y, 2, 1, '#09080e');
+      px(c, x, y, w, 1, '#141810');
+      px(c, x, y, 2, 1, '#28301e');
+      px(c, x + w - 2, y, 2, 1, '#080a06');
     }
-    // the opening: a dark well the mask is set back inside
-    for (let y = 10; y < 24; y++){
-      const w = 12 - Math.round(Math.abs(y - 16) * 0.6);
-      px(c, spine(y) - Math.round(w / 2), y, w, 1, '#07060b');
+    // the gold trim running round the hood's edge
+    for (let y = 9; y < 24; y++){
+      const hw = y < 15 ? 3.5 + (y - 5) * 0.75 : 11 + (y - 15) * 0.25;
+      px(c, spine(y) - Math.round(hw) + 2, y, 1, 1, '#9a8244');
     }
-
-    // ---- the mask ----
-    // small, dull bone, narrowing at the jaw so it reads as a face in shadow
-    for (let y = 11; y < 23; y++){
-      const w = 10 - Math.round((y - 11) * 0.3), x = spine(y) - Math.round(w / 2);
-      px(c, x, y, w, 1, '#4c4856');
-      px(c, x, y, 1, 1, '#726d7d');
-      px(c, x + w - 1, y, 1, 1, '#2c2936');
-    }
-    px(c, 46, 14, 3, 3, '#07060b'); px(c, 51, 14, 3, 3, '#07060b');      // eye pits
-    px(c, 46, 14, 3, 1, '#26232e'); px(c, 51, 14, 3, 1, '#26232e');
-    px(c, 50, 13, 1, 8, '#3d3947');                                       // centre seam
-    for (let i = 0; i < 3; i++) px(c, 47 + i*2, 20, 1, 1, '#312e3a');     // stitched mouth
-    // the cowl wound round the throat, hiding the hood's seam
-    for (let y = 24; y < 30; y++){
-      const w = 17 - (y - 24), x = spine(y) - Math.round(w / 2);
-      px(c, x, y, w, 1, y === 24 ? '#332d42' : '#1f1b2b');
-      px(c, x, y, 1, 1, '#3a3448');
+    px(c, 44, 8, 12, 1, '#9a8244');
+    // the opening: a dark well the mask sits back inside
+    for (let y = 11; y < 25; y++){
+      const w = 13 - Math.round(Math.abs(y - 17) * 0.7);
+      px(c, spine(y) - Math.round(w / 2), y, w, 1, '#05060a');
     }
 
-    // ---- the knife, carried low in the near hand ----
-    px(c, 38, 50, 2, 6, '#2a2334');                                       // grip
-    px(c, 36, 48, 6, 2, '#7a6737');                                       // guard
-    for (let i = 0; i < 15; i++){
-      const bx = 38 - Math.round(i * 0.4);
-      px(c, bx, 56 + i, 2, 1, '#8f8a9e');
-      px(c, bx, 56 + i, 1, 1, '#c9c4d6');
+    // ---- the beaked steel mask ----
+    for (let y = 12; y < 22; y++){
+      const w = 10 - Math.round((y - 12) * 0.55), x = spine(y) - Math.round(w / 2);
+      px(c, x, y, w, 1, '#59575f');
+      px(c, x, y, 1, 1, '#8b8894');
+      px(c, x + w - 1, y, 1, 1, '#302f36');
+    }
+    px(c, 46, 14, 3, 2, '#07070b'); px(c, 52, 14, 3, 2, '#07070b');      // eye slits
+    for (let i = 0; i < 6; i++)                                          // the beak
+      px(c, 49 - (i < 3 ? 0 : 1), 19 + i, 3 - (i > 3 ? 1 : 0), 1, i < 3 ? '#6d6a74' : '#4a4850');
+    px(c, 49, 19, 1, 5, '#a09da8');
+    // the mantle wrapped over the shoulders, under the hood
+    for (let y = 24; y < 31; y++){
+      const w = 22 + (y - 24), x = spine(y) - Math.round(w / 2);
+      px(c, x, y, w, 1, '#141810');
+      px(c, x, y, 2, 1, '#28301e');
+      px(c, x + w - 2, y, 2, 1, '#080a06');
+    }
+    px(c, 40, 30, 20, 1, '#0a0c07');
+
+    // ---- the dagger, held low in the near hand ----
+    px(c, 33, 48, 3, 6, '#2a231b');
+    px(c, 31, 46, 7, 2, '#6d5c38');
+    for (let i = 0; i < 14; i++){
+      const bx = 33 - Math.round(i * 0.8);
+      px(c, bx, 54 + i, 3 - (i > 10 ? 1 : 0), 1, '#8a8794');
+      px(c, bx, 54 + i, 1, 1, '#cbc8d4');
     }
 
-    grain(c, 0.06);
+    grain(c, 0.055);
     rimLight(c, 'rgba(255,190,120,0.16)');
     formShadow(c);
   }
 
+  // The Ashen Cultist: a crimson mantle gathered at the throat with silver
+  // brooches, a bronze mask under the hood, one spiked pauldron, and a cloak
+  // that reaches the floor and spreads there.
+  function cultist(c){
+    ground(c);
+    const spine = () => 50;
+
+    // ---- the cloak, floor-length and spreading at the hem ----
+    for (let y = 24; y <= 93; y++){
+      const t = (y - 24) / 69;
+      const w = Math.round((11 + t * t * 27) * 2), x = 50 - Math.round(w / 2);
+      px(c, x, y, w, 1, '#4e1018');
+      px(c, x, y, 3, 1, '#7d1c26');
+      px(c, x + w - 3, y, 3, 1, '#2a080d');
+    }
+    // the folds the reference drapes down the front, kept inside the hem —
+    // spreading them by the same factor as the cloak walked them off its edge
+    for (const [off, fy, fh] of [[-14,42,50],[-6,34,58],[3,36,56],[12,46,46],[20,58,34],[-21,56,36]])
+      for (let y = fy; y < fy + fh && y <= 93; y++){
+        const t = (y - 24) / 69, half = 11 + t * t * 27;
+        const fx = 50 + Math.round(off * (1 + t * 1.7));
+        if (fx < 50 - half + 3 || fx > 50 + half - 4) continue;
+        px(c, fx, y, 2, 1, '#380b12');
+        px(c, fx + 2, y, 1, 1, '#6b1721');
+      }
+    // boots, just showing under the hem
+    px(c, 52, 88, 9, 5, '#241a14'); px(c, 55, 92, 8, 2, '#241a14');
+    px(c, 52, 88, 9, 1, '#3d2e23');
+
+    // ---- the arms, in dark sleeves under the mantle ----
+    for (const dir of [-1, 1]){
+      for (let y = 30; y < 62; y++){
+        const t = (y - 30) / 32, w = 7 - Math.round(t * 2);
+        const x = dir < 0 ? 50 - 15 - w + Math.round(t * 3) : 50 + 14 - Math.round(t * 2);
+        px(c, x, y, w, 1, '#2a1218');
+        px(c, x, y, 1, 1, '#43202a');
+      }
+      px(c, dir < 0 ? 36 : 60, 60, 6, 7, '#3d2a1c');                     // gloved hand
+      px(c, dir < 0 ? 36 : 60, 60, 6, 1, '#5e4429');
+      for (let i = 0; i < 3; i++) px(c, dir < 0 ? 36 : 60, 66 + i, 5 - i, 1, '#3d2a1c');
+    }
+    // bronze vambrace on the spiked side
+    px(c, 60, 46, 7, 13, '#6b4826'); px(c, 60, 46, 7, 1, '#a3763d');
+    px(c, 60, 52, 7, 1, '#3f2a15'); px(c, 66, 46, 1, 13, '#3f2a15');
+
+    // ---- the spiked pauldron ----
+    // a solid bronze shell first; the spikes ride its outer edge rather than
+    // fanning off the shoulder as loose sticks
+    for (let y = 26; y < 44; y++){
+      const t = (y - 26) / 18, w = 15 - Math.round(t * 5);
+      px(c, 58, y, w, 1, '#7a5430');
+      px(c, 58, y, 2, 1, '#b5854a');
+      px(c, 58 + w - 2, y, 2, 1, '#432c17');
+    }
+    for (let i = 0; i < 4; i++) px(c, 58, 29 + i*4, 15 - i*2, 1, '#5c3d21');  // ridges
+    for (let i = 0; i < 4; i++){                                          // the spikes
+      const sy = 28 + i*4, sx = 73 - i*2, len = 7 - i;
+      for (let j = 0; j < len; j++)
+        px(c, sx + j, sy - Math.round(j * 0.7), 2, 2, j > len - 3 ? '#c99a58' : '#8b6238');
+    }
+
+    // ---- the mantle over the shoulders, gathered at the throat ----
+    for (let y = 22; y < 40; y++){
+      const w = 34 - Math.round(Math.abs(y - 30) * 0.7), x = 50 - Math.round(w / 2);
+      px(c, x, y, w, 1, '#6b1721');
+      px(c, x, y, 3, 1, '#9c2430');
+      px(c, x + w - 3, y, 3, 1, '#3d0d14');
+    }
+    for (const [off, fy] of [[-11,26],[-4,24],[4,25],[11,27]])
+      for (let y = fy; y < 40; y++) px(c, 50 + off, y, 2, 1, '#4e1018');
+    // the small silver brooches the mantle is gathered with — the first pass
+    // sized them like windows
+    // small and tarnished — anything paler than this reads as a second pair of
+    // eyes on the chest, because everything around it is crimson
+    px(c, 42, 30, 2, 2, '#6e6154'); px(c, 42, 30, 1, 1, '#928275');
+    px(c, 42, 32, 1, 3, '#4a4038');
+    px(c, 56, 33, 2, 2, '#6e6154'); px(c, 56, 33, 1, 1, '#928275');
+    px(c, 56, 35, 1, 3, '#4a4038');
+
+    // ---- the hood ----
+    for (let y = 4; y <= 26; y++){
+      const hw = y < 13 ? 3 + (y - 4) * 0.85 : 10.7 + (y - 13) * 0.42;
+      const w = Math.round(hw * 2), x = 50 - Math.round(w / 2);
+      px(c, x, y, w, 1, '#5e131c');
+      px(c, x, y, 3, 1, '#93222e');
+      px(c, x + w - 3, y, 3, 1, '#330a10');
+    }
+    for (let y = 10; y < 24; y++){
+      const w = 13 - Math.round(Math.abs(y - 16) * 0.6);
+      px(c, 50 - Math.round(w / 2), y, w, 1, '#0a0509');
+    }
+
+    // ---- the bronze mask ----
+    for (let y = 9; y < 24; y++){
+      const w = 11 - Math.round((y - 9) * 0.42), x = 50 - Math.round(w / 2);
+      px(c, x, y, w, 1, '#7d5c34');
+      px(c, x, y, 1, 1, '#b98f4f');
+      px(c, x + w - 1, y, 1, 1, '#4a3520');
+    }
+    px(c, 46, 13, 2, 4, '#07060a'); px(c, 52, 13, 2, 4, '#07060a');       // slit eyes
+    px(c, 49, 11, 1, 10, '#a37c44');                                      // ridge
+    for (let i = 0; i < 3; i++) px(c, 47 + i*2, 19, 1, 2, '#4a3520');     // vents
+    px(c, 48, 22, 3, 2, '#644828');                                       // the point
+
+    grain(c, 0.05);
+    rimLight(c, 'rgba(255,140,90,0.16)');
+    formShadow(c);
+  }
+
+  // The Gilded Inquisitor: that wide flanged helm above everything, a steel
+  // gorget, a floor-length black robe with a gilt-edged scarlet band down the
+  // front, and a tall thin staff with a conical head.
+  function inquisitor(c){
+    ground(c);
+
+    // ---- the staff, clear of the helm's flare ----
+    px(c, 78, 20, 2, 72, '#3e3e48');
+    px(c, 78, 20, 1, 72, '#63636f');
+    for (let y = 4; y < 20; y++){                                         // conical head
+      const w = y < 12 ? 2 + (y - 4) * 0.62 : 7 - (y - 12) * 0.75;
+      const ww = Math.max(2, Math.round(w));
+      px(c, 79 - Math.round(ww / 2), y, ww, 1, '#5a5a66');
+      px(c, 79 - Math.round(ww / 2), y, 1, 1, '#8f8f9c');
+    }
+    px(c, 76, 18, 6, 2, '#7a7a88');
+
+    // ---- the robe: a straight column, barely flaring ----
+    for (let y = 28; y <= 93; y++){
+      const t = (y - 28) / 65, w = Math.round((11 + t * 7) * 2);
+      const x = 50 - Math.round(w / 2);
+      px(c, x, y, w, 1, '#17161c');
+      px(c, x, y, 3, 1, '#2b2a33');
+      px(c, x + w - 3, y, 3, 1, '#0a090d');
+    }
+    for (const [off, fy] of [[-13,44],[-7,36],[8,36],[14,48]])
+      for (let y = fy; y <= 93; y++){
+        const t = (y - 28) / 65;
+        px(c, 50 + Math.round(off * (1 + t * 0.6)), y, 1, 1, '#0d0c11');
+      }
+    // the scarlet band, gilt-edged, running the length of the robe
+    for (let y = 34; y <= 90; y++){
+      const t = (y - 34) / 56, w = 7 + Math.round(t * 3);
+      const x = 50 - Math.round(w / 2);
+      px(c, x, y, w, 1, '#7a280f');
+      px(c, x, y, 1, 1, '#a8471a');
+      px(c, x + w - 1, y, 1, 1, '#4c1709');
+      if (y % 7 === 0) px(c, x + 1, y, w - 2, 1, '#9c3d15');             // brocade
+    }
+    px(c, 44, 33, 13, 2, '#7a280f');
+    for (let y = 34; y <= 90; y++){                                       // the gilt edges
+      const t = (y - 34) / 56, w = 7 + Math.round(t * 3), x = 50 - Math.round(w / 2);
+      if (y % 3) continue;
+      px(c, x - 1, y, 1, 1, '#8a7233'); px(c, x + w, y, 1, 1, '#8a7233');
+    }
+    for (let i = 0; i < 4; i++) px(c, 47 + i, 90 + i, 2, 1, '#7a280f');   // pointed tail
+    for (let i = 0; i < 4; i++) px(c, 53 - i, 90 + i, 2, 1, '#7a280f');
+
+    // ---- arms: one ribbed sleeve down to a gauntlet, one raised to the staff ----
+    for (let y = 30; y < 62; y++){                                        // near arm, hanging
+      const t = (y - 30) / 32, w = 8 - Math.round(t * 2);
+      px(c, 32 + Math.round(t * 3), y, w, 1, '#25242d');
+      px(c, 32 + Math.round(t * 3), y, 1, 1, '#3f3e4a');
+    }
+    for (let i = 0; i < 7; i++) px(c, 32 + Math.round(i * 0.4), 32 + i*4, 8 - Math.round(i*0.3), 2, '#33323d');
+    px(c, 34, 60, 7, 11, '#3a3944'); px(c, 34, 60, 7, 1, '#5a5966');      // gauntlet
+    for (let i = 0; i < 3; i++) px(c, 34, 63 + i*3, 7, 1, '#191820');
+    for (let y = 30; y < 44; y++){                                        // far arm, to the staff
+      const t = (y - 30) / 14;
+      px(c, 62 + Math.round(t * 11), y, 7 - Math.round(t * 2), 1, '#20202a');
+      px(c, 62 + Math.round(t * 11), y, 1, 1, '#38373f');
+    }
+    px(c, 74, 42, 7, 8, '#3a3944'); px(c, 74, 42, 7, 1, '#5a5966');       // hand on the shaft
+    for (let i = 0; i < 3; i++) px(c, 74, 44 + i*2, 7, 1, '#191820');
+
+    // ---- the steel gorget over the shoulders ----
+    for (let y = 24; y < 34; y++){
+      const w = 30 - Math.round((y - 24) * 0.4), x = 50 - Math.round(w / 2);
+      px(c, x, y, w, 1, '#3d3c47');
+      px(c, x, y, 2, 1, '#5f5e6c');
+      px(c, x + w - 2, y, 2, 1, '#1d1c24');
+    }
+    for (let i = 0; i < 3; i++) px(c, 36 + i*3, 26, 2, 5, '#565563');     // fluting
+    px(c, 36, 33, 28, 1, '#14131a');
+
+    // ---- the helm ----
+    // An anvil, not a plank: the crown is broad and its corners sweep *up*,
+    // the sides fall away in a concave curve, and the whole thing funnels into
+    // a narrow throat. Painted column by column, since the profile is a
+    // function of how far out from the centre you are, not of height.
+    // the throat first, running the whole way down to the gorget — without it
+    // the crown reads as a bar balanced on a post with daylight under it
+    for (let y = 12; y < 30; y++){
+      const w = 12 + Math.round(Math.max(0, y - 22) * 0.9), x = 50 - Math.round(w / 2);
+      px(c, x, y, w, 1, '#3c3b46');
+      px(c, x, y, 2, 1, '#5a5965');
+      px(c, x + w - 2, y, 2, 1, '#22212a');
+    }
+    for (let dx = -16; dx <= 16; dx++){
+      const a = Math.abs(dx), x = 50 + dx;
+      const top = 9 - Math.round((a * a) / 64);          // corners rise
+      const bot = 24 - Math.round(a * 0.86);             // sides fall away
+      if (bot < top) continue;
+      const edge = a > 13, lit = dx < -4;
+      px(c, x, top, 1, bot - top + 1, edge ? '#6a6975' : (lit ? '#565560' : '#43424d'));
+      px(c, x, top, 1, 2, '#82818d');                    // the crown's lit edge
+      if (a > 7) px(c, x, bot - 1, 1, 2, '#26252d');
+    }
+    px(c, 41, 13, 18, 1, '#8a7233');                                      // the gilt line
+    for (let y = 15; y < 22; y++){                                        // the dark of the face
+      const w = 8 - Math.round(Math.abs(y - 18) * 0.7);
+      px(c, 50 - Math.round(w / 2), y, w, 1, '#0a0a0e');
+    }
+    px(c, 50, 16, 1, 5, '#4a4954');
+    px(c, 46, 22, 8, 1, '#2a2932');
+
+    grain(c, 0.045);
+    rimLight(c, 'rgba(255,170,110,0.13)');
+    formShadow(c);
+  }
+
+  // The Rattling Skeleton: an arrow still through the skull, a red cloak gone
+  // to rags, a round shield on one arm and a notched falchion in the other.
+  function skeleton(c){
+    ground(c);
+    const BONE = '#cdc6b4', BMID = '#a49c8a', BDK = '#6b6455';
+
+    // ---- the cloak, hung behind and torn to strips ----
+    for (let y = 26; y < 88; y++){
+      const t = (y - 26) / 62, w = 26 + Math.round(t * 16);
+      px(c, 50 - Math.round(w / 2), y, w, 1, '#3a1016');
+      px(c, 50 - Math.round(w / 2), y, 2, 1, '#5c1a22');
+      px(c, 50 + Math.round(w / 2) - 2, y, 2, 1, '#20080c');
+    }
+    for (const off of [-16, -7, 6, 15])
+      for (let y = 34; y < 88; y++) px(c, 50 + off, y, 2, 1, '#280a0f');
+    tatter(c, 28, 87, 44, '#280a0f', 6);
+
+    // ---- legs ----
+    for (const dir of [-1, 1]){
+      for (let y = 60; y < 88; y++){
+        const t = (y - 60) / 28;
+        const x = 50 + dir * (3 + Math.round(t * 5)) - (dir < 0 ? 4 : 0);
+        const w = 5 - (t > 0.4 && t < 0.75 ? 1 : 0);                      // thin at the shin
+        px(c, x, y, w, 1, dir < 0 ? BMID : BDK);
+        px(c, x, y, 1, 1, dir < 0 ? BONE : BMID);
+      }
+      const fx = 50 + dir * 8 - (dir < 0 ? 4 : 0);
+      px(c, fx - 1, 84, 7, 7, '#4a3226');                                 // strapped boots
+      px(c, fx - 1, 84, 7, 1, '#6e4c39');
+      px(c, fx - 1, 87, 7, 1, '#2c1c14');
+      px(c, fx - 3, 90, 10, 3, '#3c281e');
+    }
+    // pelvis
+    for (let y = 54; y < 62; y++){
+      const w = 17 - (y - 54), x = 50 - Math.round(w / 2);
+      px(c, x, y, w, 1, BMID); px(c, x, y, 1, 1, BONE);
+    }
+    px(c, 48, 56, 5, 5, '#2a2620');
+
+    // ---- ribcage and spine ----
+    px(c, 48, 30, 3, 26, BMID); px(c, 48, 30, 1, 26, BONE);               // spine
+    for (let i = 0; i < 7; i++){
+      const y = 32 + i*3, w = 22 - Math.abs(i - 2) * 2;
+      const x = 50 - Math.round(w / 2);
+      px(c, x, y, w, 2, i % 2 ? BMID : BONE);
+      px(c, x, y + 1, w, 1, '#5d5749');
+      px(c, x, y, 1, 2, '#2c2822'); px(c, x + w - 1, y, 1, 2, '#2c2822');
+    }
+    px(c, 40, 28, 20, 3, BONE); px(c, 40, 30, 20, 1, BMID);               // collarbones
+    // the shoulder-rags the reference leaves clinging to the bone
+    px(c, 36, 27, 10, 9, '#5c1a22'); px(c, 36, 27, 10, 1, '#7d2530');
+    for (let i = 0; i < 5; i++) px(c, 36 + i*2, 36, 2, 2 + (i % 3), '#3a1016');
+    for (let i = 0; i < 10; i++) px(c, 43 + i, 33 + i, 2, 1, '#4a3226');  // baldric
+
+    // ---- arms ----
+    for (let y = 30; y < 58; y++){                                        // shield arm
+      const t = (y - 30) / 28;
+      px(c, 36 - Math.round(t * 3), y, 4, 1, BDK);
+      px(c, 36 - Math.round(t * 3), y, 1, 1, BMID);
+    }
+    for (let y = 30; y < 62; y++){                                        // sword arm
+      const t = (y - 30) / 32;
+      px(c, 61 + Math.round(t * 4), y, 4, 1, BMID);
+      px(c, 61 + Math.round(t * 4), y, 1, 1, BONE);
+    }
+    px(c, 64, 60, 6, 6, BMID); px(c, 64, 60, 6, 1, BONE);                 // the sword hand
+
+    // ---- the shield, tall and battered ----
+    for (let y = 38; y < 82; y++){
+      const t = (y - 38) / 44;
+      const w = Math.round(Math.sin((t * 0.86 + 0.07) * Math.PI) * 20) + 4;
+      const x = 26 - Math.round(w / 2) + 6;
+      px(c, x, y, w, 1, '#3a3941');
+      px(c, x, y, 2, 1, '#565560');
+      px(c, x + w - 2, y, 2, 1, '#1d1c22');
+      if (y % 9 === 0) px(c, x + 2, y, w - 4, 1, '#464550');
+      // the reference's shield has been through a war — hack marks and rot
+      if (y % 13 === 4) px(c, x + 3, y, Math.max(1, w - 9), 1, '#2e2d34');
+    }
+    px(c, 24, 56, 8, 3, '#605f6a');                                       // boss
+    px(c, 28, 44, 2, 26, '#2c2b32');
+    for (let i = 0; i < 6; i++) px(c, 22 + i, 66 + i, 2, 1, '#1e1d23');   // a long split
+
+    // ---- the falchion ----
+    px(c, 66, 56, 3, 8, '#4a3226'); px(c, 64, 54, 8, 2, '#6d5c38');
+    for (let i = 0; i < 22; i++){
+      const bx = 68 + Math.round(i * 0.5), w = i < 14 ? 3 : 4;
+      px(c, bx, 64 + i, w, 1, '#7d7b84');
+      px(c, bx, 64 + i, 1, 1, '#b0aeb8');
+    }
+
+    // ---- the skull ----
+    for (let y = 8; y < 24; y++){
+      const w = y < 18 ? 18 - Math.round(Math.abs(y - 13) * 0.5) : 14 - (y - 18);
+      const x = 50 - Math.round(w / 2);
+      px(c, x, y, w, 1, BONE);
+      px(c, x, y, 2, 1, '#e8e2d2');
+      px(c, x + w - 2, y, 2, 1, BMID);
+    }
+    px(c, 43, 13, 5, 5, '#100e0c'); px(c, 52, 13, 5, 5, '#100e0c');       // sockets
+    px(c, 44, 13, 3, 1, '#3a352c'); px(c, 53, 13, 3, 1, '#3a352c');
+    px(c, 48, 18, 4, 3, '#100e0c');                                       // nasal cavity
+    for (let i = 0; i < 5; i++) px(c, 44 + i*2, 21, 1, 3, '#4a443a');     // teeth
+    px(c, 43, 20, 14, 1, '#8d8676');
+    for (let i = 0; i < 6; i++) px(c, 41 - (i % 2), 10 + i*2, 2, 3, '#2a2620'); // lank hair
+    for (let i = 0; i < 6; i++) px(c, 58 + (i % 2), 11 + i*2, 2, 3, '#2a2620');
+    // the arrow, still through it — entering at one temple and out the far
+    // side, low enough that a good span of shaft shows clear of the bone
+    for (let ax = 28; ax <= 72; ax++){
+      const ay = 19 - Math.round((ax - 28) * 0.2);
+      if (ax > 41 && ax < 59) continue;                                   // buried in the skull
+      px(c, ax, ay, 1, 2, '#5a4530');
+      px(c, ax, ay, 1, 1, '#836a48');
+    }
+    for (let i = 0; i < 5; i++){                                          // fletching
+      const ax = 28 + i, ay = 19 - Math.round(i * 0.2);
+      px(c, ax, ay - 2 - Math.round(i * 0.4), 1, 3, '#7d3038');
+      px(c, ax, ay + 2, 1, 2 + Math.round(i * 0.4), '#7d3038');
+    }
+    for (let i = 0; i < 4; i++)                                           // the head, far side
+      px(c, 69 + i, 11 - Math.round(i * 0.2) - (i > 1 ? 1 : 0), 1, 3 - (i > 1 ? 1 : 0), '#a8a5b2');
+
+    grain(c, 0.05);
+    rimLight(c, 'rgba(200,220,255,0.10)');
+    formShadow(c);
+  }
   const PAINTERS = {
     hero_knight: knight, hero_mage: mage, hero_warden: warden,
     npc_alchemist: alchemist, hero_necromancer: necromancer, hero_rogue: rogue,
+    // enemies — each of these sprites is worn by several foes, so a figure here
+    // dresses the common kind, its elite and its guardian all at once
+    en_cultist: cultist, en_inquisitor: inquisitor, en_skeleton: skeleton,
   };
 
   // ---- traced art ----
