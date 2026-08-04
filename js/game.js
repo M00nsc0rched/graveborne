@@ -1,7 +1,7 @@
 // ================= GRAVEBORNE — main engine =================
 // shown on the title screen; keep in step with CACHE in sw.js — the game is
 // served from that cache, so the number you see is the build you're running
-const GAME_VERSION = 45;
+const GAME_VERSION = 46;
 let VW = 21, VH = 13;                 // viewport in tiles — reshaped to the stage on phones
 const TS = 32;                        // tile size in canvas pixels
 const TU = TS / 16;                   // old design unit -> new, for art not yet re-authored
@@ -3844,7 +3844,14 @@ function ornRule(label){
 function slotCell(opts){
   const el = U.make('div','slot' + (opts.filled ? ' filled' : '') + (opts.onClick ? ' usable' : ''));
   for (const k of ['tl','tr','bl','br']) el.appendChild(U.make('i','k ' + k));
-  el.appendChild(U.make('div','glyph', opts.glyph || ''));
+  if (opts.icon && Sprites.SPR[opts.icon]){
+    const c = U.make('canvas','ico'); c.width = 48; c.height = 48;
+    c.style.cssText = 'position:absolute;inset:0;margin:auto;width:72%;height:72%;image-rendering:pixelated;pointer-events:none';
+    Sprites.toCanvas(c, opts.icon, 4);
+    el.appendChild(c);
+  } else {
+    el.appendChild(U.make('div','glyph', opts.glyph || ''));
+  }
   if (opts.count > 1) el.appendChild(U.make('div','cnt', '×' + opts.count));
   if (opts.tag) el.appendChild(U.make('div','tag', T(opts.tag)));
   if (opts.title) el.title = opts.title;
@@ -3862,6 +3869,84 @@ function packGlyph(id){
   if (Data.POTIONS[id]) return '⚗';
   if (Data.ITEMS[id]) return '⚔';
   return '•';
+}
+// a real pixel icon for a thing — chosen by its slot, then by what it plainly is
+function iconFor(id, def){
+  if (typeof id === 'string' && id.indexOf('plant:') === 0) return 'ic_herb';
+  def = def || Data.CONSUMABLES[id] || Data.POTIONS[id] || Data.ITEMS[id];
+  if (!def) return null;
+  const n = (def.name || '').toLowerCase();
+  const has = (...w) => w.some(x => n.indexOf(x) >= 0);
+  if (Data.CONSUMABLES[id]) return def.food ? 'ic_food' : 'ic_potion';
+  if (Data.POTIONS[id])     return def.cat === 'food' ? 'ic_food' : 'ic_potion';
+  if (def.slot === 'weapon') return has('axe','cleaver','hatchet','maul') ? 'ic_axe' : 'ic_sword';
+  if (def.slot === 'armor'){
+    if (has('boot','greave','sabaton','tread','sole')) return 'ic_boots';
+    if (has('helm','crown','hood','coif','mask','visor')) return 'ic_helm';
+    if (has('glove','gauntlet','knuckle','grip','fist')) return 'ic_gauntlet';
+    if (has('cloak','shroud','cape','mantle','veil','robe','rags')) return 'ic_cape';
+    return 'ic_chest';
+  }
+  if (def.slot === 'trinket'){
+    if (has('ring','band','signet')) return 'ic_ring';
+    if (has('pouch','purse','sack','satchel','bowl')) return 'ic_pouch';
+    return 'ic_amulet';
+  }
+  return null;
+}
+
+// press-and-hold a cell to inspect what it holds. Element-scoped listeners only,
+// so nothing leaks when the inventory is torn down and rebuilt.
+function bindLongPress(el, fn){
+  let timer = null, sx = 0, sy = 0, fired = false;
+  const clear = () => { if (timer){ clearTimeout(timer); timer = null; } };
+  const down = (e) => {
+    fired = false;
+    const t = e.touches ? e.touches[0] : e;
+    sx = t.clientX; sy = t.clientY; clear();
+    timer = setTimeout(() => { timer = null; fired = true; fn(); }, 480);
+  };
+  const move = (e) => {
+    if (!timer) return;
+    const t = e.touches ? e.touches[0] : e;
+    if (Math.abs(t.clientX - sx) > 12 || Math.abs(t.clientY - sy) > 12) clear();
+  };
+  el.addEventListener('touchstart', down, { passive:true });
+  el.addEventListener('touchmove', move, { passive:true });
+  el.addEventListener('touchend', clear);
+  el.addEventListener('touchcancel', clear);
+  el.addEventListener('mousedown', down);
+  el.addEventListener('mousemove', move);
+  el.addEventListener('mouseup', clear);
+  el.addEventListener('mouseleave', clear);
+  // a completed hold must not also read as a tap (which would use the item)
+  el.addEventListener('click', (e) => { if (fired){ e.stopPropagation(); e.preventDefault(); fired = false; } }, true);
+  el.addEventListener('contextmenu', (e) => e.preventDefault());
+}
+
+// what a long-press pulls up: gear reuses the full compare sheet; provisions,
+// brews and reagents get a lighter card of their own.
+function showItemInfo(id){
+  if (Data.ITEMS[id]){ showItemCompare(id, null, false, null, showInventory); return; }
+  let def, kind = '';
+  if (typeof id === 'string' && id.indexOf('plant:') === 0){ def = Data.PLANTS[id.slice(6)]; kind = 'Reagent'; }
+  else if (Data.CONSUMABLES[id]){ def = Data.CONSUMABLES[id]; kind = 'Provision'; }
+  else if (Data.POTIONS[id]){ def = Data.POTIONS[id]; kind = 'Brew'; }
+  if (!def) return;
+  const s = U.make('div','sheet');
+  s.appendChild(U.make('div','sect', def.name));
+  s.appendChild(U.make('div','p dim', kind));
+  const eff = [];
+  if (def.heal)  eff.push(`restores ${Array.isArray(def.heal) ? def.heal[0] : def.heal} HP`);
+  if (def.sp)    eff.push(`restores ${def.sp} SP`);
+  if (def.food)  eff.push(`restores ${def.food} FOOD`);
+  if (def.dmg)   eff.push(`deals ${Array.isArray(def.dmg) ? def.dmg[0] : def.dmg} damage`);
+  if (eff.length) s.appendChild(U.make('div','p', `<b style="color:#d0a84e">Effect</b> — ${eff.join(' · ')}`));
+  if (def.desc)  s.appendChild(U.make('div','p dim', def.desc));
+  const row = U.make('div','row');
+  row.appendChild(Btn('Back', showInventory, 'btn center'));
+  s.appendChild(row);
+  setModal(s);
 }
 
 // ================= Inventory =================
@@ -3885,9 +3970,14 @@ function showInventory(){
     const rar = it ? (Data.RARITY[itemRarity(it)] || Data.RARITY.common) : null;
     const cell = slotCell({
       glyph: SLOT_GLYPH[slot], filled: !!it, tag: slot,
+      icon: it ? iconFor(id, it) : null,
       title: it ? `${it.name} — ${modStr(it.mods)}` : T('empty'),
     });
-    if (it) cell.querySelector('.glyph').style.color = rar.color;
+    if (it){
+      const gl = cell.querySelector('.glyph'); if (gl) gl.style.color = rar.color;
+      if (itemRarity(it) !== 'common') cell.style.boxShadow = 'inset 0 0 0 2px ' + rar.color;
+      bindLongPress(cell, () => showItemInfo(id));
+    }
     left.appendChild(cell);
   }
 
@@ -3949,17 +4039,21 @@ function showInventory(){
     if (!id){ pack.appendChild(slotCell({})); continue; }
     if (id.startsWith('plant:')){
       const pl = Data.PLANTS[id.slice(6)];
-      pack.appendChild(slotCell({ glyph:'❀', filled:true, count:counts[id], title: pl ? pl.name : '' }));
+      const pc = slotCell({ glyph:'❀', icon:'ic_herb', filled:true, count:counts[id], title: pl ? pl.name : '' });
+      bindLongPress(pc, () => showItemInfo(id));
+      pack.appendChild(pc);
       continue;
     }
     const cons = Data.CONSUMABLES[id], po = Data.POTIONS[id], it = Data.ITEMS[id];
     const def = cons || po || it;
     const cell = slotCell({
       glyph: packGlyph(id), filled:true, count:counts[id],
+      icon: iconFor(id, def),
       title: def ? (def.name + (def.desc ? ' — ' + def.desc : '')) : id,
       onClick: cons ? () => { (cons.food ? eatFood : usePotion)(id); hideModal(); showInventory(); } : null,
     });
-    if (po) cell.querySelector('.glyph').style.color = '#7fae3a';
+    if (po){ const gl = cell.querySelector('.glyph'); if (gl) gl.style.color = '#7fae3a'; }
+    bindLongPress(cell, () => showItemInfo(id));
     pack.appendChild(cell);
   }
   packWrap.appendChild(pack);

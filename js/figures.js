@@ -157,44 +157,45 @@ const Figures = (function(){
 
   // ================= the six =================
 
-  // Dark plate, horned helm, greatsword point-down, kite shield.
+  // Bright plate, cross-visor great helm, green cape, longsword point-down.
   function knight(c){
-    const P = { dark:'#14131c', mid:'#33313f', light:'#5d5b6c' };
+    const P = { dark:'#63616f', mid:'#adadc0', light:'#ececf6' };
     ground(c);
-    legs(c, { ...P, bootDark:'#0e0d14', bootLight:'#3c3a48' });
+    // green cape, hung behind the shoulders — painted first so the body sits over it
+    cloth(c, 25, 40, 50, 52, '#1f4a2c', '#3f8a50', '#65c074', 4);
+    tatter(c, 25, 90, 50, '#1f4a2c', 5);
+    legs(c, { ...P, bootDark:'#4a4858', bootLight:'#ececf6' });
     torso(c, P);
     arms(c, P);
-    pauldrons(c, { dark:'#0f0e15', mid:'#3a3846', light:'#6b697c' });
-    head(c, { dark:'#0f0e15', mid:'#34323f', light:'#5f5d6f' });
-    // visor: a dark slit with a lit brow above it
-    px(c, 40, 22, 20, 5, '#08070c');
-    px(c, 40, 20, 20, 2, '#6e6c80');
-    for (let i = 0; i < 4; i++) px(c, 43 + i*5, 22, 2, 5, '#1b1a24');
-    // horns sweeping up and out of the helm
-    for (let i = 0; i < 10; i++){
-      px(c, 37 - i, 12 - i, 3, 3, i < 6 ? '#2a2836' : '#4a4858');
-      px(c, 60 + i, 12 - i, 3, 3, i < 6 ? '#2a2836' : '#4a4858');
-    }
-    // breastplate emblem
-    px(c, 44, 42, 12, 12, '#8a6a28');
-    px(c, 46, 44, 8, 8, '#d0a84e');
-    px(c, 48, 46, 4, 4, '#ffe08a');
-    strap(c, 33, 60, 34, '#0d0c12', '#4a3520', '#8a6a28');
-    // greatsword, hilt at the hand and the blade hanging to the floor
-    px(c, 20, 58, 16, 4, '#6a5a3a');                       // crossguard
-    px(c, 26, 54, 4, 6, '#3a3448');                        // grip
-    px(c, 26, 50, 4, 4, '#d0a84e');                        // pommel
-    px(c, 26, 62, 4, 32, '#8e8ea6');                       // blade
-    px(c, 27, 62, 1, 32, '#cdcde0');                       // fuller highlight
-    px(c, 26, 94, 4, 4, '#6e6e86');
-    // kite shield on the other side
-    px(c, 70, 40, 20, 30, '#3a2a18');
-    px(c, 72, 42, 16, 26, '#5a4020');
-    px(c, 70, 40, 20, 2, '#7a5a30');
-    for (let i = 0; i < 5; i++) px(c, 74 + i*3, 44, 2, 22, '#4a3418');
-    px(c, 74, 68, 12, 10, '#3a2a18');                      // the point
-    px(c, 78, 50, 6, 6, '#d0a84e');                        // boss
-    rimLight(c, 'rgba(255,190,120,0.18)');
+    pauldrons(c, { dark:'#5a5868', mid:'#bcbcce', light:'#f4f4fc' });
+    // a tan fur mantle across the collar, over the shoulders
+    px(c, 26, 32, 48, 6, '#d6c294');
+    px(c, 26, 32, 48, 2, '#f0e0b8');
+    for (let i = 0; i < 8; i++) px(c, 28 + i*6, 34, 2, 5, '#b09a6a');
+    head(c, { dark:'#5a5868', mid:'#adadc0', light:'#ececf6' });
+    // a cross visor: a vertical bar and a slit across it, with a lit brow
+    px(c, 47, 14, 6, 20, '#0a0910');                       // vertical slit
+    px(c, 40, 22, 20, 5, '#0a0910');                       // slit across — a cross
+    px(c, 40, 20, 20, 2, '#f4f4fc');                       // brow highlight
+    // breastplate: a subtle raised cross rather than an emblem
+    px(c, 48, 40, 4, 22, '#d2d2e2');
+    px(c, 40, 48, 20, 4, '#d2d2e2');
+    strap(c, 33, 60, 34, '#3a2a18', '#7a6a45', '#b08a38'); // belt
+    // longsword, hilt at the hand and the blade hanging to the floor
+    px(c, 20, 58, 16, 4, '#7a7890');                       // crossguard
+    px(c, 26, 54, 4, 6, '#4a3a24');                        // grip
+    px(c, 26, 50, 4, 4, '#e0c078');                        // pommel
+    px(c, 26, 62, 4, 32, '#d6d6e6');                       // blade
+    px(c, 27, 62, 1, 32, '#ffffff');                       // fuller highlight
+    px(c, 26, 94, 4, 4, '#adadc0');
+    // steel heater shield on the other side, marked with a green cross
+    px(c, 70, 40, 20, 30, '#5a5868');
+    px(c, 72, 42, 16, 26, '#adadc0');
+    px(c, 72, 42, 16, 2, '#ececf6');
+    px(c, 79, 42, 2, 26, '#3f8a50');
+    px(c, 72, 53, 16, 2, '#3f8a50');
+    px(c, 74, 68, 12, 10, '#5a5868');                      // the point
+    rimLight(c, 'rgba(230,240,255,0.22)');
     formShadow(c);
   }
 
@@ -880,6 +881,9 @@ const Figures = (function(){
   const ART = (typeof FIGURE_ART === 'object' && FIGURE_ART) || {};
   const traced = {};
   for (const name in ART){
+    // the knight was reworked to the bright cross-visor look; its concept-sheet
+    // trace is the old dark design, so skip it and let the painter carry it
+    if (name === 'hero_knight') continue;
     const img = new Image();
     img.onload = () => {
       const cv = document.createElement('canvas');
