@@ -1,7 +1,7 @@
 // ================= GRAVEBORNE — main engine =================
 // shown on the title screen; keep in step with CACHE in sw.js — the game is
 // served from that cache, so the number you see is the build you're running
-const GAME_VERSION = 46;
+const GAME_VERSION = 47;
 let VW = 21, VH = 13;                 // viewport in tiles — reshaped to the stage on phones
 const TS = 32;                        // tile size in canvas pixels
 const TU = TS / 16;                   // old design unit -> new, for art not yet re-authored
@@ -3036,6 +3036,13 @@ function showCharSelect(){
   function renderDetail(){
     const id = ids[cur], c = Data.CLASSES[id], locked = isLocked(id);
     detailInner.innerHTML = '';
+    // a class with scene art gets it across the top of the opened dossier
+    if (!locked && typeof SCENES !== 'undefined' && SCENES[id]){
+      const scene = U.make('div','dd-scene');
+      const im = new Image(); im.src = SCENES[id]; im.alt = '';
+      scene.appendChild(im);
+      detailInner.appendChild(scene);
+    }
     if (locked){
       detailInner.appendChild(U.make('h4', null, '???'));
       detailInner.appendChild(U.make('div','dd-role', T('Sealed to you')));
