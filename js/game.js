@@ -1,7 +1,7 @@
 // ================= GRAVEBORNE — main engine =================
 // shown on the title screen; keep in step with CACHE in sw.js — the game is
 // served from that cache, so the number you see is the build you're running
-const GAME_VERSION = 47;
+const GAME_VERSION = 48;
 let VW = 21, VH = 13;                 // viewport in tiles — reshaped to the stage on phones
 const TS = 32;                        // tile size in canvas pixels
 const TU = TS / 16;                   // old design unit -> new, for art not yet re-authored
@@ -3851,7 +3851,13 @@ function ornRule(label){
 function slotCell(opts){
   const el = U.make('div','slot' + (opts.filled ? ' filled' : '') + (opts.onClick ? ' usable' : ''));
   for (const k of ['tl','tr','bl','br']) el.appendChild(U.make('i','k ' + k));
-  if (opts.icon && Sprites.SPR[opts.icon]){
+  // 'img:<key>' pulls a cut-out illustration from ITEM_ART; plain names are pixel SPR icons
+  if (opts.icon && typeof opts.icon === 'string' && opts.icon.indexOf('img:') === 0 &&
+      typeof ITEM_ART !== 'undefined' && ITEM_ART[opts.icon.slice(4)]){
+    const im = U.make('img','ico'); im.src = ITEM_ART[opts.icon.slice(4)]; im.alt = '';
+    im.style.cssText = 'position:absolute;inset:0;margin:auto;max-width:84%;max-height:84%;width:auto;height:auto;object-fit:contain;pointer-events:none;filter:drop-shadow(0 1px 1px rgba(0,0,0,.6))';
+    el.appendChild(im);
+  } else if (opts.icon && Sprites.SPR[opts.icon]){
     const c = U.make('canvas','ico'); c.width = 48; c.height = 48;
     c.style.cssText = 'position:absolute;inset:0;margin:auto;width:72%;height:72%;image-rendering:pixelated;pointer-events:none';
     Sprites.toCanvas(c, opts.icon, 4);
@@ -3884,19 +3890,30 @@ function iconFor(id, def){
   if (!def) return null;
   const n = (def.name || '').toLowerCase();
   const has = (...w) => w.some(x => n.indexOf(x) >= 0);
+  const art = (typeof ITEM_ART !== 'undefined') ? ITEM_ART : {};
   if (Data.CONSUMABLES[id]) return def.food ? 'ic_food' : 'ic_potion';
-  if (Data.POTIONS[id])     return def.cat === 'food' ? 'ic_food' : 'ic_potion';
-  if (def.slot === 'weapon') return has('axe','cleaver','hatchet','maul') ? 'ic_axe' : 'ic_sword';
+  if (Data.POTIONS[id])     return def.cat === 'food' ? 'ic_food' : (art.potion ? 'img:potion' : 'ic_potion');
+  if (def.slot === 'weapon'){
+    if (art.dagger && has('dagger','knife','dirk','kris','shiv','stiletto','needle','fang','kunai','shank')) return 'img:dagger';
+    if (art.tome && has('tome','grimoire','codex','book','spellbook','wand','staff','rod','scepter','stave')) return 'img:tome';
+    return has('axe','cleaver','hatchet','maul') ? 'ic_axe' : 'ic_sword';
+  }
   if (def.slot === 'armor'){
-    if (has('boot','greave','sabaton','tread','sole')) return 'ic_boots';
-    if (has('helm','crown','hood','coif','mask','visor')) return 'ic_helm';
-    if (has('glove','gauntlet','knuckle','grip','fist')) return 'ic_gauntlet';
+    if (art.boots && has('boot','greave','sabaton','tread','sole')) return 'img:boots';
+    if (art.mask && has('mask','visor','beak','muzzle')) return 'img:mask';
+    if (art.hood && has('hood','cowl','coif')) return 'img:hood';
+    if (has('helm','crown')) return 'ic_helm';
+    if (art.glove && has('glove','gauntlet','knuckle','grip','fist','mitt')) return 'img:glove';
     if (has('cloak','shroud','cape','mantle','veil','robe','rags')) return 'ic_cape';
     return 'ic_chest';
   }
   if (def.slot === 'trinket'){
-    if (has('ring','band','signet')) return 'ic_ring';
-    if (has('pouch','purse','sack','satchel','bowl')) return 'ic_pouch';
+    if (art.backpack && has('pouch','purse','sack','satchel','pack','bag','kit','knapsack')) return 'img:backpack';
+    if (has('ring','band','signet')){
+      if (has('amethyst','purple','violet','void','shadow','umbral','gloom','night')) return art.ring_amethyst ? 'img:ring_amethyst' : 'ic_ring';
+      return art.ring_green ? 'img:ring_green' : 'ic_ring';
+    }
+    if (art.amulet && has('amulet','pendant','talisman','charm','necklace','locket','idol','phylactery','sigil')) return 'img:amulet';
     return 'ic_amulet';
   }
   return null;
