@@ -1,7 +1,7 @@
 // ================= GRAVEBORNE — main engine =================
 // shown on the title screen; keep in step with CACHE in sw.js — the game is
 // served from that cache, so the number you see is the build you're running
-const GAME_VERSION = 49;
+const GAME_VERSION = 50;
 let VW = 21, VH = 13;                 // viewport in tiles — reshaped to the stage on phones
 const TS = 32;                        // tile size in canvas pixels
 const TU = TS / 16;                   // old design unit -> new, for art not yet re-authored
@@ -3885,13 +3885,14 @@ function packGlyph(id){
   return '•';
 }
 // the cut-out art set for the run's class, or null (other classes keep pixel icons).
-// rogue and mage each have their own themed sheet; keys never collide because only
-// one set is active at a time.
+// each class has its own themed sheet; keys never collide because only one set is
+// active at a time.
 function currentItemArt(){
   const cls = (typeof G !== 'undefined' && G.player && G.player.classId) ||
               (typeof G !== 'undefined' && G.selClass) || null;
-  if (cls === 'mage'  && typeof ITEM_ART_MAGE !== 'undefined') return ITEM_ART_MAGE;
-  if (cls === 'rogue' && typeof ITEM_ART      !== 'undefined') return ITEM_ART;
+  if (cls === 'mage'   && typeof ITEM_ART_MAGE   !== 'undefined') return ITEM_ART_MAGE;
+  if (cls === 'rogue'  && typeof ITEM_ART        !== 'undefined') return ITEM_ART;
+  if (cls === 'warden' && typeof ITEM_ART_WARDEN !== 'undefined') return ITEM_ART_WARDEN;
   return null;
 }
 // a real icon for a thing — chosen by its slot, then by what it plainly is. Items
@@ -3908,6 +3909,7 @@ function iconFor(id, def){
   if (Data.POTIONS[id])     return def.cat === 'food' ? 'ic_food' : (art.potion ? 'img:potion' : 'ic_potion');
   if (def.slot === 'weapon'){
     if (art.dagger && has('dagger','knife','dirk','kris','shiv','stiletto','needle','fang','kunai','shank')) return 'img:dagger';
+    if (art.sickle && has('sickle','scythe','kama','khopesh','crescent','reaper','scimitar','falchion','sabre','saber','glaive','hook','claw','moon')) return 'img:sickle';
     if (art.staff  && has('staff','stave','wand','rod','scepter','sceptre','branch','antler','cane')) return 'img:staff';
     if (art.tome   && has('tome','grimoire','codex','book','spellbook','wand','staff','rod','scepter','stave')) return 'img:tome';
     return has('axe','cleaver','hatchet','maul') ? 'ic_axe' : 'ic_sword';
@@ -3915,9 +3917,10 @@ function iconFor(id, def){
   if (def.slot === 'armor'){
     if (art.boots && has('boot','greave','sabaton','tread','sole')) return 'img:boots';
     if (art.mask && has('mask','visor','beak','muzzle')) return 'img:mask';
-    if (art.hood && has('hood','cowl','coif')) return 'img:hood';
+    if (art.hood && has('hood','cowl','coif','veil')) return 'img:hood';
     if (has('helm','crown')) return 'ic_helm';
     if (art.glove && has('glove','gauntlet','knuckle','grip','fist','mitt','bracer','vambrace','wrap')) return 'img:glove';
+    if (art.dress && has('dress','gown','frock','shift','wrappings','tatters','burial')) return 'img:dress';
     if (art.skirt && has('skirt','kilt','loincloth','legging','tasset','sarong','wrap')) return 'img:skirt';
     if (art.mantle && has('cloak','shroud','cape','mantle','veil','collar','feather','ruff','shawl')) return 'img:mantle';
     if (has('cloak','shroud','cape','mantle','veil','robe','rags')) return 'ic_cape';
@@ -3926,10 +3929,14 @@ function iconFor(id, def){
   if (def.slot === 'trinket'){
     if (art.backpack && has('pouch','purse','sack','satchel','pack','bag','kit','knapsack')) return 'img:backpack';
     if (art.bracelet && has('bracelet','bangle','wristlet','armlet','beads')) return 'img:bracelet';
+    if (art.pendant && has('pendant','locket','teardrop','droplet','vial','phial')) return 'img:pendant';
+    if (art.anklet && has('anklet','ankle')) return 'img:anklet';
+    if (art.band && has('band','circlet','torc','choker','collar')) return 'img:band';
     if (has('ring','band','signet')){
       if (has('amethyst','purple','violet','void','shadow','umbral','gloom','night')) return art.ring_amethyst ? 'img:ring_amethyst' : 'ic_ring';
       if (art.ring_green) return 'img:ring_green';
       if (art.ring_blue)  return 'img:ring_blue';
+      if (art.ring)       return 'img:ring';
       return 'ic_ring';
     }
     if (art.amulet && has('amulet','pendant','talisman','charm','necklace','locket','idol','phylactery','sigil')) return 'img:amulet';
