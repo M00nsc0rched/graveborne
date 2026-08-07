@@ -1,5 +1,5 @@
 // Graveborne service worker — cache-first, so the game runs fully offline once loaded.
-const CACHE = 'graveborne-v53';
+const CACHE = 'graveborne-v54';
 const ASSETS = [
   './',
   './index.html',
@@ -16,6 +16,7 @@ const ASSETS = [
   './js/items-art.js',
   './js/items-art-mage.js',
   './js/items-art-warden.js',
+  './js/items-art-knight.js',
   './js/i18n.js',
   './js/i18n-data.js',
   './js/figures-art.js',

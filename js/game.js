@@ -1,7 +1,7 @@
 // ================= GRAVEBORNE — main engine =================
 // shown on the title screen; keep in step with CACHE in sw.js — the game is
 // served from that cache, so the number you see is the build you're running
-const GAME_VERSION = 53;
+const GAME_VERSION = 54;
 let VW = 21, VH = 13;                 // viewport in tiles — reshaped to the stage on phones
 const TS = 32;                        // tile size in canvas pixels
 const TU = TS / 16;                   // old design unit -> new, for art not yet re-authored
@@ -3928,6 +3928,7 @@ function currentItemArt(){
   if (cls === 'mage'   && typeof ITEM_ART_MAGE   !== 'undefined') return ITEM_ART_MAGE;
   if (cls === 'rogue'  && typeof ITEM_ART        !== 'undefined') return ITEM_ART;
   if (cls === 'warden' && typeof ITEM_ART_WARDEN !== 'undefined') return ITEM_ART_WARDEN;
+  if (cls === 'knight' && typeof ITEM_ART_KNIGHT !== 'undefined') return ITEM_ART_KNIGHT;
   return null;
 }
 // a real icon for a thing — chosen by its slot, then by what it plainly is. Items
@@ -3942,8 +3943,11 @@ function iconFor(id, def){
   const art = currentItemArt() || {};
   if (Data.CONSUMABLES[id]) return def.food ? 'ic_food' : 'ic_potion';
   if (Data.POTIONS[id])     return def.cat === 'food' ? 'ic_food' : (art.potion ? 'img:potion' : 'ic_potion');
+  // a shield reads the same whatever slot it sits in
+  if (art.shield && has('shield','buckler','aegis','bulwark','targe','kite','rondel','pavise')) return 'img:shield';
   if (def.slot === 'weapon'){
     if (art.dagger && has('dagger','knife','dirk','kris','shiv','stiletto','needle','fang','kunai','shank')) return 'img:dagger';
+    if (art.axe && has('axe','mace','maul','hammer','warhammer','halberd','bardiche','poleaxe','cleaver','hatchet','flail','morningstar','greatsword')) return 'img:axe';
     if (art.sickle && has('sickle','scythe','kama','khopesh','crescent','reaper','scimitar','falchion','sabre','saber','glaive','hook','claw','moon')) return 'img:sickle';
     if (art.staff  && has('staff','stave','wand','rod','scepter','sceptre','branch','antler','cane')) return 'img:staff';
     if (art.tome   && has('tome','grimoire','codex','book','spellbook','wand','staff','rod','scepter','stave')) return 'img:tome';
@@ -3953,10 +3957,12 @@ function iconFor(id, def){
     if (art.boots && has('boot','greave','sabaton','tread','sole')) return 'img:boots';
     if (art.mask && has('mask','visor','beak','muzzle')) return 'img:mask';
     if (art.hood && has('hood','cowl','coif','veil')) return 'img:hood';
+    if (art.helm && has('helm','crown','greathelm','sallet','bascinet','casque','visor')) return 'img:helm';
     if (has('helm','crown')) return 'ic_helm';
+    if (art.gauntlet && has('gauntlet','glove','knuckle','grip','fist','mitt','vambrace','bracer')) return 'img:gauntlet';
     if (art.glove && has('glove','gauntlet','knuckle','grip','fist','mitt','bracer','vambrace','wrap')) return 'img:glove';
     if (art.dress && has('dress','gown','frock','shift','wrappings','tatters','burial')) return 'img:dress';
-    if (art.skirt && has('skirt','kilt','loincloth','legging','tasset','sarong','wrap')) return 'img:skirt';
+    if (art.skirt && has('skirt','kilt','loincloth','legging','tasset','sarong','fauld','greaves','wrap')) return 'img:skirt';
     if (art.mantle && has('cloak','shroud','cape','mantle','veil','collar','feather','ruff','shawl')) return 'img:mantle';
     if (has('cloak','shroud','cape','mantle','veil','robe','rags')) return 'ic_cape';
     return 'ic_chest';

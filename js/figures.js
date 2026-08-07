@@ -881,9 +881,6 @@ const Figures = (function(){
   const ART = (typeof FIGURE_ART === 'object' && FIGURE_ART) || {};
   const traced = {};
   for (const name in ART){
-    // the knight was reworked to the bright cross-visor look; its concept-sheet
-    // trace is the old dark design, so skip it and let the painter carry it
-    if (name === 'hero_knight') continue;
     const img = new Image();
     img.onload = () => {
       const cv = document.createElement('canvas');
