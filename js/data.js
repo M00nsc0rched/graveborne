@@ -252,6 +252,17 @@ const SKILLS = {
         {effect:{shield:'def4',regen:{amt:11,turns:5}}}] },
 };
 
+// Support is meant to be dear. Healing, shields and buffs cost far more SP than
+// a plain swing, so you spend your defence rather than spam it — a paid skill of
+// these kinds jumps by 7 SP (capped at 12). Free ones (Meditate) stay free, and
+// attacks — even lifesteal ones — are untouched. Enemy/follower moves live in
+// their own tables, so this only touches the player's skill list.
+for (const _id in SKILLS){
+  const _sk = SKILLS[_id];
+  if (_sk.cost > 0 && (_sk.type === 'defend' || _sk.type === 'buff' || _sk.type === 'heal'))
+    _sk.cost = Math.min(12, _sk.cost + 7);
+}
+
 // ---------- Class passives ----------
 // One signature rule per class, always on, no button to press.
 const PASSIVES = {

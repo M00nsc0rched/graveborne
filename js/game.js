@@ -1,12 +1,13 @@
 // ================= GRAVEBORNE — main engine =================
 // shown on the title screen; keep in step with CACHE in sw.js — the game is
 // served from that cache, so the number you see is the build you're running
-const GAME_VERSION = 51;
+const GAME_VERSION = 52;
 let VW = 21, VH = 13;                 // viewport in tiles — reshaped to the stage on phones
 const TS = 32;                        // tile size in canvas pixels
 const TU = TS / 16;                   // old design unit -> new, for art not yet re-authored
 const SPRITE_PX = 24;                 // how much of a tile a creature fills
 const SPRITE_OFF = (TS - SPRITE_PX) >> 1;
+const HERO_MAP_PX = 34;               // the player's 100x100 figure, drawn a touch taller than a tile on the map
 // deterministic per-tile noise, so stonework varies but never flickers
 function tileHash(x, y, salt){
   let h = (x * 374761393 + y * 668265263 + (salt || 0) * 2147483647) | 0;
@@ -2500,11 +2501,11 @@ function renderExplore(){
     for (const [back, a] of [[0.34, 0.22], [0.62, 0.11]]){
       const t = Math.max(0, slideEase(k) - back);
       ctx.globalAlpha = a * fade;
-      Sprites.drawFit(ctx, p.sprite, SX(s.fromX + dx*t)+SPRITE_OFF, SY(s.fromY + dy*t)+SPRITE_OFF, SPRITE_PX);
+      heroArt(ctx, p.sprite, SX(s.fromX + dx*t) + (TS-HERO_MAP_PX)/2, SY(s.fromY + dy*t) + TS-HERO_MAP_PX-2, HERO_MAP_PX, true);
     }
     ctx.globalAlpha = 1;
   }
-  Sprites.drawFit(ctx, p.sprite, SX(p.rx)+SPRITE_OFF, SY(p.ry)+SPRITE_OFF, SPRITE_PX);
+  heroArt(ctx, p.sprite, SX(p.rx) + (TS-HERO_MAP_PX)/2, SY(p.ry) + TS-HERO_MAP_PX-2, HERO_MAP_PX, true);
 
   // fog: darken explored-not-visible
   for (let vy = 0; vy <= VH; vy++){
@@ -2912,6 +2913,23 @@ function classStatDeltas(id){
   return { up, dn };
 }
 
+// Draw a hero using its 100x100 combat figure when one exists, else the low-res
+// sprite. `smooth` gives a soft downscale (map, portrait); the card sits near 1:1
+// and stays crisp. imageSmoothing is saved and restored so the caller's pixel art
+// is unaffected. Returns true either way.
+function heroArt(ctx, sprite, x, y, size, smooth){
+  const cv = (typeof Figures !== 'undefined') ? Figures.get(sprite) : null;
+  if (cv){
+    const prev = ctx.imageSmoothingEnabled;
+    ctx.imageSmoothingEnabled = !!smooth;
+    if (smooth) ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(cv, Math.round(x), Math.round(y), Math.round(size), Math.round(size));
+    ctx.imageSmoothingEnabled = prev;
+    return true;
+  }
+  return Sprites.drawFit(ctx, sprite, Math.round(x), Math.round(y), Math.round(size));
+}
+
 // the card face: a lit alcove with the class standing in it
 function paintCardArt(cv, c){
   const ctx = cv.getContext('2d');
@@ -2930,10 +2948,10 @@ function paintCardArt(cv, c){
   const rg = ctx.createRadialGradient(W/2, H*0.62, 2, W/2, H*0.62, W*0.5);
   rg.addColorStop(0, 'rgba(208,168,78,0.13)'); rg.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = rg; ctx.fillRect(0, 0, W, H);
-  // 48px suits both resolutions exactly (12x4 and 24x2), so a redrawn class and
-  // one still on the old art stand the same height on their cards
-  const art = 48;
-  Sprites.drawFit(ctx, c.sprite, Math.round(W/2 - art/2), Math.round(H*0.88 - art), art);
+  // the 100x100 figure stands in the alcove; classes without one fall back to the
+  // old sprite at the same footing
+  const fs = Math.round(Math.min(W*0.94, H*0.66));
+  heroArt(ctx, c.sprite, Math.round(W/2 - fs/2), Math.round(H*0.87 - fs), fs, true);
   ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(0, H - 3, W, 3);
 }
 
@@ -3292,7 +3310,8 @@ function showAllotment(){
     : 'Nothing. There is no before — she traded it, and the terms were not favourable.'));
 
   const head = U.make('div','card sel');
-  const cv = U.make('canvas'); cv.width=52; cv.height=52; head.appendChild(cv); Sprites.toCanvas(cv, c.sprite, 4);
+  const cv = U.make('canvas'); cv.width=52; cv.height=52; head.appendChild(cv);
+  heroArt(cv.getContext('2d'), c.sprite, 0, 0, 52, true);
   const info = U.make('div');
   info.appendChild(U.make('h3', null, c.name));
   info.appendChild(U.make('div','role', c.role));
