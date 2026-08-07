@@ -1,7 +1,7 @@
 // ================= GRAVEBORNE — main engine =================
 // shown on the title screen; keep in step with CACHE in sw.js — the game is
 // served from that cache, so the number you see is the build you're running
-const GAME_VERSION = 50;
+const GAME_VERSION = 51;
 let VW = 21, VH = 13;                 // viewport in tiles — reshaped to the stage on phones
 const TS = 32;                        // tile size in canvas pixels
 const TU = TS / 16;                   // old design unit -> new, for art not yet re-authored
@@ -1049,18 +1049,34 @@ function freeNearby(x, y){
 function activePotionQuest(){
   return G.floor && G.floor.entities.find(e => e.type==='npc' && e.quest && e.quest.stage==='active');
 }
+const PLANT_CAP = 3;   // a non-brewer carries at most this many of each herb; extras are crushed on the spot
 function collectPlant(e){
-  const p = G.player, npc = activePotionQuest(), nm = Data.PLANTS[e.plant].name;
-  // every herb goes into your gathering pouch (the Alchemist brews from these)
+  const p = G.player, npc = activePotionQuest(), pd = Data.PLANTS[e.plant], nm = pd.name;
   p.plants = p.plants || {};
-  p.plants[e.plant] = (p.plants[e.plant] || 0) + 1;
-  if (npc && npc.quest.plants.includes(e.plant) && !npc.quest.have.includes(e.plant)){
-    npc.quest.have.push(e.plant);
-    log(`You gather ${nm}. (${npc.quest.have.length}/3 for the potion-maker)`, 'good');
+  // only the Alchemist (a craft-only class) hoards herbs to brew; everyone else
+  // keeps a few of each and gets a small restorative from any beyond the cap
+  const brewer = p.classId === 'alchemist' || (Data.CLASSES[p.classId] && Data.CLASSES[p.classId].craftOnly);
+  const cur = p.plants[e.plant] || 0;
+  const questGrab = npc && npc.quest.plants.includes(e.plant) && !npc.quest.have.includes(e.plant);
+  if (brewer || cur < PLANT_CAP){
+    p.plants[e.plant] = cur + 1;
+    if (questGrab){
+      npc.quest.have.push(e.plant);
+      log(`You gather ${nm}. (${npc.quest.have.length}/3 for the potion-maker)`, 'good');
+    } else {
+      log(`You gather ${nm}.`, 'dim');
+    }
+    floatOn(true, pd.glyph, pd.color);
   } else {
-    log(`You gather ${nm}.`, 'dim');
+    // already carrying three — no bottles to brew, so crush it for what it holds
+    const use = pd.use || { hp:5 }, parts = [];
+    if (use.hp){   const b = p.hp;   p.hp   = Math.min(p.maxhp, p.hp   + use.hp);   if (p.hp-b>0)   parts.push(`+${p.hp-b} HP`); }
+    if (use.sp){   const b = p.sp;   p.sp   = Math.min(p.maxsp, p.sp   + use.sp);   if (p.sp-b>0)   parts.push(`+${p.sp-b} SP`); }
+    if (use.food){ const b = p.food; p.food = Math.min(FOOD_MAX, p.food + use.food); if (p.food-b>0) parts.push(`+${p.food-b} FOOD`); }
+    if (parts.length) log(`You already carry three ${nm}; you crush this one and take it in — ${parts.join(', ')}.`, 'good');
+    else              log(`You already carry three ${nm}, and need nothing it offers — you leave it crushed underfoot.`, 'dim');
+    floatOn(true, pd.glyph, pd.color);
   }
-  floatOn(true, Data.PLANTS[e.plant].glyph, Data.PLANTS[e.plant].color);
   G.floor.removeEntity(e);
   updateHUD();
 }

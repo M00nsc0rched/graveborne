@@ -695,13 +695,15 @@ const CONSUMABLES = {
 // Each floor's request draws three of these; the last is the one that only
 // pushes up where the floor's keeper (its guardian) falls.
 const PLANTS = {
-  bloodroot:  { name:'Bloodroot',      glyph:'✿', color:'#c05070' },
-  gravemoss:  { name:'Gravemoss',      glyph:'❧', color:'#7fae3a' },
-  wickthorn:  { name:'Wickthorn',      glyph:'✤', color:'#c8a24a' },
-  nightcap:   { name:'Nightcap',       glyph:'❀', color:'#9a5cc0' },
-  ashen_lily: { name:'Ashen Lily',     glyph:'✽', color:'#c9bfd6' },
-  weepwort:   { name:'Weepwort',       glyph:'❦', color:'#7fb0d0' },
-  gallowvine: { name:'Gallowvine',     glyph:'☙', color:'#6fbf6a' },
+  // `use` is what a non-brewer gets when they crush an extra herb on the spot —
+  // they can carry only a few of each; the Alchemist alone hoards them to brew
+  bloodroot:  { name:'Bloodroot',      glyph:'✿', color:'#c05070', use:{ hp:8 } },
+  gravemoss:  { name:'Gravemoss',      glyph:'❧', color:'#7fae3a', use:{ food:10 } },
+  wickthorn:  { name:'Wickthorn',      glyph:'✤', color:'#c8a24a', use:{ sp:6 } },
+  nightcap:   { name:'Nightcap',       glyph:'❀', color:'#9a5cc0', use:{ sp:8 } },
+  ashen_lily: { name:'Ashen Lily',     glyph:'✽', color:'#c9bfd6', use:{ hp:6 } },
+  weepwort:   { name:'Weepwort',       glyph:'❦', color:'#7fb0d0', use:{ sp:8 } },
+  gallowvine: { name:'Gallowvine',     glyph:'☙', color:'#6fbf6a', use:{ food:10 } },
 };
 
 // ---------- Potions the Alchemist brews from gathered plants ----------
