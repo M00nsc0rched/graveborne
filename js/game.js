@@ -1,7 +1,7 @@
 // ================= GRAVEBORNE — main engine =================
 // shown on the title screen; keep in step with CACHE in sw.js — the game is
 // served from that cache, so the number you see is the build you're running
-const GAME_VERSION = 55;
+const GAME_VERSION = 56;
 let VW = 21, VH = 13;                 // viewport in tiles — reshaped to the stage on phones
 const TS = 32;                        // tile size in canvas pixels
 const TU = TS / 16;                   // old design unit -> new, for art not yet re-authored
@@ -2939,11 +2939,13 @@ function paintCardArt(cv, c){
   const g = ctx.createLinearGradient(0, 0, 0, H);
   g.addColorStop(0, '#1a1428'); g.addColorStop(0.55, '#100c1a'); g.addColorStop(1, '#07050d');
   ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-  // an arch behind the figure, so every card reads as the same shrine
-  ctx.strokeStyle = 'rgba(208,168,78,0.16)'; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.arc(W/2, H*0.46, W*0.34, Math.PI, 0); ctx.stroke();
-  ctx.fillStyle = 'rgba(208,168,78,0.05)';
-  ctx.fillRect(Math.round(W/2 - W*0.34), Math.round(H*0.46), Math.round(W*0.68), Math.round(H*0.32));
+  // No arch here. A semicircle sitting on a filled rectangle is the silhouette
+  // of a padlock, and behind a figure that is all it read as — a lock the eye
+  // kept finding instead of the character. The alcove is carried by the light
+  // alone now: a wash from above and the glow the figure stands in.
+  const top = ctx.createLinearGradient(0, 0, 0, H * 0.6);
+  top.addColorStop(0, 'rgba(208,168,78,0.07)'); top.addColorStop(1, 'rgba(208,168,78,0)');
+  ctx.fillStyle = top; ctx.fillRect(0, 0, W, Math.round(H * 0.6));
   // floor line + the glow the figure stands in
   const rg = ctx.createRadialGradient(W/2, H*0.62, 2, W/2, H*0.62, W*0.5);
   rg.addColorStop(0, 'rgba(208,168,78,0.13)'); rg.addColorStop(1, 'rgba(0,0,0,0)');
@@ -3001,7 +3003,8 @@ function showCharSelect(){
     el.appendChild(U.make('div','tcard-name', locked ? '???' : c.name.toUpperCase()));
 
     const frame = U.make('div','tcard-frame');
-    const cv = U.make('canvas'); cv.width = 59; cv.height = 84;
+    // exactly half the frame's CSS size, so the pixel art lands on a whole 2x
+    const cv = U.make('canvas'); cv.width = 75; cv.height = 107;
     frame.appendChild(cv);
     if (locked){
       paintLockedArt(cv);
@@ -3053,7 +3056,7 @@ function showCharSelect(){
   nav.appendChild(prevB); nav.appendChild(pips); nav.appendChild(nextB);
   s.appendChild(nav);
 
-  const hint = U.make('div','deck-hint','Pull the card up to draw it — <b>↑</b> or drag  ·  down for details');
+  const hint = U.make('div','deck-hint','Pull up to draw  ·  down for details  ·  swipe to turn');
   s.appendChild(hint);
 
   const row = U.make('div','row');
@@ -3105,19 +3108,26 @@ function showCharSelect(){
     if (detailOpen) renderDetail();
   }
 
+  // the rail's resting offset, kept so a swipe can drag away from it and snap back
+  let railX = 0;
+  function setRail(px, animate){
+    rail.style.transition = animate ? '' : 'none';
+    rail.style.transform = `translateX(${px}px)`;
+  }
   function layout(){
     const el = cardEls[cur];
     if (!el) return;
     // centre the current card: the rail's origin sits at the deck's midpoint
     const x = el.offsetLeft + el.offsetWidth / 2;
-    rail.style.transform = `translateX(${-x}px)`;
+    railX = -x;
+    setRail(railX, true);
     cardEls.forEach((c, i) => c.classList.toggle('is-current', i === cur));
     [...pips.children].forEach((p, i) => p.classList.toggle('on', i === cur));
     const id = ids[cur];
     if (!isLocked(id)) G.selClass = id;
     hint.innerHTML = isLocked(id)
       ? T('This one is sealed. Earn it, and it will take your hand.')
-      : T('Pull the card up to draw it — <b>↑</b> or drag  ·  down for details');
+      : T('Pull up to draw  ·  down for details  ·  swipe to turn');
     prevB.disabled = cur <= 0; nextB.disabled = cur >= ids.length - 1;
     if (detailOpen) renderDetail();
   }
@@ -3138,63 +3148,127 @@ function showCharSelect(){
     });
   });
 
-  // ---- pull-to-draw ----
-  // One drag at a time, tracked here rather than per card, so the window
-  // listeners are a single pair that gets torn down when the deck closes —
-  // otherwise every visit to this screen left another twelve behind.
+  // ---- one gesture, three meanings ----
+  // Sideways pages the deck, up draws the card, down opens its dossier. The axis
+  // is decided once, at the first few pixels, and then held — otherwise a swipe
+  // that drifts upward starts burning the card it was only trying to leave.
+  //
+  // It is tracked here rather than per card, so the window listeners are a single
+  // pair that gets torn down when the deck closes; per card, every visit to this
+  // screen left another twelve behind.
   const DETAIL_PULL = 34;   // how far down before the dossier commits to opening
-  let dragEl = null, startY = null, moved = 0, swallowClick = false;
+  const AXIS_LOCK = 7;      // how far before the drag decides which way it is going
+  const SWIPE = 44;         // how far sideways before the release pages the deck
+  const DRAW_PULL = 46;     // how far up before the release draws the card
+  const BURN_PULL = 165;    // the pull that would burn the card outright...
+  const BURN_MAX = 0.62;    // ...but the finger only ever gets it this far
+  const reduceMotion = window.matchMedia
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  let dragging = false, dragEl = null, axis = null;
+  let startX = 0, startY = 0, moved = 0, movedX = 0;
+  let burning = null, swallowClick = false;
+  const ptrX = (e) => (e.touches && e.touches[0]) ? e.touches[0].clientX : e.clientX;
   const ptrY = (e) => (e.touches && e.touches[0]) ? e.touches[0].clientY : e.clientY;
+
+  const dropBurn = () => { if (burning){ burning.cancel(); burning = null; } };
+
   const onMove = (e) => {
-    if (!dragEl) return;
-    moved = startY - ptrY(e);
-    if (e.cancelable && Math.abs(moved) > 4) e.preventDefault();
+    if (!dragging) return;
+    const dx = ptrX(e) - startX, dy = startY - ptrY(e);
+    if (!axis){
+      if (Math.max(Math.abs(dx), Math.abs(dy)) < AXIS_LOCK) return;
+      axis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+      // only the centred card can be pulled; a swipe may start on any of them
+      if (axis === 'y' && !dragEl){ dragging = false; return; }
+    }
+    if (e.cancelable) e.preventDefault();
+
+    if (axis === 'x'){
+      movedX = dx;
+      // the rail follows the finger, and drags heavy at the two ends so the deck
+      // reads as bounded rather than broken
+      const atEnd = (dx > 0 && cur === 0) || (dx < 0 && cur === ids.length - 1);
+      setRail(railX + (atEnd ? dx * 0.3 : dx), false);
+      return;
+    }
+
+    moved = dy;
     if (moved > 0){
-      dragEl.classList.add('drawing');
-      dragEl.style.transform = `translateY(${-Math.min(moved, 90)}px) scale(1)`;
+      // the burn rides the pull: the card is already being eaten while the finger
+      // is still on it, and the release only finishes what the drag started
+      if (!isLocked(dragEl.dataset.id) && !reduceMotion){
+        if (!burning) burning = startBurn(dragEl);
+        burning.set(Math.min(BURN_MAX, moved / BURN_PULL), Math.min(moved, 110));
+      } else {
+        dragEl.classList.add('drawing');
+        dragEl.style.transform = `translateY(${-Math.min(moved, 90)}px) scale(1)`;
+      }
     } else if (moved < 0){
       // pulling down peeks at the dossier, and opens it once you commit
+      dropBurn();
       dragEl.classList.add('drawing');
       dragEl.style.transform = `translateY(${Math.min(-moved, 26)}px) scale(1)`;
       if (-moved > DETAIL_PULL && !detailOpen) setDetail(true);
     }
   };
+
   const onUp = () => {
-    if (!dragEl) return;
-    const el = dragEl; dragEl = null;
-    // releasing also fires a click; an aborted pull must not draw the card anyway
-    if (Math.abs(moved) > 4) swallowClick = true;
-    if (moved > 46 && !isLocked(el.dataset.id)){ beginDraw(el); return; }
+    if (!dragging) return;
+    const el = dragEl, ax = axis;
+    dragging = false; dragEl = null; axis = null;
+    // releasing also fires a click; an aborted gesture must not act on it
+    if (Math.abs(moved) > 4 || Math.abs(movedX) > 4) swallowClick = true;
+
+    if (ax === 'x'){
+      const d = Math.abs(movedX) > SWIPE ? (movedX < 0 ? 1 : -1) : 0;
+      movedX = 0;
+      if (d && cur + d >= 0 && cur + d < ids.length) go(d); else setRail(railX, true);
+      return;
+    }
+    if (!el) return;
+    if (moved > DRAW_PULL && !isLocked(el.dataset.id)){
+      const b = burning; burning = null;
+      beginDraw(el, b);
+      return;
+    }
+    dropBurn();
     // a downward pull that never reached the threshold closes it again
     if (moved < 0 && -moved <= DETAIL_PULL) setDetail(false);
     el.classList.remove('drawing');
-    el.style.transform = '';
+    el.style.transform = ''; el.style.opacity = '';
+    moved = 0;
   };
-  cardEls.forEach((el, i) => {
-    const down = (e) => {
-      if (drawing || i !== cur) return;
-      dragEl = el; startY = ptrY(e); moved = 0;
-    };
-    el.addEventListener('touchstart', down, { passive:true });
-    el.addEventListener('touchmove', onMove, { passive:false });
-    el.addEventListener('touchend', onUp);
-    el.addEventListener('touchcancel', onUp);
-    el.addEventListener('mousedown', down);
-  });
+
+  const down = (e) => {
+    if (drawing) return;
+    dragging = true; axis = null; moved = 0; movedX = 0;
+    startX = ptrX(e); startY = ptrY(e);
+    dragEl = (cardEls[cur] && cardEls[cur].contains(e.target)) ? cardEls[cur] : null;
+  };
+  deck.addEventListener('touchstart', down, { passive:true });
+  deck.addEventListener('touchmove', onMove, { passive:false });
+  deck.addEventListener('touchend', onUp);
+  deck.addEventListener('touchcancel', onUp);
+  deck.addEventListener('mousedown', down);
   window.addEventListener('mousemove', onMove);
   window.addEventListener('mouseup', onUp);
   teardown = () => {
     window.removeEventListener('mousemove', onMove);
     window.removeEventListener('mouseup', onUp);
+    dropBurn();
   };
 
-  function beginDraw(el){
+  // `burning` is the controller the pull already started, if there was one; the
+  // click and the keyboard arrive without it and burn from cold
+  function beginDraw(el, burnInProgress){
     if (drawing) return;
     drawing = true;
     G.selClass = el.dataset.id;
     G.deck = null;
     if (teardown){ teardown(); G.deckTeardown = null; }
-    burnCard(el, () => showAllotment());
+    if (burnInProgress) burnInProgress.finish(() => showAllotment());
+    else burnCard(el, () => showAllotment());
   }
 
   // arrow keys and Enter drive the deck too (see onKey)
@@ -3211,12 +3285,16 @@ function showCharSelect(){
 
 // The card rises out of the rail and is eaten from the bottom up: the DOM node is
 // clipped to a jagged front that climbs, while a canvas paints the ember edge and
-// the sparks coming off it. Reduced-motion skips straight to the payload.
-function burnCard(el, done){
-  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  if (reduce){ done(); return; }
-
-  el.classList.add('drawing');
+// the sparks coming off it.
+//
+// This is a controller rather than a one-shot animation, because the pull is what
+// drives it. While the finger is still on the card, `set()` walks the front to
+// wherever the drag has reached, so the card is visibly burning as it is drawn;
+// `finish()` only takes the rest of the way once it is released, easing on from
+// however far the pull got. `cancel()` puts the card back for a pull that was
+// thought better of. Its own rAF runs throughout, so the embers keep breathing
+// even while the finger is held still.
+function startBurn(el){
   const rect = el.getBoundingClientRect();
   const layer = U.make('div','burn-layer');
   const cv = U.make('canvas');
@@ -3226,6 +3304,7 @@ function burnCard(el, done){
   el.appendChild(layer);
   const ctx = cv.getContext('2d');
   ctx.imageSmoothingEnabled = false;
+  el.classList.add('drawing');
 
   // one jagged profile, reused every frame so the edge does not swim about
   const COLS = 22;
@@ -3234,44 +3313,41 @@ function burnCard(el, done){
 
   const sparks = [];
   const DUR = 760, LIFT = 118;
-  const t0 = performance.now();
+  let front = 0, lift = 0;                    // front: 0 = untouched, 1 = wholly gone
+  let finishing = false, dead = false, raf = 0;
+  let t0 = 0, front0 = 0, lift0 = 0, span = DUR, done = null;
 
-  function frame(now){
-    const k = Math.min(1, (now - t0) / DUR);
-    const ease = k * k * (3 - 2 * k);
+  // where the burnt edge sits in a column, as a percentage down the card
+  const edgeAt = (i, f) =>
+    Math.max(0, Math.min(100, (1 - f) * 100 + jag[i] * (1 - Math.abs(0.5 - f) * 1.2)));
 
-    // the card climbs out of the rail as it goes
-    el.style.transform = `translateY(${-(LIFT * ease)}px) scale(${1 - 0.06 * ease})`;
-    el.style.opacity = String(1 - 0.15 * ease);
+  function draw(){
+    el.style.transform = `translateY(${-lift}px) scale(${1 - 0.06 * (lift / LIFT)})`;
+    el.style.opacity = String(1 - 0.15 * front);
 
-    // burn front, as a fraction of the card height from the bottom
-    const front = ease;                       // 0 = untouched, 1 = wholly gone
     const pts = [];
-    for (let i = 0; i <= COLS; i++){
-      const px = (i / COLS) * 100;
+    for (let i = 0; i <= COLS; i++)
       // quantise to keep the edge blocky, like the rest of the art
-      const py = Math.max(0, Math.min(100, (1 - front) * 100 + jag[i] * (1 - Math.abs(0.5 - front) * 1.2)));
-      pts.push(`${px}% ${Math.round(py / 2) * 2}%`);
-    }
-    el.style.clipPath = `polygon(0 0, 100% 0, ${[...pts].reverse().join(', ')}, 0 0)`;
+      pts.push(`${(i / COLS) * 100}% ${Math.round(edgeAt(i, front) / 2) * 2}%`);
+    el.style.clipPath = `polygon(0 0, 100% 0, ${pts.reverse().join(', ')}, 0 0)`;
     el.style.webkitClipPath = el.style.clipPath;
 
     // ---- embers along the front, drawn in the layer's own space ----
     ctx.clearRect(0, 0, W, H);
     const padX = 18, padY = 24;
-    const cardW = rect.width, cardH = rect.height;
-    for (let i = 0; i <= COLS; i++){
-      const px = padX + (i / COLS) * cardW;
-      const pyPct = (1 - front) * 100 + jag[i] * (1 - Math.abs(0.5 - front) * 1.2);
-      const py = padY + (Math.max(0, Math.min(100, pyPct)) / 100) * cardH;
-      if (front <= 0.01 || front >= 0.995) continue;
-      ctx.fillStyle = 'rgba(255,150,40,0.95)';
-      ctx.fillRect(Math.round(px) - 2, Math.round(py) - 2, 5, 4);
-      ctx.fillStyle = 'rgba(255,215,120,0.85)';
-      ctx.fillRect(Math.round(px) - 1, Math.round(py) - 1, 2, 2);
-      ctx.fillStyle = 'rgba(90,40,20,0.75)';
-      ctx.fillRect(Math.round(px) - 3, Math.round(py) + 2, 7, 3);
-      if (Math.random() < 0.25) sparks.push({ x:px, y:py, vx:(Math.random()-0.5)*0.5, vy:-(0.5+Math.random()*1.4), life:1 });
+    if (front > 0.004 && front < 0.995){
+      for (let i = 0; i <= COLS; i++){
+        const px = padX + (i / COLS) * rect.width;
+        const py = padY + (edgeAt(i, front) / 100) * rect.height;
+        ctx.fillStyle = 'rgba(255,150,40,0.95)';
+        ctx.fillRect(Math.round(px) - 2, Math.round(py) - 2, 5, 4);
+        ctx.fillStyle = 'rgba(255,215,120,0.85)';
+        ctx.fillRect(Math.round(px) - 1, Math.round(py) - 1, 2, 2);
+        ctx.fillStyle = 'rgba(90,40,20,0.75)';
+        ctx.fillRect(Math.round(px) - 3, Math.round(py) + 2, 7, 3);
+        if (Math.random() < 0.25)
+          sparks.push({ x:px, y:py, vx:(Math.random()-0.5)*0.5, vy:-(0.5+Math.random()*1.4), life:1 });
+      }
     }
     for (let i = sparks.length - 1; i >= 0; i--){
       const sp = sparks[i];
@@ -3281,15 +3357,60 @@ function burnCard(el, done){
       const sz = sp.life > 0.6 ? 2 : 1;
       ctx.fillRect(Math.round(sp.x), Math.round(sp.y), sz, sz);
     }
+  }
 
-    // once the card is gone, hold just long enough for the last embers to die —
-    // waiting for the spark list to drain stretched the transition past a second
-    if (k < 1 || now - t0 < DUR + 220){ requestAnimationFrame(frame); return; }
+  function strip(){
+    dead = true;
+    cancelAnimationFrame(raf);
     layer.remove();
     el.style.clipPath = ''; el.style.webkitClipPath = '';
-    done();
   }
-  requestAnimationFrame(frame);
+
+  function frame(now){
+    if (dead) return;
+    if (finishing){
+      const k = Math.min(1, (now - t0) / span);
+      const ease = k * k * (3 - 2 * k);
+      front = front0 + (1 - front0) * ease;
+      lift  = lift0  + (LIFT - lift0) * ease;
+      // once the card is gone, hold just long enough for the last embers to die —
+      // waiting for the spark list to drain stretched the transition past a second
+      if (k >= 1 && now - t0 >= span + 220){ strip(); if (done) done(); return; }
+    }
+    draw();
+    raf = requestAnimationFrame(frame);
+  }
+  raf = requestAnimationFrame(frame);
+
+  return {
+    // driven by the pull, while the finger is down
+    set(f, px){
+      if (finishing || dead) return;
+      front = U.clamp(f, 0, 1);
+      lift = Math.max(0, Math.min(LIFT, px || 0));
+    },
+    // carry on from wherever the pull left it, over what is left of the duration
+    finish(cb){
+      if (finishing || dead) return;
+      finishing = true; front0 = front; lift0 = lift; done = cb;
+      span = Math.max(180, DUR * (1 - front0));
+      t0 = performance.now();
+    },
+    cancel(){
+      if (dead) return;
+      strip();
+      el.classList.remove('drawing');
+      el.style.transform = ''; el.style.opacity = '';
+    },
+  };
+}
+
+// the click and the keyboard arrive with no pull to ride, so they burn from cold.
+// Reduced motion skips straight to the payload.
+function burnCard(el, done){
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reduce){ done(); return; }
+  startBurn(el).finish(done);
 }
 
 // ---- Spend the twenty before the stair ----
