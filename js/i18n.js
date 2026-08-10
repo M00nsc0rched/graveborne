@@ -99,8 +99,8 @@ const I18N = (function(){
     'Sealed to you': 'Előtted lepecsételve',
     'Nothing of this one is written down yet. Earn the card, and the page fills in.':
       'Erről még semmi nincs feljegyezve. Érdemeld ki a kártyát, és kitöltődik a lap.',
-    'Pull the card up to draw it — <b>↑</b> or drag  ·  down for details':
-      'Húzd fel a kártyát a felhúzáshoz — <b>↑</b> vagy húzás  ·  lefelé a részletekért',
+    'Pull up to draw  ·  down for details  ·  swipe to turn':
+      'Húzd fel a lapot  ·  le a részletekért  ·  ujjal lapozz',
     'LOCKED': 'ZÁROLVA',
     '???': '???',
     'Spread them evenly': 'Oszd el egyenletesen',
