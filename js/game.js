@@ -1,7 +1,7 @@
 // ================= GRAVEBORNE — main engine =================
 // shown on the title screen; keep in step with CACHE in sw.js — the game is
 // served from that cache, so the number you see is the build you're running
-const GAME_VERSION = 56;
+const GAME_VERSION = 57;
 let VW = 21, VH = 13;                 // viewport in tiles — reshaped to the stage on phones
 const TS = 32;                        // tile size in canvas pixels
 const TU = TS / 16;                   // old design unit -> new, for art not yet re-authored
