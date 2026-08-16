@@ -1741,7 +1741,12 @@ const WHISPERS = [
 ];
 
 // ---------- Biomes: each depth may shift terrain, light, foes — and how it treats each class ----------
-// pal: wallTop/wallFace/wallDark/floorA/floorB/speck are colors; ambient/torch are "r,g,b" for light gradients
+// pal: ambient/torch are "r,g,b" for light gradients. Since the map became a
+// drawn ink map, wallTop is the one colour key the tiles still read: inkPal() in
+// game.js takes the region's stone hue from it and derives the whole paper/ink/
+// hatch set, so a biome is retinted by editing wallTop alone. The remaining
+// colour keys (wallFace/wallDark/floorA/floorB/speck) are the old painted-stone
+// palette and no longer reach the screen.
 // fov: global sight change on this floor. classMods: per-class stat deltas (fov key = personal sight change).
 const BIOMES = {
   catacombs: { id:'catacombs', name:'The Catacombs',
