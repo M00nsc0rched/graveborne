@@ -1833,7 +1833,28 @@ const SANCTUM = [
   { id:'favor',     name:"Merchant's Favor",   desc:'Shop Gold prices −10%, per rank.',           max:2, base:30, growth:20 },
 ];
 
-const Data = { SKILLS, PASSIVES, CLASSES, FOLLOWERS, ENEMIES, EVENT_ICONS, SETS, RARITY, ITEMS, CONSUMABLES, PLANTS, POTIONS, ITEM_POOL, HUNTER_POOL, BIOME_ELITES, BIOME_GUARDIANS, BIOME_PROPS, HONOR_TIERS, EVENTS, CODEX, SANCTUM, BIOMES, WHISPERS, DISCOURAGEMENTS, DESERTIONS,
+
+// ---------- Painted map tints: how each region's stone tileset is coloured ----------
+// The old pal colours were authored for an unlit near-black dungeon, so their
+// lightness is useless here and their saturation says nothing about whether a
+// region should read vivid (a sunlit waste) or drained (a crypt). These eight
+// numbers are the whole look of a floor: g* is the ground, s* the quarried
+// stone, o* whatever creeps over both. h is a hue in degrees, s and l percent.
+const PAINT = {
+  catacombs: { gh:272, gs:11, gl:63, sh:268, ss:13, sl:58, oh:96,  os:20 },
+  fungal:    { gh:96,  gs:17, gl:66, sh:112, ss:15, sl:60, oh:88,  os:52 },
+  drowned:   { gh:168, gs:18, gl:62, sh:172, ss:15, sl:56, oh:150, os:44 },
+  ember:     { gh:22,  gs:34, gl:62, sh:14,  ss:26, sl:54, oh:26,  os:62 },
+  ossuary:   { gh:44,  gs:19, gl:73, sh:46,  ss:13, sl:68, oh:58,  os:24 },
+  umbral:    { gh:78,  gs:24, gl:60, sh:92,  ss:16, sl:54, oh:100, os:52 },
+  dungeon:   { gh:214, gs:7,  gl:65, sh:216, ss:8,  sl:60, oh:100, os:30 },
+  desert:    { gh:36,  gs:52, gl:74, sh:34,  ss:40, sl:69, oh:72,  os:40 },
+  castle:    { gh:214, gs:13, gl:64, sh:218, ss:13, sl:58, oh:96,  os:34 },
+  cathedral: { gh:286, gs:16, gl:64, sh:280, ss:17, sl:58, oh:298, os:30 },
+  monastery: { gh:37,  gs:26, gl:69, sh:35,  ss:20, sl:63, oh:80,  os:34 },
+};
+
+const Data = { SKILLS, PASSIVES, CLASSES, FOLLOWERS, ENEMIES, EVENT_ICONS, SETS, RARITY, ITEMS, CONSUMABLES, PLANTS, POTIONS, ITEM_POOL, HUNTER_POOL, BIOME_ELITES, BIOME_GUARDIANS, BIOME_PROPS, HONOR_TIERS, EVENTS, CODEX, SANCTUM, BIOMES, PAINT, WHISPERS, DISCOURAGEMENTS, DESERTIONS,
   honorTier(h){ for (const t of HONOR_TIERS){ if (h >= t.min) return t; } return HONOR_TIERS[HONOR_TIERS.length-1]; },
   enemyPool(depth){
     const ids = [];

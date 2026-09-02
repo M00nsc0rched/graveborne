@@ -1,7 +1,7 @@
 // ================= GRAVEBORNE — main engine =================
 // shown on the title screen; keep in step with CACHE in sw.js — the game is
 // served from that cache, so the number you see is the build you're running
-const GAME_VERSION = 58;
+const GAME_VERSION = 59;
 let VW = 21, VH = 13;                 // viewport in tiles — reshaped to the stage on phones
 const TS = 32;                        // tile size in canvas pixels
 const TU = TS / 16;                   // old design unit -> new, for art not yet re-authored
@@ -2246,206 +2246,261 @@ function updateEnemyPanel(){
 }
 
 // ---------------------------------------------------------------------------
-// The floor is drawn the way a hand draws a dungeon map: stone filled with a
-// basket weave of short strokes, paper pricked with a cross at every corner,
-// and one heavy wobbling line wherever stone meets open ground. Both surfaces
-// are pre-rendered once per biome onto a ten-tile sheet and blitted per tile —
-// laying the weave stroke by stroke every frame would cost thousands of
-// fillRects on the commonest tile in the game.
+// The map is a painted stone tileset: quarried blocks for the rock, warm ground
+// scored into squares, and whatever the region grows creeping over both. Each
+// biome bakes its two surfaces once onto a ten-tile sheet that is then blitted
+// per tile — laying every stone again each frame would cost thousands of path
+// fills on the commonest tile in the game.
 // ---------------------------------------------------------------------------
-const SHEET_T = 10, SHEET_PX = SHEET_T * TS;   // 320px: a whole number of hatch blocks, so it wraps
-// The weave cell measures half a tile on the reference sheet, which lands at
-// exactly 2x2 blocks per tile — so a stroke can never straddle a block, and
-// nothing has to be clipped or wrapped at the sheet edge.
-const HB = TS / 2;
-const inkSheets = new Map();
+const SHEET_T = 10, SHEET_PX = SHEET_T * TS;   // 320px, and BLK divides it so the sheet wraps seamlessly
+const BLK = 16;                                // a quarried block: two to a tile, the size that still reads as cut stone at this scale
+const paintSheets = new Map();
 
-// The paper takes its tint from the biome's own stone rather than its torch:
-// ambient is the colour of fire, which is warm in every region and would wash
-// all twelve of them to the same cream.
-function inkPal(biome){
-  if (biome._ink) return biome._ink;
-  const n = parseInt(biome.pal.wallTop.slice(1), 16);
-  const stone = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
-  const mx = Math.max(stone[0], stone[1], stone[2]) || 1;
-  const hue = stone.map(v => v / mx * 255);
-  const mix = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
-  const css = c => `rgb(${c[0]},${c[1]},${c[2]})`;
-  const paper = mix([236, 231, 220], hue, 0.16), ink = mix([13, 10, 17], hue, 0.10);
-  biome._ink = {
-    paper: css(paper), paperRGB: paper.join(','),
-    paperAlt: css(mix(paper, [0, 0, 0], 0.03)),
-    ink: css(ink), inkRGB: ink.join(','),
-    hatch: css(mix(ink, paper, 0.06)),
-    off: css(mix(ink, [0, 0, 0], 0.45)),          // the page beyond what has been mapped
-  };
-  return biome._ink;
+const HSL = (h, s, l, a) => `hsla(${h|0},${s|0}%,${l|0}%,${a == null ? 1 : a})`;
+
+// hue and saturation of a palette entry, so a region can be retinted through the
+// colours it already declares rather than through a second table
+function hueSat(hex){
+  const n = parseInt(hex.slice(1), 16);
+  const r = ((n >> 16) & 255) / 255, g = ((n >> 8) & 255) / 255, b = (n & 255) / 255;
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn, l = (mx + mn) / 2;
+  if (d === 0) return { h: 0, s: 0 };
+  let h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  h *= 60; if (h < 0) h += 360;
+  return { h, s: d / (1 - Math.abs(2 * l - 1)) };
 }
 
-function buildInkSheets(biome){
-  const p = inkPal(biome);
-  const hatch = document.createElement('canvas'); hatch.width = hatch.height = SHEET_PX;
-  const hc = hatch.getContext('2d');
-  hc.fillStyle = p.paper; hc.fillRect(0, 0, SHEET_PX, SHEET_PX);
-  // The sheet is baked once per biome, so the strokes are worth drawing as real
-  // bowed paths with round caps rather than stacks of rectangles — the cost is
-  // paid at load, and rectangles are what made an earlier pass read as woven
-  // cloth instead of a drawn wall.
-  const NB = SHEET_PX / HB;
-  hc.strokeStyle = p.hatch; hc.lineCap = 'round';
-  for (let by = 0; by < NB; by++) for (let bx = 0; bx < NB; bx++){
-    // orientation flips across BOTH axes, so every block's four edge-neighbours
-    // run perpendicular to it. Alternating on x alone would give corduroy.
-    const vert = ((bx + by) & 1) === 0;
-    if (tileHash(bx, by, 210) > 0.97) continue;               // a block the pen skipped
-    const ox = bx * HB, oy = by * HB;
-    // three strokes is the hand's habit; now and then it lays two or four
-    const r = tileHash(bx, by, 220);
-    const n = r > 0.90 ? 4 : r < 0.12 ? 2 : 3;
-    const pitch = 4.5, span = (n - 1) * pitch;
-    const base = (HB - span) / 2;
-    for (let s = 0; s < n; s++){
-      // five independent jitters, each on its own salt: correlated noise streaks
-      // diagonally and looks worse than no noise at all
-      const shrt = tileHash(bx, by, 50 + s) > 0.90 ? 0.6 : 1;   // the pen lifted early
-      const half = 6 * (0.85 + tileHash(bx, by, 30 + s) * 0.30) * shrt;
-      const tilt = (tileHash(bx, by, 40 + s) - 0.5) * 1.2;      // ~3 degrees of drift
-      const bow  = (tileHash(bx, by, 60 + s) - 0.5) * 1.2;
-      hc.lineWidth = 2.0 + tileHash(bx, by, 70 + s);
-      // a stroke must never leave its own block: at the sheet border an escaped
-      // stroke is clipped instead of wrapped, and that shows as a seam every
-      // ten tiles once the sheet starts repeating
-      const pad = hc.lineWidth / 2 + Math.abs(tilt) + 0.5;
-      const off = U.clamp(base + s * pitch + (tileHash(bx, by, 10 + s) - 0.5) * 1.4, pad, HB - pad);
-      const mid = U.clamp(HB / 2 + (tileHash(bx, by, 20 + s) - 0.5) * 2.0, half + pad, HB - half - pad);
-      hc.beginPath();
-      if (vert){
-        hc.moveTo(ox + off - tilt, oy + mid - half);
-        hc.quadraticCurveTo(ox + off + bow, oy + mid, ox + off + tilt, oy + mid + half);
-      } else {
-        hc.moveTo(ox + mid - half, oy + off - tilt);
-        hc.quadraticCurveTo(ox + mid, oy + off + bow, ox + mid + half, oy + off + tilt);
-      }
-      hc.stroke();
-    }
+// floorA carries the ground's hue, wallTop the stone's, speck whatever the
+// region grows over them. The lightness is fixed here rather than taken from
+// those colours: every one of them is near-black, since they were authored for
+// the old unlit dungeon, and only the hue is still worth reading.
+function paintPal(biome){
+  if (biome._paint) return biome._paint;
+  // Data.PAINT is the authored look; a region without one still renders, tinted
+  // from the hues its old palette already carries.
+  let p = Data.PAINT && Data.PAINT[biome.id];
+  if (!p){
+    const g = hueSat(biome.pal.floorA), s = hueSat(biome.pal.wallTop), o = hueSat(biome.pal.speck);
+    p = { gh:g.h, gs:U.clamp(Math.round(g.s*90),12,40), gl:66,
+          sh:s.h, ss:U.clamp(Math.round(s.s*70),8,26),  sl:60,
+          oh:o.h, os:U.clamp(Math.round(o.s*110),24,55) };
   }
+  p = Object.assign({}, p);
+  p.ground = HSL(p.gh, p.gs, p.gl);
+  p.deep   = HSL(p.sh, p.ss + 4, p.sl - 40);   // rock nobody has cut a face into
+  p.off    = HSL(p.sh, p.ss + 6, 7);            // the rock nobody has cut into yet
+  return (biome._paint = p);
+}
 
+function buildPaintSheets(biome){
+  const p = paintPal(biome);
+
+  // ---- ground: scored into squares, weathered, with the odd stone lying on it
   const floor = document.createElement('canvas'); floor.width = floor.height = SHEET_PX;
   const fc = floor.getContext('2d');
-  fc.fillStyle = p.paper; fc.fillRect(0, 0, SHEET_PX, SHEET_PX);
+  fc.fillStyle = p.ground; fc.fillRect(0, 0, SHEET_PX, SHEET_PX);
+  // each square is laid a shade off its neighbour, which is what stops a large
+  // room reading as one flat sheet of colour
   for (let ty = 0; ty < SHEET_T; ty++) for (let tx = 0; tx < SHEET_T; tx++){
-    if (tileHash(tx, ty, 30) > 0.82){ fc.fillStyle = p.paperAlt; fc.fillRect(tx * TS, ty * TS, TS, TS); }
+    fc.fillStyle = HSL(p.gh, p.gs, p.gl - 5 + Math.round(tileHash(tx, ty, 3) * 9));
+    fc.fillRect(tx * TS, ty * TS, TS, TS);
   }
-  // The squares are not ruled lines: the pen only touches down near the corners,
-  // so open floor reads as a field of broken crosses. Ruling every tile would
-  // give back the flagstone floor this is replacing, and drawing the grid in
-  // grey would break the one-pen illusion — it stays full ink, kept faint by
-  // being thin and broken instead.
-  fc.fillStyle = `rgba(${p.inkRGB},0.28)`;
-  for (let ty = 0; ty < SHEET_T; ty++) for (let tx = 0; tx < SHEET_T; tx++){
-    const cx = tx * TS, cy = ty * TS;
-    // arms are long, unequal, and about one in five never gets drawn at all
-    const arm = (salt) => tileHash(tx, ty, salt) > 0.80 ? 0 : 5 + Math.round(tileHash(tx, ty, salt + 1) * 8);
-    const aL = arm(6), aR = arm(8), aU = arm(10), aD = arm(12);
-    const jx = tileHash(tx, ty, 15) > 0.6 ? 1 : 0, jy = tileHash(tx, ty, 16) > 0.6 ? 1 : 0;
-    const hx = cx - aL + jx, hw = aL + aR, vy = cy - aU + jy, vh = aU + aD;
-    if (hw) fc.fillRect(hx, cy + jy, hw, 1);
-    if (vh) fc.fillRect(cx + jx, vy, 1, vh);
-    // the sheet wraps, so an arm reaching off the left or top edge is painted
-    // again on the far side rather than being cut
-    if (hx < 0) fc.fillRect(SHEET_PX + hx, cy + jy, -hx, 1);
-    if (vy < 0) fc.fillRect(cx + jx, SHEET_PX + vy, 1, -vy);
-    if (tileHash(tx, ty, 9) > 0.85){                          // a stray dash mid-span
-      fc.fillRect(cx + 10 + Math.floor(tileHash(tx, ty, 18) * 12), cy + 10 + Math.floor(tileHash(tx, ty, 19) * 12), 4, 1);
+  // weathering: soft blotches drifting across the squares, ignoring the grid
+  for (let i = 0; i < 220; i++){
+    const bx = tileHash(i, 7, 11) * SHEET_PX, by = tileHash(i, 9, 13) * SHEET_PX;
+    const r = 4 + tileHash(i, 11, 17) * 12, up = tileHash(i, 13, 19) > 0.5;
+    fc.fillStyle = HSL(p.gh, p.gs, up ? p.gl + 8 : p.gl - 11, 0.10);
+    fc.beginPath(); fc.ellipse(bx, by, r, r * (0.6 + tileHash(i, 15, 23) * 0.6), tileHash(i, 17, 29) * 3, 0, 7); fc.fill();
+    // the wrap: a blotch overhanging an edge is painted again on the far side
+    if (bx > SHEET_PX - r - 12 || bx < r + 12){
+      fc.beginPath(); fc.ellipse(bx + (bx < SHEET_PX / 2 ? SHEET_PX : -SHEET_PX), by, r, r * 0.8, 0, 0, 7); fc.fill();
     }
   }
-  const s = { hatch, floor };
-  inkSheets.set(biome.id, s);
-  return s;
-}
-function getInkSheets(biome){ return inkSheets.get(biome.id) || buildInkSheets(biome); }
-
-// A heavy line with a hand's wobble: short segments that each step a pixel off
-// the true edge, so no wall ever reads as ruler-straight. Seeded on the world
-// position rather than the tile, so the wobble agrees frame to frame.
-function inkEdge(x0, y0, horiz, len, w, seed){
-  for (let o = 0; o < len; o += 6){
-    const l = Math.min(6, len - o);
-    const j = tileHash(x0 + o, y0, seed) > 0.5 ? 1 : 0;
-    const t = tileHash(x0 + o, y0, seed + 3) > 0.72 ? 1 : 0;   // the odd heavier press of the nib
-    if (horiz) ctx.fillRect(x0 + o, y0 + j, l, w + t);
-    else       ctx.fillRect(x0 + j, y0 + o, w + t, l);
+  // the grid the squares are scored on — drawn with a hand's waver, two tones,
+  // so it reads as a cut groove rather than a ruled line
+  for (let k = 0; k <= SHEET_T; k++){
+    const at = (k % SHEET_T) * TS;
+    for (let o = 0; o < SHEET_PX; o += 8){
+      const j = tileHash(k, o, 31) > 0.55 ? 1 : 0, w = tileHash(k, o, 37) > 0.8 ? 3 : 2;
+      fc.fillStyle = HSL(p.gh, p.gs + 4, p.gl - 30, 0.72);
+      fc.fillRect(at + j, o, w, 8); fc.fillRect(o, at + j, 8, w);
+      fc.fillStyle = HSL(p.gh, p.gs, p.gl + 14, 0.45);              // the lit lip of the groove
+      fc.fillRect(at + j + w, o, 1, 8); fc.fillRect(o, at + j + w, 8, 1);
+    }
   }
+  // cracks and loose stones, sparse enough that no square owns two of them
+  for (let ty = 0; ty < SHEET_T; ty++) for (let tx = 0; tx < SHEET_T; tx++){
+    const seed = tileHash(tx, ty, 41), ox = tx * TS, oy = ty * TS;
+    if (seed > 0.76){
+      fc.strokeStyle = HSL(p.gh, p.gs + 6, p.gl - 32, 0.5); fc.lineWidth = 1;
+      fc.beginPath();
+      let cx = ox + 4 + tileHash(tx, ty, 43) * 22, cy = oy + 3;
+      fc.moveTo(cx, cy);
+      for (let s = 0; s < 4; s++){
+        cx += (tileHash(tx, ty, 45 + s) - 0.5) * 14; cy += 6 + tileHash(tx, ty, 51 + s) * 4;
+        fc.lineTo(cx, cy);
+      }
+      fc.stroke();
+    } else if (seed < 0.12){
+      const px = ox + 8 + tileHash(tx, ty, 57) * 14, py = oy + 8 + tileHash(tx, ty, 59) * 14;
+      const r = 2 + tileHash(tx, ty, 61) * 2;
+      fc.fillStyle = HSL(p.gh, p.gs, p.gl - 36, 0.35);
+      fc.beginPath(); fc.ellipse(px, py + 1, r, r * 0.7, 0, 0, 7); fc.fill();
+      fc.fillStyle = HSL(p.gh, p.gs - 6, p.gl + 10);
+      fc.beginPath(); fc.ellipse(px, py, r, r * 0.7, 0, 0, 7); fc.fill();
+    }
+  }
+
+  // ---- stone: courses of quarried blocks, each lit from the top left
+  const wall = document.createElement('canvas'); wall.width = wall.height = SHEET_PX;
+  const wc = wall.getContext('2d');
+  wc.fillStyle = HSL(p.sh, p.ss + 8, p.sl - 19); wc.fillRect(0, 0, SHEET_PX, SHEET_PX);   // mortar behind everything
+  const rows = SHEET_PX / BLK;
+  const block = (x, y, w, h, tone, grow, seed) => {
+    const r = 1.5;
+    const path = () => {
+      const rr = Math.min(r, w / 2, h / 2);
+      wc.beginPath();
+      wc.moveTo(x + rr, y); wc.lineTo(x + w - rr, y); wc.quadraticCurveTo(x + w, y, x + w, y + rr);
+      wc.lineTo(x + w, y + h - rr); wc.quadraticCurveTo(x + w, y + h, x + w - rr, y + h);
+      wc.lineTo(x + rr, y + h); wc.quadraticCurveTo(x, y + h, x, y + h - rr);
+      wc.lineTo(x, y + rr); wc.quadraticCurveTo(x, y, x + rr, y);
+      wc.closePath();
+    };
+    path(); wc.fillStyle = HSL(p.sh, p.ss, tone); wc.fill();
+    // the light comes over the top-left shoulder, so that corner catches it and
+    // the opposite one sinks — a band across the whole face read as a stacked slab
+    wc.save(); path(); wc.clip();
+    wc.fillStyle = HSL(p.sh, p.ss - 6, tone + 18, 0.95);
+    wc.fillRect(x, y, w, 3); wc.fillRect(x, y, 3, h);
+    wc.fillStyle = HSL(p.sh, p.ss + 9, tone - 21, 0.9);
+    wc.fillRect(x, y + h - 3, w, 3); wc.fillRect(x + w - 3, y, 3, h);
+    // a little grain so the face is not a flat swatch
+    for (let i = 0; i < 3; i++){
+      const gx = x + 2 + tileHash(seed, i, 111) * (w - 4), gy = y + 2 + tileHash(seed, i, 113) * (h - 4);
+      wc.fillStyle = HSL(p.sh, p.ss, tone + (tileHash(seed, i, 117) > 0.5 ? 7 : -7), 0.5);
+      wc.beginPath(); wc.ellipse(gx, gy, 1.6 + tileHash(seed, i, 119) * 2, 1.2, 0, 0, 7); wc.fill();
+    }
+    wc.restore();
+    path(); wc.strokeStyle = HSL(p.sh, p.ss + 10, p.sl - 32, 0.45); wc.lineWidth = 0.8; wc.stroke();
+    if (grow){                                   // whatever the region grows, taking the block
+      for (let i = 0; i < 3; i++){
+        const gx = x + w * (0.2 + tileHash(seed, i, 127) * 0.6);
+        const gy = y + h * (0.5 + tileHash(seed, i, 131) * 0.45);
+        wc.fillStyle = HSL(p.oh, p.os, 32 + tileHash(seed, i, 137) * 16, 0.5);
+        wc.beginPath(); wc.ellipse(gx, gy, w * 0.2 + 1, h * 0.13 + 1, tileHash(seed, i, 139) * 3, 0, 7); wc.fill();
+      }
+    }
+  };
+  for (let ry = 0; ry < rows; ry++){
+    // Real masonry does not repeat one stone: the course is cut into pieces of
+    // uneven width. Normalising the widths back to the sheet is what lets them
+    // stay uneven AND still tile.
+    const n = rows;
+    const wts = []; let sum = 0;
+    for (let i = 0; i < n; i++){ const v = 0.62 + tileHash(i, ry, 91) * 0.9; wts.push(v); sum += v; }
+    let x = tileHash(ry, 0, 71) * SHEET_PX;      // and each course starts wherever it was quarried to
+    for (let i = 0; i < n; i++){
+      const w = wts[i] / sum * SHEET_PX;
+      const h = BLK - 1.0 - tileHash(i, ry, 79) * 0.8;
+      const tone = p.sl - 10 + Math.round(tileHash(i, ry, 83) * 22);
+      const grow = tileHash(i, ry, 89) > 0.84;
+      const seed = i * 37 + ry * 101;
+      for (const dx of [0, -SHEET_PX, SHEET_PX]){
+        const px = x + dx; if (px > SHEET_PX || px + w < 0) continue;
+        block(px + 0.5, ry * BLK + 0.5, w - 1.0, h, tone, grow, seed);
+      }
+      x += w;
+    }
+  }
+  const sheets = { floor, wall };
+  paintSheets.set(biome.id, sheets);
+  return sheets;
 }
+function getPaintSheets(biome){ return paintSheets.get(biome.id) || buildPaintSheets(biome); }
 
 function drawTile(t, sx, sy, x, y){
-  const biome = curBiome(), p = inkPal(biome), sh = getInkSheets(biome), f = G.floor;
+  const biome = curBiome(), p = paintPal(biome), sh = getPaintSheets(biome), f = G.floor;
   const mx = ((x % SHEET_T) + SHEET_T) % SHEET_T, my = ((y % SHEET_T) + SHEET_T) % SHEET_T;
-  const wallAt = (ax, ay) => !f || f.tileAt(ax, ay) === TILE.WALL;
+  const rock = (ax, ay) => !f || f.tileAt(ax, ay) === TILE.WALL;
 
   if (t === TILE.WALL){
-    ctx.drawImage(sh.hatch, mx * TS, my * TS, TS, TS, sx, sy, TS, TS);
-    // the heavy outline lands only where stone meets open ground — drawn on
-    // every wall tile it would criss-cross the inside of the rock instead of
-    // bounding it, which is the whole point of the line
-    // the silhouette runs about 1.8x the weight of a hatch stroke; that ratio
-    // is what carries the woodcut punch, and at 2-3px it reads as a cartoon border
-    const W = 5;
-    const oN = !wallAt(x, y-1), oS = !wallAt(x, y+1), oW = !wallAt(x-1, y), oE = !wallAt(x+1, y);
-    if (oN || oS || oW || oE){
-      ctx.fillStyle = p.ink;
-      if (oN) inkEdge(sx, sy, true, TS, W, 1);
-      if (oS) inkEdge(sx, sy + TS - W - 1, true, TS, W, 2);
-      if (oW) inkEdge(sx, sy, false, TS, W, 3);
-      if (oE) inkEdge(sx + TS - W - 1, sy, false, TS, W, 4);
-      // a corner needs its own dab, or the two edges leave a notch in the line
-      if (oN && oW) ctx.fillRect(sx, sy, W + 1, W + 1);
-      if (oN && oE) ctx.fillRect(sx + TS - W - 1, sy, W + 1, W + 1);
-      if (oS && oW) ctx.fillRect(sx, sy + TS - W - 1, W + 1, W + 1);
-      if (oS && oE) ctx.fillRect(sx + TS - W - 1, sy + TS - W - 1, W + 1, W + 1);
+    // Only the rock that actually shows a face to open ground is dressed as
+    // masonry. Cutting every tile of a wall mass into blocks made the whole map
+    // one busy field of stone with the rooms lost inside it — in the reference
+    // the stone is a border and everything past it is undug dark.
+    const face = !rock(x, y-1) || !rock(x, y+1) || !rock(x-1, y) || !rock(x+1, y) ||
+                 !rock(x-1, y-1) || !rock(x+1, y-1) || !rock(x-1, y+1) || !rock(x+1, y+1);
+    if (face){
+      ctx.drawImage(sh.wall, mx * TS, my * TS, TS, TS, sx, sy, TS, TS);
+    } else {
+      ctx.fillStyle = p.deep; ctx.fillRect(sx, sy, TS, TS);
+      ctx.fillStyle = HSL(p.sh, p.ss, p.sl - 34, 0.5);
+      for (let i = 0; i < 3; i++){
+        const a = tileHash(x, y, 150 + i), b = tileHash(x, y, 160 + i);
+        ctx.beginPath(); ctx.ellipse(sx + a * TS, sy + b * TS, 5 + a * 5, 4 + b * 4, a * 3, 0, 7); ctx.fill();
+      }
     }
 
   } else if (t === TILE.DOOR){
     ctx.drawImage(sh.floor, mx * TS, my * TS, TS, TS, sx, sy, TS, TS);
-    // a map draws a door as a box set into the wall line, and the box has to
-    // lie across the passage — the old plank leaf was always vertical whichever
-    // way the doorway actually ran
-    const vert = wallAt(x-1, y) && wallAt(x+1, y);
-    ctx.fillStyle = p.ink;
-    if (vert){
-      ctx.fillRect(sx + 2, sy + 9, TS - 4, 3); ctx.fillRect(sx + 2, sy + TS - 12, TS - 4, 3);
-      ctx.fillRect(sx + 2, sy + 9, 3, TS - 18); ctx.fillRect(sx + TS - 5, sy + 9, 3, TS - 18);
-    } else {
-      ctx.fillRect(sx + 9, sy + 2, 3, TS - 4); ctx.fillRect(sx + TS - 12, sy + 2, 3, TS - 4);
-      ctx.fillRect(sx + 9, sy + 2, TS - 18, 3); ctx.fillRect(sx + 9, sy + TS - 5, TS - 18, 3);
-    }
+    // the leaf lies across the passage, so the doorway has to be read first —
+    // the old plank was always drawn vertical whichever way the gap ran
+    const vert = rock(x-1, y) && rock(x+1, y);
+    ctx.save(); ctx.translate(sx + TS/2, sy + TS/2); if (!vert) ctx.rotate(Math.PI/2);
+    ctx.fillStyle = HSL(p.sh, p.ss + 6, 20); ctx.fillRect(-15, -8, 30, 16);
+    ctx.fillStyle = '#6b4a24'; ctx.fillRect(-14, -7, 28, 14);
+    ctx.fillStyle = 'rgba(0,0,0,0.22)';
+    for (let i = -10; i <= 10; i += 5) ctx.fillRect(i, -7, 1, 14);
+    ctx.fillStyle = '#8a6330'; ctx.fillRect(-14, -6, 28, 2); ctx.fillRect(-14, 4, 28, 2);
+    ctx.fillStyle = '#d8b45a'; ctx.fillRect(9, -1, 3, 3);
+    ctx.restore();
 
   } else if (t === TILE.HAZARD){
     ctx.drawImage(sh.floor, mx * TS, my * TS, TS, TS, sx, sy, TS, TS);
     const hz = biome.hazard;
-    const pulse = 0.6 + 0.4 * Math.sin(G.time / 320 + x * 7 + y * 13);
-    ctx.globalAlpha = pulse * 0.9;
-    // scribbled over the square rather than tinting it, so the danger still
-    // reads as a mark somebody made on the map
+    const pulse = 0.62 + 0.38 * Math.sin(G.time / 320 + x * 7 + y * 13);
+    ctx.globalAlpha = pulse * 0.8;
     ctx.fillStyle = hz.color;
-    for (let i = 0; i < 6; i++){
+    for (let i = 0; i < 5; i++){
       const a = tileHash(x, y, 20 + i), b = tileHash(x, y, 40 + i);
-      const px = sx + 4 + Math.floor(a * (TS - 12)), py = sy + 4 + Math.floor(b * (TS - 12));
-      if (i & 1) ctx.fillRect(px, py, 7, 2); else ctx.fillRect(px, py, 2, 7);
+      const px = sx + 5 + Math.floor(a * (TS - 12)), py = sy + 5 + Math.floor(b * (TS - 12));
+      ctx.beginPath(); ctx.ellipse(px, py, 4 + a * 3, 3 + b * 2, a * 3, 0, 7); ctx.fill();
     }
     ctx.fillStyle = hz.accent;
     for (let i = 0; i < 3; i++){
       const a = tileHash(x, y, 60 + i), b = tileHash(x, y, 80 + i);
-      ctx.fillRect(sx + 5 + Math.floor(a * (TS - 12)), sy + 5 + Math.floor(b * (TS - 12)), 3, 3);
+      ctx.beginPath(); ctx.arc(sx + 6 + a * (TS - 12), sy + 6 + b * (TS - 12), 2, 0, 7); ctx.fill();
     }
     ctx.globalAlpha = 1;
 
   } else {
     ctx.drawImage(sh.floor, mx * TS, my * TS, TS, TS, sx, sy, TS, TS);
-    // the odd square carries a scuff, the way a used map does
-    if (tileHash(x, y, 13) > 0.88){
-      ctx.fillStyle = `rgba(${p.inkRGB},0.13)`;
-      ctx.fillRect(sx + 6, sy + 14, 20, 1);
+  }
+
+  // Stone stands proud of the ground, so it throws a shadow onto the squares
+  // beside it. Painting that from the GROUND tile is what keeps it off the rock
+  // itself and stops two neighbouring walls shading each other.
+  if (t !== TILE.WALL && f){
+    const n = rock(x, y-1), s = rock(x, y+1), w = rock(x-1, y), e = rock(x+1, y);
+    if (n || s || w || e){
+      const D = 5;
+      let g;
+      if (n){ g = ctx.createLinearGradient(0, sy, 0, sy + D); g.addColorStop(0,'rgba(0,0,0,0.34)'); g.addColorStop(1,'rgba(0,0,0,0)');
+              ctx.fillStyle = g; ctx.fillRect(sx, sy, TS, D); }
+      if (w){ g = ctx.createLinearGradient(sx, 0, sx + D, 0); g.addColorStop(0,'rgba(0,0,0,0.30)'); g.addColorStop(1,'rgba(0,0,0,0)');
+              ctx.fillStyle = g; ctx.fillRect(sx, sy, D, TS); }
+      if (s){ g = ctx.createLinearGradient(0, sy + TS, 0, sy + TS - D); g.addColorStop(0,'rgba(0,0,0,0.20)'); g.addColorStop(1,'rgba(0,0,0,0)');
+              ctx.fillStyle = g; ctx.fillRect(sx, sy + TS - D, TS, D); }
+      if (e){ g = ctx.createLinearGradient(sx + TS, 0, sx + TS - D, 0); g.addColorStop(0,'rgba(0,0,0,0.20)'); g.addColorStop(1,'rgba(0,0,0,0)');
+              ctx.fillStyle = g; ctx.fillRect(sx + TS - D, sy, D, TS); }
+      // and the region creeps out of the joint onto the ground
+      if (tileHash(x, y, 97) > 0.72){
+        ctx.fillStyle = HSL(p.oh, p.os, 40, 0.55);
+        const ex = n || s ? sx + 4 + tileHash(x, y, 101) * (TS - 12) : (w ? sx + 1 : sx + TS - 7);
+        const ey = w || e ? sy + 4 + tileHash(x, y, 103) * (TS - 12) : (n ? sy + 1 : sy + TS - 7);
+        ctx.beginPath(); ctx.ellipse(ex + 3, ey + 3, 5, 3.5, tileHash(x, y, 107) * 3, 0, 7); ctx.fill();
+      }
     }
   }
 }
@@ -2572,12 +2627,12 @@ function renderExplore(){
   // needs no wash of its own — it lies outside every light, so the darkness
   // pass below already dims it, and washing it here as well left the whole
   // remembered half of the map a flat mid-grey with the ink lost in it.
-  const ink = inkPal(curBiome());
+  const pt = paintPal(curBiome());
   for (let vy = 0; vy <= VH; vy++){
     for (let vx = 0; vx <= VW; vx++){
       const x = camX+vx, y = camY+vy; if (!f.inb(x,y)) continue;
       if (f.explored[f.idx(x,y)]) continue;
-      ctx.fillStyle = ink.off; ctx.fillRect(SX(x),SY(y),TS,TS);
+      ctx.fillStyle = pt.off; ctx.fillRect(SX(x),SY(y),TS,TS);
     }
   }
   // Paper cannot take additive light: 240 plus anything clips to white within a
@@ -2588,7 +2643,7 @@ function renderExplore(){
   const sc = shadowLayer(canvas.width, canvas.height);
   sc.globalCompositeOperation = 'source-over';
   sc.clearRect(0, 0, canvas.width, canvas.height);
-  sc.fillStyle = `rgba(${ink.inkRGB},0.60)`;
+  sc.fillStyle = HSL(pt.sh, pt.ss + 10, 8, 0.44);
   sc.fillRect(0, 0, canvas.width, canvas.height);
   sc.globalCompositeOperation = 'destination-out';
   const unshadow = (cx, cy, r, a) => {
