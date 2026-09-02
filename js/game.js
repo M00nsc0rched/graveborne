@@ -1,7 +1,7 @@
 // ================= GRAVEBORNE — main engine =================
 // shown on the title screen; keep in step with CACHE in sw.js — the game is
 // served from that cache, so the number you see is the build you're running
-const GAME_VERSION = 59;
+const GAME_VERSION = 60;
 let VW = 21, VH = 13;                 // viewport in tiles — reshaped to the stage on phones
 const TS = 32;                        // tile size in canvas pixels
 const TU = TS / 16;                   // old design unit -> new, for art not yet re-authored
@@ -2413,7 +2413,97 @@ function buildPaintSheets(biome){
       x += w;
     }
   }
-  const sheets = { floor, wall };
+  // ---- what lies beyond the walls where the region is not underground at all.
+  // A desert's halls are buried in a sea of sand and a drowned harbor stands in
+  // swamp; filling those with dark cave rock was the one thing still reading as
+  // "dungeon" in the open regions.
+  let outside = null;
+  if (p.out){
+    outside = document.createElement('canvas'); outside.width = outside.height = SHEET_PX;
+    const oc = outside.getContext('2d');
+    // every mark has to be laid again across the far edge or the terrain seams
+    // every ten tiles, which on a soft ground is far more obvious than on stone
+    const blob = (x, y, rx, ry, rot, fill) => {
+      oc.fillStyle = fill;
+      for (const dx of [0, -SHEET_PX, SHEET_PX]) for (const dy of [0, -SHEET_PX, SHEET_PX]){
+        if (x + dx < -rx * 2 || x + dx > SHEET_PX + rx * 2) continue;
+        if (y + dy < -ry * 2 || y + dy > SHEET_PX + ry * 2) continue;
+        oc.beginPath(); oc.ellipse(x + dx, y + dy, rx, ry, rot, 0, 7); oc.fill();
+      }
+    };
+    const R = (i, s) => tileHash(i, s, 211);
+
+    if (p.out === 'sand'){
+      oc.fillStyle = HSL(p.gh, p.gs + 6, p.gl - 7); oc.fillRect(0, 0, SHEET_PX, SHEET_PX);
+      // dunes: long soft crests, each with its trough shadow drawn just below it
+      for (let i = 0; i < 14; i++){
+        const x = R(i, 1) * SHEET_PX, y = R(i, 2) * SHEET_PX;
+        const rx = 46 + R(i, 3) * 60, ry = 13 + R(i, 4) * 14, rot = (R(i, 5) - 0.5) * 1.4;
+        blob(x, y, rx, ry, rot, HSL(p.gh, p.gs + 4, p.gl + 4, 0.30));
+        blob(x + Math.sin(rot) * 8, y + Math.cos(rot) * (ry * 0.9), rx * 0.9, ry * 0.7, rot,
+             HSL(p.gh, p.gs + 10, p.gl - 17, 0.26));
+      }
+      // wind ripples, and the odd tuft or stone the sand has not taken yet
+      for (let i = 0; i < 150; i++){
+        const x = R(i, 6) * SHEET_PX, y = R(i, 7) * SHEET_PX;
+        blob(x, y, 6 + R(i, 8) * 9, 1.2, (R(i, 9) - 0.5) * 1.2, HSL(p.gh, p.gs + 8, p.gl - 12, 0.22));
+      }
+      for (let i = 0; i < 26; i++){
+        const x = R(i, 10) * SHEET_PX, y = R(i, 11) * SHEET_PX;
+        if (R(i, 12) > 0.45){
+          blob(x, y + 1, 3, 2, 0, HSL(p.gh, p.gs, p.gl - 24, 0.35));
+          blob(x, y, 3, 2, 0, HSL(p.gh, p.gs - 8, p.gl + 9));
+        } else {
+          for (let k = 0; k < 5; k++)
+            blob(x + (k - 2) * 1.6, y - R(i, 13 + k) * 4, 0.9, 3 + R(i, 20 + k) * 3,
+                 (k - 2) * 0.24, HSL(p.oh, p.os, 34, 0.7));
+        }
+      }
+
+    } else if (p.out === 'forest'){
+      oc.fillStyle = HSL(p.gh, p.gs + 8, p.gl - 24); oc.fillRect(0, 0, SHEET_PX, SHEET_PX);
+      for (let i = 0; i < 26; i++)                      // bare earth showing through
+        blob(R(i,1)*SHEET_PX, R(i,2)*SHEET_PX, 16+R(i,3)*26, 12+R(i,4)*20, R(i,5)*3,
+             HSL(p.gh, p.gs + 12, p.gl - 33, 0.5));
+      for (let i = 0; i < 320; i++){                    // undergrowth, thick enough to hide the ground
+        const x = R(i,6)*SHEET_PX, y = R(i,7)*SHEET_PX;
+        blob(x, y, 4+R(i,8)*7, 3+R(i,9)*5, R(i,10)*3, HSL(p.oh, p.os, 24+R(i,11)*16, 0.55));
+      }
+      for (let i = 0; i < 90; i++)                      // leaf litter catching the light
+        blob(R(i,12)*SHEET_PX, R(i,13)*SHEET_PX, 1.6+R(i,14)*2, 1.2, R(i,15)*3,
+             HSL(p.oh, p.os + 10, 46+R(i,16)*14, 0.6));
+      for (let i = 0; i < 14; i++){                     // petrified roots breaking the surface
+        const x = R(i,17)*SHEET_PX, y = R(i,18)*SHEET_PX, a = R(i,19)*3;
+        for (let k = 0; k < 7; k++)
+          blob(x + Math.cos(a)*k*5, y + Math.sin(a)*k*5, 4-k*0.35, 2.6-k*0.2, a,
+               HSL(p.gh, p.gs + 14, p.gl - 40, 0.75));
+      }
+
+    } else {                                            // swamp
+      oc.fillStyle = HSL(p.gh, p.gs + 6, p.gl - 26); oc.fillRect(0, 0, SHEET_PX, SHEET_PX);
+      for (let i = 0; i < 20; i++)                      // sodden ground, darker where it pools
+        blob(R(i,1)*SHEET_PX, R(i,2)*SHEET_PX, 18+R(i,3)*30, 14+R(i,4)*22, R(i,5)*3,
+             HSL(p.gh, p.gs + 10, p.gl - 36, 0.45));
+      for (let i = 0; i < 6; i++){                      // standing water, still enough to hold a sky
+        const x = R(i,6)*SHEET_PX, y = R(i,7)*SHEET_PX;
+        const rx = 13+R(i,8)*15, ry = 10+R(i,9)*11, rot = R(i,10)*3;
+        blob(x, y, rx+2.5, ry+2.5, rot, HSL(p.gh, p.gs + 16, p.gl - 44, 0.7));
+        blob(x, y, rx, ry, rot, HSL(p.gh + 12, p.gs + 10, p.gl - 22, 0.8));
+        blob(x - rx*0.22, y - ry*0.3, rx*0.42, ry*0.24, rot, HSL(p.gh + 16, p.gs + 8, p.gl - 8, 0.35));
+      }
+      for (let i = 0; i < 200; i++)                     // weed and moss on whatever is not water
+        blob(R(i,11)*SHEET_PX, R(i,12)*SHEET_PX, 3+R(i,13)*6, 2.4+R(i,14)*4, R(i,15)*3,
+             HSL(p.oh, p.os, 26+R(i,16)*16, 0.45));
+      for (let i = 0; i < 22; i++){                     // reeds standing out of it
+        const x = R(i,17)*SHEET_PX, y = R(i,18)*SHEET_PX;
+        for (let k = 0; k < 4; k++)
+          blob(x + (k-1.5)*2, y - R(i,19+k)*3, 0.8, 4+R(i,24+k)*4, (k-1.5)*0.2,
+               HSL(p.oh, p.os + 8, 34, 0.65));
+      }
+    }
+  }
+
+  const sheets = { floor, wall, outside };
   paintSheets.set(biome.id, sheets);
   return sheets;
 }
@@ -2428,11 +2518,16 @@ function drawTile(t, sx, sy, x, y){
     // Only the rock that actually shows a face to open ground is dressed as
     // masonry. Cutting every tile of a wall mass into blocks made the whole map
     // one busy field of stone with the rooms lost inside it — in the reference
-    // the stone is a border and everything past it is undug dark.
+    // the stone is only a border, and what lies past it depends on the region.
     const face = !rock(x, y-1) || !rock(x, y+1) || !rock(x-1, y) || !rock(x+1, y) ||
                  !rock(x-1, y-1) || !rock(x+1, y-1) || !rock(x-1, y+1) || !rock(x+1, y+1);
     if (face){
       ctx.drawImage(sh.wall, mx * TS, my * TS, TS, TS, sx, sy, TS, TS);
+    } else if (sh.outside){
+      // a region that is not underground has open country behind its walls
+      // rather than undug rock, which was the last thing still reading as a
+      // dungeon out in the sand and the swamp
+      ctx.drawImage(sh.outside, mx * TS, my * TS, TS, TS, sx, sy, TS, TS);
     } else {
       ctx.fillStyle = p.deep; ctx.fillRect(sx, sy, TS, TS);
       ctx.fillStyle = HSL(p.sh, p.ss, p.sl - 34, 0.5);
