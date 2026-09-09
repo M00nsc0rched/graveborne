@@ -121,6 +121,11 @@ const CONTRACTS = [
     brief:'All the way to the bottom, and whatever is sitting at it.', pay:250 },
 ];
 
+// The localisation overlay only ever writes onto Data, so the city tables are
+// registered there too. City keeps the same object references, which means a
+// language switch reaches the tavern without city.js knowing i18n exists.
+if (typeof Data !== 'undefined') Object.assign(Data, { BACKSTORY, CITY_NPCS, CONTRACTS });
+
 if (typeof window !== 'undefined'){
   window.City = { BACKSTORY, CITY_MOOD, CITY_NPCS, CONTRACTS };
 }

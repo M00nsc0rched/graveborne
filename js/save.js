@@ -51,7 +51,7 @@ const Save = {
   // fill: 0.80–1.00 of the phone's viewport · orient: 'auto' | 'landscape'
   // motion: 'smooth' slides between tiles (+ a faint trail) · 'instant' snaps, as it used to
   // lang: 'en' source text · 'hu' Hungarian, falling back to English where untranslated
-  opts(){ return this._read(this.KEY_OPTS, { fill: 1, orient: 'auto', motion: 'smooth', lang: 'en' }); },
+  opts(){ return this._read(this.KEY_OPTS, { fill: 1, orient: 'auto', motion: 'smooth', lang: 'hu' }); },
   setOpt(k, v){ const o = this.opts(); o[k] = v; this._write(this.KEY_OPTS, o); return o; },
 
   // ---------- The roster: a player keeps several souls, each with its own

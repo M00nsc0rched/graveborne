@@ -594,6 +594,10 @@ const I18N = (function(){
       if (wasOn) applyData(true);
     },
     addUI(block){ Object.assign(UI_HU, block); },
+    // Lines that interpolate a name or a number cannot be matched exactly, so
+    // they go in as [regex, replacement] pairs. Registered ones are tried before
+    // the built-in list, which lets a later file correct an earlier pattern.
+    addPatterns(list){ PATTERNS_HU.unshift.apply(PATTERNS_HU, list); },
   };
 })();
 

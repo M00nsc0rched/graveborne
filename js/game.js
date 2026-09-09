@@ -1,7 +1,7 @@
 // ================= GRAVEBORNE — main engine =================
 // shown on the title screen; keep in step with CACHE in sw.js — the game is
 // served from that cache, so the number you see is the build you're running
-const GAME_VERSION = 63;
+const GAME_VERSION = 64;
 let VW = 21, VH = 13;                 // viewport in tiles — reshaped to the stage on phones
 const TS = 32;                        // tile size in canvas pixels
 const TU = TS / 16;                   // old design unit -> new, for art not yet re-authored
@@ -415,7 +415,7 @@ const STATIC_TEXT = {
   'hint': 'Move: WASD / Arrows &nbsp;·&nbsp; Inventory: I &nbsp;·&nbsp; Wait: Space',
 };
 function applyLanguage(){
-  const want = Save.opts().lang || 'en';
+  const want = Save.opts().lang || 'hu';   // the game ships Hungarian; English is the fallback source, not the default
   if (I18N.lang !== want){
     I18N.setLang(want);
     // an enemy already in the ring copied its name when the fight began

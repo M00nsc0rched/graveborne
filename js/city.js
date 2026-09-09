@@ -28,10 +28,12 @@ function npcLines(npc, ch){
 // Dark half again as bad, compounding, which is what was asked for and is why
 // the fourth one is a different game from the first. ----
 function dreadOf(ch){ return Math.pow(1.5, ch ? (ch.descents || 0) : 0); }
+// Localised here rather than at the call sites: this label is concatenated into
+// larger strings that carry markup, and an exact-match lookup would never see it.
 function dreadLabel(ch){
   const n = ch ? (ch.descents || 0) : 0;
-  if (!n) return 'Untouched — the Deep Dark has not met you yet.';
-  return `Descents survived: ${n} · the dark comes back ${Math.round((dreadOf(ch) - 1) * 100)}% heavier`;
+  if (!n) return T('Untouched — the Deep Dark has not met you yet.');
+  return T(`Descents survived: ${n} · the dark comes back ${Math.round((dreadOf(ch) - 1) * 100)}% heavier`);
 }
 
 // ================= ROSTER =================
@@ -45,7 +47,7 @@ function showRoster(){
   body.appendChild(U.make('div','p center dim',`<i>${U.choice(Data.DISCOURAGEMENTS)}</i>`));
   const m = Save.meta();
   body.appendChild(U.make('div','p center',
-    `<span style="color:#7fb0d0">◈ ${Save.souls()} Souls</span> — the one coin that outlives a soul.`));
+    `<span style="color:#7fb0d0">◈ ${Save.souls()} ${T('Souls')}</span> — ${T('the one coin that outlives a soul.')}`));
   body.appendChild(U.make('div','p center dim',
     `Descents: ${m.runs} · Deepest: ${m.deepest} · Codex: ${Save.discoveredCount()}/${Data.CODEX.length}`));
 
@@ -55,7 +57,7 @@ function showRoster(){
       const bs = City.BACKSTORY[ch.classId] || {};
       const p = ch.player, tier = Data.honorTier(p.honor);
       const card = U.make('div','codex-item open');
-      card.appendChild(U.make('h4', null, `${bs.title || p.name} — Lv ${p.level}`));
+      card.appendChild(U.make('h4', null, `${bs.title || p.name} — ${T('Lv')} ${p.level}`));
       card.appendChild(U.make('div','d',
         `<span style="color:${tier.color}">${tier.name}</span> · ${p.gold}✦ · ${dreadLabel(ch)}`));
       card.onclick = () => { Save.setActive(ch.id); showCity(ch); };
@@ -84,7 +86,7 @@ function characterMade(ch){
   const art = U.make('canvas'); art.width = 120; art.height = 120; art.className = 'scene-art';
   s.appendChild(art); try { Sprites.toCanvas(art, ch.player.sprite, 9); } catch(e){}
   s.appendChild(U.make('div','p', bs.long || ''));
-  if (bs.goal) s.appendChild(U.make('div','p dim', `<i>What you came for: ${bs.goal}</i>`));
+  if (bs.goal) s.appendChild(U.make('div','p dim', `<i>${T('What you came for:')} ${bs.goal}</i>`));
   const row = U.make('div','row');
   row.appendChild(Btn('Visit the city', ()=>showCity(ch), 'btn center good'));
   row.appendChild(Btn('Cancel', showRoster, 'btn center'));
@@ -110,7 +112,7 @@ function showCity(ch){
   body.appendChild(U.make('div','p dim',
     'The last city above the Deep Dark. It has stopped growing and has not yet agreed to stop existing.'));
   body.appendChild(U.make('div','p center',
-    `${City.BACKSTORY[ch.classId] ? City.BACKSTORY[ch.classId].title : p.name} · Lv ${p.level} · ` +
+    `${City.BACKSTORY[ch.classId] ? City.BACKSTORY[ch.classId].title : p.name} · ${T('Lv')} ${p.level} · ` +
     `<span style="color:${tier.color}">${tier.name} (${p.honor})</span> · ${p.gold}✦ · ◈ ${Save.souls()}`));
   body.appendChild(U.make('div','p center dim', dreadLabel(ch)));
 
@@ -141,7 +143,7 @@ function showTavern(ch){
     const npc = City.CITY_NPCS[key];
     const card = U.make('div','codex-item open');
     const seen = ch.met[npc.id];
-    card.appendChild(U.make('h4', null, npc.name + (seen ? '' : ' — new')));
+    card.appendChild(U.make('h4', null, npc.name + (seen ? '' : ' — ' + T('new'))));
     card.appendChild(U.make('div','d', npc.role));
     card.onclick = () => showNpc(ch, npc);
     body.appendChild(card);
@@ -151,7 +153,7 @@ function showTavern(ch){
     body.appendChild(U.make('div','sect','Work in hand'));
     const c = U.make('div','codex-item open');
     c.appendChild(U.make('h4', null, ch.contract.name));
-    c.appendChild(U.make('div','d', ch.contract.brief + ` — pays ${ch.contract.pay}✦`));
+    c.appendChild(U.make('div','d', ch.contract.brief + ` — ${T('pays')} ${ch.contract.pay}✦`));
     c.onclick = () => confirmDescent(ch);
     body.appendChild(c);
   }
@@ -197,7 +199,7 @@ function bountyBoard(ch){
     return {
       id: 'bo_' + id, kind: 'bounty', target: id,
       name: e.name,
-      brief: `${bountyRank(e)} · ${e.hp} HP · ${e.atk} ATK / ${e.mag} MAG. Halloway wants proof, not a story.`,
+      brief: `${T(bountyRank(e))} · ${e.hp} ${T('HP')} · ${e.atk} ${T('ATK')} / ${e.mag} ${T('MAG')}. ${T('Halloway wants proof, not a story.')}`,
       pay: Math.round(bountyWorth(e) * (1 + 0.5 * (ch.descents || 0))),
     };
   });
@@ -225,7 +227,7 @@ function contractOffer(ch){
       const b = U.choice(Object.keys(Data.BIOMES));
       const gid = Data.BIOME_GUARDIANS[b];
       c.target = gid;
-      c.brief = `${Data.ENEMIES[gid].name} bars a stair in ${Data.BIOMES[b].name}. Bring back the proof.`;
+      c.brief = `${Data.ENEMIES[gid].name} ${T('bars a stair in')} ${Data.BIOMES[b].name}. ${T('Bring back the proof.')}`;
     }
     if (t.kind === 'boss'){
       c.brief = 'All the way to the bottom, and whatever is sitting on the throne this time.';
@@ -244,7 +246,7 @@ function showContracts(ch){
   for (const c of contractOffer(ch)){
     const card = U.make('div','codex-item open');
     card.appendChild(U.make('h4', null, c.name));
-    card.appendChild(U.make('div','d', c.brief + ` — pays ${c.pay}✦`));
+    card.appendChild(U.make('div','d', c.brief + ` — ${T('pays')} ${c.pay}✦`));
     card.onclick = () => { ch.contract = c; Save.putChar(ch); confirmDescent(ch); };
     body.appendChild(card);
   }
