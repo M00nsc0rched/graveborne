@@ -54,10 +54,42 @@ const Save = {
   opts(){ return this._read(this.KEY_OPTS, { fill: 1, orient: 'auto', motion: 'smooth', lang: 'en' }); },
   setOpt(k, v){ const o = this.opts(); o[k] = v; this._write(this.KEY_OPTS, o); return o; },
 
+  // ---------- The roster: a player keeps several souls, each with its own
+  // progress. A character is its player object plus what the city remembers of
+  // it. Dying deletes the record; Souls are meta and survive in KEY_META.
+  KEY_ROSTER: 'graveborne_roster_v1',
+
+  roster(){ return this._read(this.KEY_ROSTER, { chars: {}, activeId: null }); },
+  chars(){ const r = this.roster(); return Object.values(r.chars).sort((a,b) => b.born - a.born); },
+  getChar(id){ return this.roster().chars[id] || null; },
+  activeChar(){ const r = this.roster(); return r.activeId ? (r.chars[r.activeId] || null) : null; },
+  setActive(id){ const r = this.roster(); r.activeId = id; this._write(this.KEY_ROSTER, r); },
+  putChar(c){
+    const r = this.roster();
+    r.chars[c.id] = c;
+    this._write(this.KEY_ROSTER, r);
+    return c;
+  },
+  newChar(classId, player){
+    const id = 'c' + Date.now().toString(36) + Math.floor(Math.random()*1e6).toString(36);
+    const c = { id, classId, born: Date.now(), descents: 0, player, flags: {}, met: {}, contract: null };
+    this.putChar(c);
+    this.setActive(id);
+    return c;
+  },
+  // death is final for the soul, not for the ledger: the record goes, the Souls stay
+  killChar(id){
+    const r = this.roster();
+    delete r.chars[id];
+    if (r.activeId === id) r.activeId = null;
+    this._write(this.KEY_ROSTER, r);
+  },
+
   wipe(){
     localStorage.removeItem(this.KEY_CODEX);
     localStorage.removeItem(this.KEY_META);
     localStorage.removeItem(this.KEY_SANCTUM);
     localStorage.removeItem(this.KEY_ACH);
+    localStorage.removeItem(this.KEY_ROSTER);
   }
 };

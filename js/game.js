@@ -1,7 +1,7 @@
 // ================= GRAVEBORNE — main engine =================
 // shown on the title screen; keep in step with CACHE in sw.js — the game is
 // served from that cache, so the number you see is the build you're running
-const GAME_VERSION = 62;
+const GAME_VERSION = 63;
 let VW = 21, VH = 13;                 // viewport in tiles — reshaped to the stage on phones
 const TS = 32;                        // tile size in canvas pixels
 const TU = TS / 16;                   // old design unit -> new, for art not yet re-authored
@@ -383,7 +383,7 @@ function init(){
   window.addEventListener('resize', applyDisplayOpts);
   window.addEventListener('orientationchange', () => setTimeout(applyDisplayOpts, 120));
   requestAnimationFrame(loop);
-  showTitle();
+  showRoster();
 }
 
 // ---- Display: how much screen the game takes, and which way up ----
@@ -487,7 +487,7 @@ function showSettings(back){
   row.appendChild(Btn('Reset to full & upright', ()=>{
     Save.setOpt('fill', 1); Save.setOpt('orient', 'auto'); Save.setOpt('motion', 'smooth'); applyDisplayOpts(); snapPlayerVisual(); showSettings(back);
   }, 'btn center'));
-  row.appendChild(Btn('Back', ()=>{ hideModal(); (back || showTitle)(); }, 'btn center'));
+  row.appendChild(Btn('Back', ()=>{ hideModal(); (back || showRoster)(); }, 'btn center'));
   s.appendChild(row);
   setModal(s);
 }
@@ -789,7 +789,20 @@ function grantItem(id){
 }
 
 // ================= FLOOR / MOVEMENT =================
-function startRun(){
+// A soul is made once, in the city. Making it no longer starts anything - the
+// stair is reached from the tavern, from the Wanderer, with work in hand.
+function createCharacter(){
+  if (G.selClass !== 'necromancer') G.necroStyle = null;
+  const p = newPlayer(G.selClass);
+  if (G.selClass === 'necromancer') p.necroStyle = G.necroStyle;
+  const ch = Save.newChar(G.selClass, p);
+  hideModal();
+  characterMade(ch);
+}
+
+// Going down again with the same soul: it keeps its level, its gear and its
+// honor, and the Deep Dark keeps what it learned about it.
+function beginDescent(ch){
   Save.bumpRun();
   // A run that ended in death left G.busy latched true (lose() sets it and nothing
   // clears it), so the next descent started with every input gated shut and the
@@ -798,14 +811,19 @@ function startRun(){
   G.pendingEvent = null; G.usedActives = {}; G.shop = null;
   G.biome = null; G.harborSeen = false;
   G.bossId = U.choice(Data.BOSSES);   // who is waiting at the bottom of this one
-  if (G.selClass !== 'necromancer') G.necroStyle = null;   // keep the chosen path only for this run
-  G.player = newPlayer(G.selClass);
+  G.charId = ch.id;
+  G.dread = dreadOf(ch);              // every descent this soul survived is still on the bill
+  G.player = ch.player;
+  G.selClass = ch.classId;
+  G.necroStyle = ch.player.necroStyle || G.necroStyle;
   G.depth = 1;
+  G.player.unlockPool = rollUnlockPool(G.player);   // a fresh offer of skills each time down
   enterFloor();
   hideModal();
   G.state = 'EXPLORE';
   U.el('log').innerHTML = '';
-  log(`You descend into the Graveborne depths as the ${G.player.name}.`, 'hi');
+  log(`You go down into the Deep Dark as the ${G.player.name}.`, 'hi');
+  if (G.dread > 1) log(`It remembers you. Everything down here comes ${Math.round((G.dread - 1) * 100)}% heavier than it did.`, 'bad');
   log('Your HONOR shapes what you find here. The dishonored see threats where the pure see people.', 'mag');
   updateHUD();
   renderActions();
@@ -1370,7 +1388,8 @@ function revealFOV(){
 // ================= COMBAT =================
 function makeEnemyInstance(id){
   const e = Data.ENEMIES[id];
-  let f = e.boss ? 1 : (1 + (G.depth - 1) * 0.12);
+  const dread = G.dread || 1;        // half again as bad per descent this soul survived
+  let f = (e.boss ? 1 : (1 + (G.depth - 1) * 0.12)) * dread;
   if (e.hunter) f *= heatScale();   // the hunt grows stronger with your bounty
   // the stair's keeper is dead and they know it — lesser things fight cowed
   const cowed = !!(G.floor && G.floor.guardianSlain) && !e.boss && !e.guardian && !e.hunter;
@@ -1379,7 +1398,7 @@ function makeEnemyInstance(id){
   const inst = {
     id, name:e.name, sprite:e.sprite,
     maxhp, hp:maxhp,
-    atk:Math.round(e.atk*(e.boss?1:f)), def:e.def, mag:Math.round(e.mag*(e.boss?1:f)), spd:e.spd,
+    atk:Math.round(e.atk*(e.boss?dread:f)), def:e.def, mag:Math.round(e.mag*(e.boss?dread:f)), spd:e.spd,
     moves:e.moves.map(m => ({ ...m })),   // instance-local: severing may disable moves
     tags:e.tags||[], gold:e.gold, boss:!!e.boss, hunter:!!e.hunter, elite:!!e.elite, guardian:!!e.guardian, cowed, drop:e.drop, dialogue:e.dialogue, isEnemy:true,
     shield:0, statuses:{},
@@ -2023,6 +2042,7 @@ function lose(force){
   const converted = Math.floor((G.player.gold || 0) / 3);
   if (converted > 0) Save.addSouls(converted);
   G.lastConverted = converted;
+  soulLost();                    // the record goes; the Souls were already banked above
   log('Darkness takes you. Your bones join the Graveborne.', 'bad');
   if (converted > 0) log(`Your gold scatters — but ${converted} Souls cling to you beyond death.`, 'mag');
   showGameOver();
@@ -3115,31 +3135,6 @@ function Btn(label, fn, cls, key){
 function setModal(node){ const m = U.el('modal'); m.innerHTML=''; m.appendChild(node); m.classList.remove('hidden'); }
 function hideModal(){ U.el('modal').classList.add('hidden'); }
 
-function showTitle(){
-  const s = U.make('div','sheet');
-  s.appendChild(U.make('div','title-big','GRAVEBORNE'));
-  s.appendChild(U.make('div','title-sub','· A DARK-FANTASY DESCENT ·'));
-  s.appendChild(U.make('div','p center dim',
-    `<i>${U.choice(Data.DISCOURAGEMENTS)}</i>`));
-  s.appendChild(U.make('div','p center dim','Buriedbornes-style skill combat · roguelike depths · your <b style="color:#c8a24a">HONOR</b> decides what the dark shows you.'));
-  const m = Save.meta();
-  s.appendChild(U.make('div','p center',
-    `<span style="color:#7fb0d0">◈ ${Save.souls()} Souls</span> &nbsp;—&nbsp; your stable coin, kept across every death.`));
-  s.appendChild(U.make('div','p center dim',
-    `Runs: ${m.runs} · Deepest: ${m.deepest} · Wins: ${m.wins} · Codex: ${Save.discoveredCount()}/${Data.CODEX.length}`));
-  const row = U.make('div','row');
-  const saved = savedRunInfo();
-  if (saved){
-    row.appendChild(Btn(`Continue — ${saved.name} · Lv ${saved.lv} · Depth ${saved.depth}`,
-      ()=>{ if (!loadRun()) log('That descent could not be taken up again.', 'bad'); }, 'btn center good'));
-  }
-  row.appendChild(Btn('Begin Descent', showCharSelect, 'btn center'));
-  row.appendChild(Btn('Codex', ()=>showCodex(false), 'btn center'));
-  row.appendChild(Btn('Settings', ()=>showSettings(showTitle), 'btn center'));
-  s.appendChild(row);
-  s.appendChild(U.make('div','p center dim', 'v' + GAME_VERSION));
-  setModal(s);
-}
 
 // ---- Character select: a deck you draw from ----
 // The classes sit in a carousel of tarot-style cards. Only the centred card can
@@ -3318,7 +3313,7 @@ function showCharSelect(){
   s.appendChild(hint);
 
   const row = U.make('div','row');
-  row.appendChild(Btn('Back', showTitle, 'btn center'));
+  row.appendChild(Btn('Back', showRoster, 'btn center'));
   s.appendChild(row);
 
   // ---- rail mechanics ----
@@ -3727,7 +3722,7 @@ function showAllotment(){
       `<span style="color:#9a5cc0">◈ ${pv.name}</span> — <span style="color:#8a7f9e">${pv.desc}</span>`));
     s.appendChild(U.make('div','p dim','<i>No points to spend. Every fight you win gives her one instead — and she chooses no better than the dark does.</i>'));
     const row0 = U.make('div','row');
-    row0.appendChild(Btn('Descend', startRun, 'btn center'));
+    row0.appendChild(Btn('Take the road', createCharacter, 'btn center'));
     row0.appendChild(Btn('Back', showCharSelect, 'btn center'));
     s.appendChild(row0);
     setModal(s);
@@ -3753,7 +3748,7 @@ function showAllotment(){
 
   const row = U.make('div','row');
   const needStyle = G.selClass === 'necromancer' && !G.necroStyle;
-  const go = Btn(needStyle ? 'Choose a path first' : 'Descend', startRun, 'btn center');
+  const go = Btn(needStyle ? 'Choose a path first' : 'Take the road', createCharacter, 'btn center');
   go.disabled = left > 0 || needStyle;
   if (left > 0) row.appendChild(Btn('Spread them evenly', ()=>{
     const each = Math.floor(ALLOT_POINTS / ALLOT_STATS.length);
@@ -4778,7 +4773,7 @@ function pagedSheet(titleText, onClose, backFn){
 }
 
 function showCodex(fromGame){
-  const close = () => { if (fromGame){ hideModal(); } else showTitle(); };
+  const close = () => { if (fromGame){ hideModal(); } else showRoster(); };
   const { sheet, body } = pagedSheet(
     `Codex of Encounters — ${Save.discoveredCount()}/${Data.CODEX.length}`, close);
   body.appendChild(U.make('div','p dim','The same place wears a different face for a different soul. Discover both by walking two different roads of honor. Anything you have found opens.'));
@@ -4797,7 +4792,7 @@ function showCodex(fromGame){
 
 // What the hint was only the smell of. Reached by opening an entry you own.
 function showCodexEntry(c, fromGame){
-  const close = () => { if (fromGame){ hideModal(); } else showTitle(); };
+  const close = () => { if (fromGame){ hideModal(); } else showRoster(); };
   const { sheet, body } = pagedSheet(c.title, close, () => showCodex(fromGame));
   const tag = { good:'A mercy', bad:'A cruelty', mag:'A mystery' }[c.tag] || 'Recorded';
   body.appendChild(U.make('div','codex-tag '+c.tag, tag));
@@ -4821,15 +4816,18 @@ function confirmAbandon(){
 
 // Walking out does not get a summary screen. It gets the lights turned off and
 // one sentence, and then you can go back to the title and think about it.
+// Walking out is not dying. The soul keeps what it is carrying and the city
+// takes it back - it simply does not get paid, and the dark learns nothing.
 function desertRun(){
+  const carried = G.player;
   clearSavedRun();
-  G.player=null; G.floor=null; G.combat=null;
+  G.floor=null; G.combat=null;
   G.busy=false; G.moving=false; G.state='TITLE';
   hideModal();
 
   const veil = U.make('div','blackout');
   veil.appendChild(U.make('span', null, U.choice(Data.DESERTIONS)));
-  const leave = () => { if (veil.parentNode) veil.parentNode.removeChild(veil); showTitle(); };
+  const leave = () => { if (veil.parentNode) veil.parentNode.removeChild(veil); G.player = carried; returnToCity(false); };
   veil.onclick = leave;
   document.body.appendChild(veil);
   setTimeout(() => { if (veil.parentNode) leave(); }, 3600);
@@ -4843,9 +4841,9 @@ function showGameOver(){
   if (G.lastConverted > 0) s.appendChild(U.make('div','p center',`<span style="color:#7fb0d0">◈ ${G.lastConverted} Souls</span> clung to you beyond death. Total: ◈ ${Save.souls()}.`));
   s.appendChild(U.make('div','p center dim',`Codex discovered: ${Save.discoveredCount()}/${Data.CODEX.length}`));
   const row = U.make('div','row');
-  row.appendChild(Btn('Rise Again', showCharSelect, 'btn center'));
+  row.appendChild(Btn('Begin again', showCharSelect, 'btn center'));
   row.appendChild(Btn('Codex', ()=>showCodex(false), 'btn center'));
-  row.appendChild(Btn('Title', showTitle, 'btn center'));
+  row.appendChild(Btn('Hollowgate', showRoster, 'btn center'));
   s.appendChild(row);
   setModal(s);
 }
@@ -4857,7 +4855,7 @@ function showVictory(){
   s.appendChild(U.make('div','p center dim',`Final honor: <span style="color:${tier.color}">${tier.name} (${G.player.honor})</span> · Codex: ${Save.discoveredCount()}/${Data.CODEX.length}`));
   s.appendChild(U.make('div','p center dim','Try a darker — or purer — soul to uncover the encounters you did not see.'));
   const row = U.make('div','row');
-  row.appendChild(Btn('New Descent', showCharSelect, 'btn center'));
+  row.appendChild(Btn('Climb back to Hollowgate', ()=>returnToCity(true), 'btn center good'));
   row.appendChild(Btn('Codex', ()=>showCodex(false), 'btn center'));
   s.appendChild(row);
   setModal(s);
