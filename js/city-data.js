@@ -57,7 +57,7 @@ const CITY_MOOD = {
 // beat. Ungated lines are the fallback so nobody is ever left silent.
 const CITY_NPCS = {
   wanderer: {
-    id: 'wanderer', name: 'The Dark Wanderer', sprite: 'npc_silhouette',
+    id: 'wanderer', name: 'The Dark Wanderer', sprite: 'npc_silhouette', where: 'tavern',
     role: 'Takes the descents. Sits at the back table. Has been here longer than the tavern.',
     intro: 'He does not drink and he does not leave, and the landlord has stopped charging him for the chair. Everyone who goes down the stair signs with him first. Nobody can say who gave him the authority.',
     lines: [
@@ -75,7 +75,7 @@ const CITY_NPCS = {
     ],
   },
   landlord: {
-    id: 'landlord', name: 'Aggie Voss, the Landlord', sprite: 'npc_woman',
+    id: 'landlord', name: 'Aggie Voss, the Landlord', sprite: 'npc_woman', where: 'tavern',
     role: 'Owns the Rope and Lantern. Has buried more regulars than she has served.',
     intro: 'She keeps a slate behind the bar with names on it. About a third are crossed out. She does not explain the system and nobody has ever asked twice.',
     lines: [
@@ -93,7 +93,7 @@ const CITY_NPCS = {
     ],
   },
   quartermaster: {
-    id: 'quartermaster', name: 'Sergeant Halloway', sprite: 'npc_merchant',
+    id: 'quartermaster', name: 'Sergeant Halloway', sprite: 'npc_merchant', where: 'tavern',
     role: 'Posts the bounties. Was garrison once, before the garrison stopped answering.',
     intro: 'The board beside him is the only official thing left in Hollowgate. He writes the notices himself, in a hand that was trained for requisition forms.',
     lines: [
@@ -104,6 +104,60 @@ const CITY_NPCS = {
       { tier:'MARKED',     text:'"You are on a notice yourself. In another city that would matter. Here it just means you know the format."' },
       { tier:'HALLOWED',   text:'"Bring the proof and I will pay it clean. You would be astonished how rare the clean part is."' },
       { text:'"Every notice on that board is somebody who did not come back. The bounty is what is left of their pay."' },
+    ],
+  },
+  // ---- Gallows Market: nobody here sells anything any more. They stayed for
+  // other reasons, and each of them will tell you a different one. ----
+  gravedigger: {
+    id: 'gravedigger', name: 'Iron Mabb, the Gravedigger', sprite: 'npc_gibbet', where: 'market',
+    role: 'Digs for the city. Has not been paid since the second winter.',
+    intro: 'She works the ground at the far end of the market where the stalls give out. There is no wall around what she digs and there has not needed to be one; nobody in Hollowgate has to be told what that corner is.',
+    lines: [
+      { cls:'knight',      text:'"Ash-grey. I have put nine of you in. Two of them I dug twice, because the first hole was not deep enough for what came back up."' },
+      { cls:'rogue',       text:'"You will end up in my ground like the rest, and you will be the only one who was honest about why you came. I will give you the good corner for that."' },
+      { cls:'mage',        text:'"I do not dig for your sort. Whatever you are carrying when you go, it stays above and it goes in the fire."' },
+      { cls:'warden',      text:'"Say the words for the ones with no names, would you. Row four. I have been saying them wrong for eleven years and I know it."' },
+      { cls:'necromancer', text:'"You and I are in the same trade, then. I put them down. Stay out of my rows."' },
+      { cls:'alchemist',   text:'"Nothing grows in that soil. Nothing. And you and I both know that is not normal."' },
+      { tier:'MARKED',     text:'"The Choir does not let its condemned into consecrated ground. Lucky for you, none of this is consecrated."' },
+      { tier:'HALLOWED',   text:'"You will get a stone. Not everyone gets a stone."' },
+      { codex:'hang_rite', text:'"Word is you cut a woman down out of a gibbet and said the words over her. That is my job, and you did it better."' },
+      { codex:'shr_rest',  text:'"Somebody laid twelve of the order to rest properly down there. I would like to shake that hand, and I suspect I am shaking it."' },
+      { text:'"Rows one through six are full. Seven is for this winter. Do not walk on eight."' },
+    ],
+  },
+  crier: {
+    id: 'crier', name: 'Wick, Who Reads the Notices', sprite: 'npc_beggar', where: 'market',
+    role: 'Reads the board aloud for those who cannot. Charges nothing and takes what he is given.',
+    intro: 'He stands on an upturned crate where the crowd used to be and reads Halloway\'s notices out to an empty square, twice a day, at the hours he was told to. Nobody has told him to stop.',
+    lines: [
+      { cls:'knight',      text:'"An order man! Stand there a moment, would you. It reads better with somebody in front of it."' },
+      { cls:'rogue',       text:'"You do not need me. You read the notices before Halloway pins them, and I have seen you do it."' },
+      { cls:'mage',        text:'"You read. Everyone who reads has stopped needing me, and there are fewer of you every year, which is either good for business or very bad."' },
+      { cls:'warden',      text:'"They used to send a lantern to stand with me at the second reading, so the ones at the back could see the board. You are the first in six years."' },
+      { cls:'necromancer', text:'"I will read to anybody. That is the whole of the position. I am not going to pretend I am pleased about all of them."' },
+      { cls:'alchemist',   text:'"Third notice down wants seven bundles of anything that grows below. Nobody has claimed it in a year and a half."' },
+      { tier:'MARKED',     text:'"Your name is on the board. I have to read it out at noon and at dusk. I read it quietly."' },
+      { tier:'HALLOWED',   text:'"I put your name in the good part, after the bounties, where people are still listening."' },
+      { codex:'beg_alms',  text:'"Old Fen shares. He does not have anything, and he shares it. I mention it in the readings now. Nobody stops me."' },
+      { text:'"Nine notices this morning. Two are the same man. One is a building that fell over."' },
+    ],
+  },
+  widow: {
+    id: 'widow', name: 'The Waiting Widow', sprite: 'npc_bride', where: 'market',
+    role: 'Keeps a stall with nothing on it. Comes every day the market opens.',
+    intro: 'The stall is swept, the cloth is clean, and there has been nothing to put on it for four years. She sets it out anyway, sits behind it, and watches the mouth of the stair.',
+    lines: [
+      { cls:'knight',      text:'"He wore that grey. Not that armour — that grey. Do not tell me it is a common colour, I know what I am looking at."' },
+      { cls:'rogue',       text:'"He went down with three others and a thief, and the thief came back. So it can be done. So somebody does come back."' },
+      { cls:'mage',        text:'"Can you call them? No. Do not answer that. I asked once and the answer cost me a year."' },
+      { cls:'warden',      text:'"If you find him, do not bring him. Bring the word. I have got used to the not-knowing and I would rather it than the other."' },
+      { cls:'necromancer', text:'"No. Whatever you are about to offer — no. Get away from my stall."' },
+      { cls:'alchemist',   text:'"Do you have anything for sleeping? Not the kind that works. The kind that does not."' },
+      { tier:'MARKED',     text:'"They say you are hunted. Good. Somebody in this city should be looking for somebody."' },
+      { tier:'HALLOWED',   text:'"You would tell me. If you found him, you would actually come back and tell me. I can see it."' },
+      { codex:'bride_truth', text:'"There is a woman in the water down there who was going to be married. Somebody spoke to her. Whoever it was — thank you. Thank you."' },
+      { text:'"The stall is not for selling. It is so that when he comes up, there is something of ours he will recognise."' },
     ],
   },
 };

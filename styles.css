@@ -322,6 +322,13 @@ body.force-landscape .blackout span{transform:rotate(90deg)}
 .codex-item.open h4::after{content:' >';color:var(--gold);opacity:.7}
 .codex-item.open:hover{border-color:var(--gold);background:#191323}
 .codex-item.open:active{background:#221a30}
+/* letting go of a soul: the card fogs out under a held thumb. No transition on
+   the properties the hold animates, or the frame-by-frame fade fights it. */
+.codex-item.letting-go{
+  transition:none;
+  will-change:filter,opacity,transform;
+  user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;
+}
 .codex-tag{display:inline-block;font-size:10px;letter-spacing:2px;text-transform:uppercase;
   border:1px solid var(--edge);border-radius:3px;padding:3px 8px;margin-bottom:12px;color:var(--ink-dim)}
 .codex-tag.good{color:#7fae3a;border-color:#3d5620}

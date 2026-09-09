@@ -642,3 +642,174 @@ I18N.addData({
     carrion:{ desc:'A horog, a lepel és a harang. Együtt: +15 TÁM, +8 VÉD, +22 ÉP, +3 GYO, +20% kritikus esély, és minden sebzés 15%-kal keményebb.' },
   },
 });
+
+// ================= v65: the other buildings, and letting a life go =================
+// The Cold Forge, the Grey Chapel and Gallows Market all arrived in English, as
+// did the hold-to-delete question and the new reading of what walking out of a
+// run means. Stat abbreviations inside item mod strings had never been relabelled
+// either, which is why a chapel row read "fegyver — +4 ATK".
+
+const HU_STAT_WORDS = (s) => s
+  .replace(/\bATK\b/g, 'TÁM').replace(/\bDEF\b/g, 'VÉD').replace(/\bMAG\b/g, 'MÁG')
+  .replace(/\bSPD\b/g, 'GYO').replace(/\bHP\b/g, 'ÉP').replace(/\bSP\b/g, 'FP');
+
+I18N.addUI({
+  // ---- what the city says the buildings are, now that they are open ----
+  'Steel for coin, and more steel beaten into what you already carry.':
+    'Acél pénzért, és még több acél abba verve, amit már hordasz.',
+  'The Choir keeps the rail, the ledger, and whatever is behind it.':
+    'A Kórus őrzi a korlátot, a könyvet, és azt, ami mögötte van.',
+  'Nothing for sale. The people who still come are the point.':
+    'Semmi sem eladó. Azok az emberek a lényeg, akik még mindig eljönnek.',
+
+  // ---- The Cold Forge ----
+  '"The fire is only cold when nobody is paying. Show me coin and show me what you carry."':
+    '„A tűz csak akkor hideg, ha senki nem fizet. Mutass pénzt, és mutasd, mit hordasz.”',
+  'The work': 'A munka',
+  'Beat the ATK up': 'A TÁM kikalapálása',
+  'Beat the DEF up': 'A VÉD kikalapálása',
+  'Beat the MAG up': 'A MÁG kikalapálása',
+  'Steel': 'Acél',
+  'The rack is bare until the next descent.': 'Az állvány üres a következő lemerülésig.',
+
+  // ---- The Grey Chapel ----
+  '"The order is ash and you came anyway. Kneel. It costs the Choir nothing to say the words and it is plainly costing you something to hear them."':
+    '„A rend hamu, és te mégis eljöttél. Térdelj le. A Kórusnak semmibe nem kerül kimondani a szavakat, és jól látszik, hogy neked valamibe kerül végighallgatni őket.”',
+  '"You came in. Everyone in this city knows what you are, and you came in anyway, and you stood at the back where you thought nobody was looking."':
+    '„Bejöttél. Ebben a városban mindenki tudja, mi vagy, és te mégis bejöttél, és hátul álltál meg, ahol azt hitted, senki nem néz.”',
+  '"Coin buys bread. Souls buy the other thing. Do not confuse the two at this rail."':
+    '„A pénz kenyeret vesz. A lélek a másik dolgot veszi. Ennél a korlátnál ne keverd össze a kettőt.”',
+  'The offering': 'Az adomány',
+  'Ask for coin back': 'Pénzt kérni vissza',
+  'The Choir returns 40 gold for 6 Souls': 'A Kórus 40 aranyat ad 6 lélekért',
+  'The rail opens and forty gold comes back across it.':
+    'A korlát kinyílik, és negyven arany jön vissza rajta.',
+  'Behind the rail': 'A korlát mögött',
+  'What you carry': 'Amit hordasz',
+  'You are carrying nothing the Choir wants.': 'Semmit nem hordasz, ami a Kórusnak kellene.',
+
+  // ---- Gallows Market ----
+  'Two rows of stalls with nothing on them and a gallows nobody has taken down, because taking it down would be a decision and nobody here makes those any more.':
+    'Két sor stand, semmi rajtuk, és egy akasztófa, amit senki nem bontott le, mert a lebontása döntés lenne, és itt már senki nem hoz döntéseket.',
+  'Who is out today': 'Ki van kint ma',
+  'The square is empty today.': 'A tér ma üres.',
+
+  // ---- letting a life go, and the new reading of walking out of a run ----
+  'Let go of this life?': 'Biztos elhagyod ezt az életet?',
+  '<i>There is no undoing it. The roster simply has one fewer name in it.</i>':
+    '<i>Nincs visszaút. A névsorban egyszerűen eggyel kevesebb név lesz.</i>',
+  'Let it go': 'Elengedem',
+  'Keep it': 'Megtartom',
+  'The name goes off the slate.': 'A név lekerül a tábláról.',
+  'Turning back is not a way out. This soul ends here, and only its Souls climb the stair. (Codex discoveries are kept.)':
+    'A visszafordulás nem kijárat. Ez a lélek itt ér véget, és csak a lelkei jutnak fel a lépcsőn. (A kódex-felfedezések megmaradnak.)',
+  'End it here': 'Itt vess véget neki',
+});
+
+I18N.addPatterns([
+  // ---- the forge, which counts its own work ----
+  [/^\+1 ATK for good — (\d+) done so far$/, '+1 TÁM véglegesen — eddig $1'],
+  [/^\+1 DEF for good — (\d+) done so far$/, '+1 VÉD véglegesen — eddig $1'],
+  [/^\+1 MAG for good — (\d+) done so far$/, '+1 MÁG véglegesen — eddig $1'],
+  [/^The Cold Forge beats another point of ATK into you\.$/,
+    'A Hideg Kohó még egy pont TÁM-ot kalapál beléd.'],
+  [/^The Cold Forge beats another point of DEF into you\.$/,
+    'A Hideg Kohó még egy pont VÉD-et kalapál beléd.'],
+  [/^The Cold Forge beats another point of MAG into you\.$/,
+    'A Hideg Kohó még egy pont MÁG-ot kalapál beléd.'],
+
+  // ---- the chapel ledger ----
+  [/^Your honor rises by (\d+)\.$/, 'A becsületed nő: +$1.'],
+  [/^Give (\d+) gold$/, '$1 arany felajánlása'],
+  [/^The ledger records (\d+) Souls$/, 'A könyv $1 lelket ír jóvá'],
+  [/^The Choir takes the coin and writes down (\d+) Souls\.$/,
+    'A Kórus elveszi a pénzt, és $1 lelket ír be.'],
+  [/^Give up (.+)$/, 'Lemondasz erről: $1'],
+  [/^The Choir takes (?:the )?(.+) and enters (\d+) Souls against your name\.$/,
+    'A Kórus elveszi — $1 —, és $2 lelket ír a nevedhez.'],
+
+  // ---- the question the roster asks when a card is held all the way out ----
+  [/^(.+), level (\d+), (\d+) descents survived\. Nothing of this one is kept but the Souls, which were never really its own\.$/,
+    '$1, $2. szint, $3 túlélt lemerülés. Ebből semmi nem marad meg, csak a lelkek, amelyek sosem voltak igazán az övéi.'],
+
+  // ---- item mod strings, everywhere they are shown ----
+  // "+4 ATK · +10 HP" standing on its own, and the chapel's "<slot> — <mods>" row.
+  [/^[+-]\d+ (?:ATK|DEF|MAG|SPD|HP|SP)(?: · [+-]\d+ (?:ATK|DEF|MAG|SPD|HP|SP))*$/,
+    (m) => HU_STAT_WORDS(m)],
+  [/^(weapon|armor|trinket) — (.+)$/,
+    (m, slot, mods) => ({ weapon:'fegyver', armor:'páncél', trinket:'ereklye' })[slot]
+      + ' — ' + HU_STAT_WORDS(mods)],
+
+  // ---- the two coin lines the city assembles markup around ----
+  [/^<span class="g">✦ (\d+) Gold<\/span>$/, '<span class="g">✦ $1 arany</span>'],
+  [/^<span class="g">✦ (\d+) Gold<\/span><span class="s">◈ (\d+) Souls<\/span>$/,
+    '<span class="g">✦ $1 arany</span><span class="s">◈ $2 lélek</span>'],
+]);
+
+// ---- the three who still come to a market that sells nothing ----
+I18N.addData({
+  CITY_NPCS: {
+    gravedigger: {
+      name: 'Vas Mabb, a Sírásó',
+      role: 'A városnak ás. A második tél óta nem kapott fizetést.',
+      intro: 'A piac túlsó végén dolgozza a földet, ahol a standok elfogynak. Nincs kerítés akörül, amit ás, és sosem volt rá szükség; Hollowgate-ben senkinek nem kell elmagyarázni, mi az a sarok.',
+      lines: {
+        0: { text:'„Hamuszürke. Kilencet temettem el a fajtádból. Kettőt kétszer ástam ki, mert az első gödör nem volt elég mély ahhoz, ami feljött belőle.”' },
+        1: { text:'„Az én földemben végzed, mint a többiek, és te leszel az egyetlen, aki őszinte volt afelől, miért jött. Ezért megkapod a jó sarkot.”' },
+        2: { text:'„A te fajtádnak nem ások. Bármit is hordasz, amikor elmész, az fent marad, és megy a tűzbe.”' },
+        3: { text:'„Mondd el a szavakat a névteleneknek, jó? Negyedik sor. Tizenegy éve rosszul mondom, és tudom is.”' },
+        4: { text:'„Akkor egy szakmában vagyunk. Én lefektetem őket. Maradj távol a soraimtól.”' },
+        5: { text:'„Semmi nem nő abban a földben. Semmi. És mindketten tudjuk, hogy ez nem normális.”' },
+        6: { text:'„A Kórus nem engedi az elítéltjeit megszentelt földbe. Szerencsédre itt semmi nincs megszentelve.”' },
+        7: { text:'„Kapsz követ. Nem mindenki kap követ.”' },
+        8: { text:'„Azt beszélik, levágtál egy nőt a bitóról, és elmondtad fölötte a szavakat. Az az én dolgom, és te jobban csináltad.”' },
+        9: { text:'„Valaki tizenkettőt a rendből tisztességgel nyugalomra helyezett odalent. Szeretném megszorítani azt a kezet, és gyanítom, épp most szorítom.”' },
+        10:{ text:'„Az egyestől a hatosig minden sor tele van. A hetes ezé a télé. A nyolcasra ne lépj rá.”' },
+      },
+    },
+    crier: {
+      name: 'Wick, aki a hirdetményeket olvassa',
+      role: 'Hangosan olvassa a táblát azoknak, akik nem tudják. Nem kér semmit, és elfogadja, amit adnak.',
+      intro: 'Egy felfordított ládán áll ott, ahol régen a tömeg volt, és Halloway hirdetményeit olvassa fel az üres térnek, naponta kétszer, abban az órában, amit mondtak neki. Senki nem szólt neki, hogy hagyja abba.',
+      lines: {
+        0: { text:'„Egy rendbéli! Állj csak ott egy pillanatra, jó? Jobban hangzik, ha valaki áll előtte.”' },
+        1: { text:'„Rám nincs szükséged. Te előbb elolvasod a hirdetményeket, mint hogy Halloway kitűzné őket, és láttam is, ahogy csinálod.”' },
+        2: { text:'„Te olvasol. Mindenki, aki olvas, megszűnt rám szorulni, és évről évre kevesebben vagytok, ami vagy jó az üzletnek, vagy nagyon rossz.”' },
+        3: { text:'„Régen küldtek egy lámpást, hogy velem álljon a második felolvasáson, hogy a hátul állók is lássák a táblát. Hat éve te vagy az első.”' },
+        4: { text:'„Bárkinek felolvasok. Ennyi az egész állás. Nem fogok úgy tenni, mintha mindegyiküknek örülnék.”' },
+        5: { text:'„A harmadik hirdetmény hét köteget kér bármiből, ami odalent nő. Másfél éve senki nem jelentkezett érte.”' },
+        6: { text:'„A neved fent van a táblán. Délben és alkonyatkor fel kell olvasnom. Halkan olvasom.”' },
+        7: { text:'„A jó részbe tettem a nevedet, a vérdíjak után, ahol az emberek még figyelnek.”' },
+        8: { text:'„Vén Fen oszt. Nincs semmije, és mégis oszt. Mostanában megemlítem a felolvasásokban. Senki nem állít le.”' },
+        9: { text:'„Kilenc hirdetmény ma reggel. Kettő ugyanaz az ember. Egy meg egy ház, ami eldőlt.”' },
+      },
+    },
+    widow: {
+      name: 'A Várakozó Özvegy',
+      role: 'Standot tart, amin nincs semmi. Minden nap eljön, amikor a piac nyit.',
+      intro: 'A stand felsöpörve, a terítő tiszta, és négy éve nincs mit rátenni. Mégis kirakja, mögé ül, és nézi a lépcső száját.',
+      lines: {
+        0: { text:'„Ő is azt a szürkét viselte. Nem azt a páncélt — azt a szürkét. Ne mondd nekem, hogy közönséges szín, tudom, mit nézek.”' },
+        1: { text:'„Hárommal ment le meg egy tolvajjal, és a tolvaj visszajött. Szóval lehetséges. Szóval valaki mégiscsak visszajön.”' },
+        2: { text:'„Meg tudod hívni őket? Nem. Ne válaszolj. Egyszer megkérdeztem, és a válasz egy évembe került.”' },
+        3: { text:'„Ha megtalálod, ne hozd fel. A hírt hozd. Megszoktam a nem-tudást, és inkább azt, mint a másikat.”' },
+        4: { text:'„Nem. Bármit is akarsz ajánlani — nem. Menj el a standomtól.”' },
+        5: { text:'„Van valamid alváshoz? Nem az a fajta, ami használ. Az a fajta, ami nem.”' },
+        6: { text:'„Azt mondják, üldöznek. Jó. Ebben a városban valakinek keresnie kellene valakit.”' },
+        7: { text:'„Te elmondanád. Ha megtalálnád, tényleg visszajönnél és elmondanád. Látom rajtad.”' },
+        8: { text:'„Van odalent egy nő a vízben, aki férjhez ment volna. Valaki beszélt vele. Bárki is volt — köszönöm. Köszönöm.”' },
+        9: { text:'„A stand nem eladásra van. Azért van, hogy amikor feljön, legyen itt valami a miénkből, amit felismer.”' },
+      },
+    },
+  },
+});
+
+// The forge and the chapel both buy through forceEquip, which writes these two
+// lines to the log. They had been sitting untranslated behind the Hollow
+// Merchant, where they were rarer; two shops in the city put them in front of
+// the player on every purchase.
+I18N.addPatterns([
+  [/^You buy the (.+)\.$/, 'Megveszed: $1.'],
+  [/^The merchant takes your old (.+) for (\d+) gold\.$/,
+    'A kereskedő elveszi a régi darabodat — $1 —, $2 aranyért.'],
+]);

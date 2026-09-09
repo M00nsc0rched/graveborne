@@ -1,7 +1,7 @@
 // ================= GRAVEBORNE — main engine =================
 // shown on the title screen; keep in step with CACHE in sw.js — the game is
 // served from that cache, so the number you see is the build you're running
-const GAME_VERSION = 64;
+const GAME_VERSION = 65;
 let VW = 21, VH = 13;                 // viewport in tiles — reshaped to the stage on phones
 const TS = 32;                        // tile size in canvas pixels
 const TU = TS / 16;                   // old design unit -> new, for art not yet re-authored
@@ -750,6 +750,10 @@ function recomputeStats(p){
     hp+=m.hp||0; sp+=m.sp||0; atk+=m.atk||0; def+=m.def||0; mag+=m.mag||0; spd+=m.spd||0;
     addPassive(set.passive);
   }
+  // what the Cold Forge beat into the gear. It rides on the soul rather than on
+  // the item, so selling a sword does not sell the work that went into it.
+  const fg = p.forge || {};
+  atk += fg.atk || 0; def += fg.def || 0; mag += fg.mag || 0;
   // the current biome treats each class differently
   const bm = biomeClassMods(p);
   hp+=bm.hp||0; sp+=bm.sp||0; atk+=bm.atk||0; def+=bm.def||0; mag+=bm.mag||0; spd+=bm.spd||0;
@@ -4806,9 +4810,9 @@ function showCodexEntry(c, fromGame){
 function confirmAbandon(){
   const s = U.make('div','sheet');
   s.appendChild(U.make('div','sect','Abandon this run?'));
-  s.appendChild(U.make('div','p','Your progress this descent will be lost. (Codex discoveries are kept.)'));
+  s.appendChild(U.make('div','p','Turning back is not a way out. This soul ends here, and only its Souls climb the stair. (Codex discoveries are kept.)'));
   const row = U.make('div','row');
-  row.appendChild(Btn('Return to Title', desertRun, 'btn danger'));
+  row.appendChild(Btn('End it here', desertRun, 'btn danger'));
   row.appendChild(Btn('Keep Going', ()=>{ hideModal(); }, 'btn center'));
   s.appendChild(row);
   setModal(s);
@@ -4816,18 +4820,14 @@ function confirmAbandon(){
 
 // Walking out does not get a summary screen. It gets the lights turned off and
 // one sentence, and then you can go back to the title and think about it.
-// Walking out is not dying. The soul keeps what it is carrying and the city
-// takes it back - it simply does not get paid, and the dark learns nothing.
+// Walking out is dying. There is no exit from the stair that is not the top of
+// it, and a soul that turns back is a soul the Deep Dark keeps. Only the Souls
+// climb out, the way they do from any other death.
 function desertRun(){
-  const carried = G.player;
-  clearSavedRun();
-  G.floor=null; G.combat=null;
-  G.busy=false; G.moving=false; G.state='TITLE';
   hideModal();
-
   const veil = U.make('div','blackout');
   veil.appendChild(U.make('span', null, U.choice(Data.DESERTIONS)));
-  const leave = () => { if (veil.parentNode) veil.parentNode.removeChild(veil); G.player = carried; returnToCity(false); };
+  const leave = () => { if (veil.parentNode) veil.parentNode.removeChild(veil); lose(true); };
   veil.onclick = leave;
   document.body.appendChild(veil);
   setTimeout(() => { if (veil.parentNode) leave(); }, 3600);

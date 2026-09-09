@@ -60,7 +60,8 @@ function showRoster(){
       card.appendChild(U.make('h4', null, `${bs.title || p.name} — ${T('Lv')} ${p.level}`));
       card.appendChild(U.make('div','d',
         `<span style="color:${tier.color}">${tier.name}</span> · ${p.gold}✦ · ${dreadLabel(ch)}`));
-      card.onclick = () => { Save.setActive(ch.id); showCity(ch); };
+      const wasHeld = armCardRelease(card, ch);
+      card.onclick = () => { if (wasHeld()) return; Save.setActive(ch.id); showCity(ch); };
       body.appendChild(card);
     }
   } else {
@@ -94,12 +95,81 @@ function characterMade(ch){
   setModal(s);
 }
 
+
+// ---- letting go of a soul ----
+// Hold the card and it fogs and fades under your thumb, further the longer you
+// hold. Let go early and it comes back; hold it all the way out and the game
+// asks whether you meant it. A tap still just opens the city, so nothing about
+// the ordinary gesture changes.
+const FADE_MS = 1100;
+function armCardRelease(card, ch){
+  let raf = null, timer = null, start = 0, done = false;
+
+  const paint = (k) => {
+    card.style.filter = `blur(${(k * 5).toFixed(2)}px)`;
+    card.style.opacity = (1 - k * 0.85).toFixed(3);
+    card.style.transform = `scale(${(1 - k * 0.06).toFixed(3)})`;
+  };
+  const clear = () => {
+    if (raf) cancelAnimationFrame(raf); raf = null;
+    if (timer) clearTimeout(timer); timer = null;
+    card.style.filter = ''; card.style.opacity = ''; card.style.transform = '';
+    card.classList.remove('letting-go');
+  };
+  const step = () => {
+    const k = Math.min(1, (performance.now() - start) / FADE_MS);
+    paint(k);
+    if (k < 1) raf = requestAnimationFrame(step);
+  };
+
+  // The question is asked on a timer and only the fog is painted on frames.
+  // requestAnimationFrame stops entirely while the page is not being drawn, so a
+  // hold that began before the screen slept would otherwise never resolve.
+  const begin = (e) => {
+    if (done) return;
+    // a second finger, or the right button, is not a hold
+    if (e.type === 'pointerdown' && e.button !== 0) return;
+    done = false; start = performance.now();
+    card.classList.add('letting-go');
+    raf = requestAnimationFrame(step);
+    timer = setTimeout(() => { done = true; clear(); confirmLetGo(ch); }, FADE_MS);
+  };
+  const cancel = () => { if (!done) clear(); };
+
+  card.addEventListener('pointerdown', begin);
+  card.addEventListener('pointerup', cancel);
+  card.addEventListener('pointerleave', cancel);
+  card.addEventListener('pointercancel', cancel);
+  // holding on a phone otherwise raises the text-selection menu over the card
+  card.addEventListener('contextmenu', (e) => e.preventDefault());
+  return () => done;
+}
+
+function confirmLetGo(ch){
+  const bs = City.BACKSTORY[ch.classId] || {};
+  const p = ch.player;
+  const s = U.make('div','sheet');
+  s.appendChild(U.make('div','sect','Let go of this life?'));
+  s.appendChild(U.make('div','p',
+    `${bs.title || p.name}, level ${p.level}, ${ch.descents || 0} descents survived. Nothing of this one is kept but the Souls, which were never really its own.`));
+  s.appendChild(U.make('div','p dim','<i>There is no undoing it. The roster simply has one fewer name in it.</i>'));
+  const row = U.make('div','row');
+  row.appendChild(Btn('Let it go', () => {
+    Save.killChar(ch.id);
+    log('The name goes off the slate.', 'dim');
+    showRoster();
+  }, 'btn danger center'));
+  row.appendChild(Btn('Keep it', showRoster, 'btn center'));
+  s.appendChild(row);
+  setModal(s);
+}
+
 // ================= THE CITY =================
 const CITY_BUILDINGS = [
-  { id:'tavern',  name:'The Rope and Lantern', desc:'Work, drink, and the only door in Hollowgate that leads down.', open:true },
-  { id:'smithy',  name:'The Cold Forge',       desc:'The fire is banked and the shutters are down.', open:false },
-  { id:'chapel',  name:'The Grey Chapel',      desc:'The Choir keeps it locked from the inside.', open:false },
-  { id:'market',  name:'Gallows Market',       desc:'Stalls, mostly empty. Nobody is buying.', open:false },
+  { id:'tavern', name:'The Rope and Lantern', desc:'Work, drink, and the only door in Hollowgate that leads down.', go:(ch)=>showTavern(ch) },
+  { id:'smithy', name:'The Cold Forge',       desc:'Steel for coin, and more steel beaten into what you already carry.', go:(ch)=>showForge(ch) },
+  { id:'chapel', name:'The Grey Chapel',      desc:'The Choir keeps the rail, the ledger, and whatever is behind it.', go:(ch)=>showChapel(ch) },
+  { id:'market', name:'Gallows Market',       desc:'Nothing for sale. The people who still come are the point.', go:(ch)=>showMarket(ch) },
 ];
 
 function showCity(ch){
@@ -117,10 +187,10 @@ function showCity(ch){
   body.appendChild(U.make('div','p center dim', dreadLabel(ch)));
 
   for (const b of CITY_BUILDINGS){
-    const card = U.make('div','codex-item' + (b.open ? ' open' : ' locked'));
+    const card = U.make('div','codex-item open');
     card.appendChild(U.make('h4', null, b.name));
     card.appendChild(U.make('div','d', b.desc));
-    if (b.open) card.onclick = () => showTavern(ch);
+    card.onclick = () => b.go(ch);
     body.appendChild(card);
   }
   const row = U.make('div','row');
@@ -141,6 +211,7 @@ function showTavern(ch){
   body.appendChild(U.make('div','sect','Who is in tonight'));
   for (const key in City.CITY_NPCS){
     const npc = City.CITY_NPCS[key];
+    if (npc.where && npc.where !== 'tavern') continue;   // the market keeps its own people
     const card = U.make('div','codex-item open');
     const seen = ch.met[npc.id];
     card.appendChild(U.make('h4', null, npc.name + (seen ? '' : ' — ' + T('new'))));
@@ -160,9 +231,12 @@ function showTavern(ch){
   setModal(sheet);
 }
 
-function showNpc(ch, npc){
+// back is where the door leads out to - the tavern for its regulars, the market
+// for the people who stand in it.
+function showNpc(ch, npc, back){
   ch.met[npc.id] = true; Save.putChar(ch);
-  const { sheet, body } = pagedSheet(npc.name, ()=>showTavern(ch));
+  const home = back || ((c)=>showTavern(c));
+  const { sheet, body } = pagedSheet(npc.name, ()=>home(ch));
   const art = U.make('canvas'); art.width = 120; art.height = 120; art.className = 'scene-art';
   body.appendChild(art); try { Sprites.toCanvas(art, npc.sprite, 9); } catch(e){}
   body.appendChild(U.make('div','p dim', npc.intro));
@@ -171,7 +245,7 @@ function showNpc(ch, npc){
   const row = U.make('div','row');
   if (npc.id === 'wanderer') row.appendChild(Btn('Ask about work', ()=>showContracts(ch), 'btn center good'));
   if (npc.id === 'quartermaster') row.appendChild(Btn('Read the board', ()=>showBounties(ch), 'btn center good'));
-  row.appendChild(Btn('Back', ()=>showTavern(ch), 'btn center'));
+  row.appendChild(Btn('Back', ()=>home(ch), 'btn center'));
   body.appendChild(row);
   setModal(sheet);
 }
@@ -268,6 +342,173 @@ function confirmDescent(ch){
   setModal(s);
 }
 
+
+// ================= THE COLD FORGE =================
+// Gold only. It sells steel and it beats more out of the steel you already
+// carry, and the work rides on the soul rather than on the item — sell the
+// sword and you keep what the forge put into your arm.
+function forgeStock(ch){
+  const tier = U.clamp(1 + Math.floor((ch.descents || 0) / 2), 1, 3);
+  const ids = Object.keys(Data.ITEMS).filter(id => {
+    const it = Data.ITEMS[id];
+    return it.slot === 'weapon' && (it.tier || 1) <= tier && !it.set;
+  });
+  U.shuffle(ids);
+  return ids.slice(0, 4);
+}
+
+// Each beating costs more than the last, so a soul cannot simply stand here
+// until it is unbeatable.
+function forgeCost(ch, stat){
+  const n = ((ch.player.forge || {})[stat] || 0);
+  return Math.round(60 * Math.pow(1.6, n) * (1 + 0.25 * (ch.descents || 0)));
+}
+
+function showForge(ch){
+  ch = ch || Save.activeChar(); if (!ch) return showRoster();
+  const p = ch.player;
+  p.forge = p.forge || { atk:0, def:0, mag:0 };
+  const { sheet, body } = pagedSheet('The Cold Forge', ()=>showCity(ch));
+  const art = U.make('canvas'); art.width = 96; art.height = 96; art.className = 'merchant-art';
+  body.appendChild(art); try { Sprites.toCanvas(art, 'npc_smith', 6); } catch(e){}
+  body.appendChild(U.make('div','p dim center',
+    '"The fire is only cold when nobody is paying. Show me coin and show me what you carry."'));
+  body.appendChild(U.make('div','balance', `<span class="g">✦ ${p.gold} Gold</span>`));
+
+  body.appendChild(U.make('div','sect','The work'));
+  for (const [stat, label] of [['atk','ATK'], ['def','DEF'], ['mag','MAG']]){
+    const cost = forgeCost(ch, stat), have = p.forge[stat] || 0;
+    body.appendChild(shopLine(
+      `Beat the ${label} up`, `+1 ${label} for good — ${have} done so far`,
+      `<span class="price g">✦ ${cost}</span>`, p.gold < cost,
+      () => {
+        p.gold -= cost; p.forge[stat] = have + 1; recomputeStats(p);
+        Save.putChar(ch);
+        log(`The Cold Forge beats another point of ${label} into you.`, 'gold');
+        showForge(ch);
+      }));
+  }
+
+  body.appendChild(U.make('div','sect','Steel'));
+  ch.forgeStock = ch.forgeStock || forgeStock(ch);
+  let anything = false;
+  for (const id of ch.forgeStock){
+    const it = Data.ITEMS[id];
+    if (p.equip.weapon === id) continue;
+    anything = true;
+    const cost = gearPriceGold(id);
+    body.appendChild(shopLine(it.name, modStr(it.mods),
+      `<span class="price g">✦ ${cost}</span>`, p.gold < cost,
+      () => { p.gold -= cost; forceEquip(id); Save.putChar(ch); showForge(ch); }));
+  }
+  if (!anything) body.appendChild(U.make('div','p dim','The rack is bare until the next descent.'));
+  setModal(sheet);
+}
+
+// ================= THE GREY CHAPEL =================
+// Souls, not gold. The Choir will take a donation in coin and enter it in the
+// ledger as Souls, and it keeps relics behind the rail for those who can pay in
+// the currency that matters.
+function chapelStock(ch){
+  const ids = Object.keys(Data.ITEMS).filter(id => {
+    const it = Data.ITEMS[id];
+    return it.slot === 'trinket' && (it.tier || 1) >= 2;
+  });
+  U.shuffle(ids);
+  return ids.slice(0, 3);
+}
+
+function showChapel(ch){
+  ch = ch || Save.activeChar(); if (!ch) return showRoster();
+  const p = ch.player;
+  const { sheet, body } = pagedSheet('The Grey Chapel', ()=>showCity(ch));
+  const art = U.make('canvas'); art.width = 96; art.height = 96; art.className = 'merchant-art';
+  body.appendChild(art); try { Sprites.toCanvas(art, 'npc_lightbearer', 6); } catch(e){}
+
+  // Two classes get something out of walking in that the others do not: one
+  // because the order still means something to him, one because she is the only
+  // person in Hollowgate who thinks she needs to be here. Once per stay.
+  const blesses = (ch.classId === 'knight' || ch.classId === 'rogue');
+  if (blesses && !ch.flags.chapelSeen){
+    ch.flags.chapelSeen = true;
+    const gain = ch.classId === 'knight' ? 6 : 4;
+    p.honor = U.clamp(p.honor + gain, -100, 100);
+    Save.putChar(ch);
+    body.appendChild(U.make('div','p', ch.classId === 'knight'
+      ? '"The order is ash and you came anyway. Kneel. It costs the Choir nothing to say the words and it is plainly costing you something to hear them."'
+      : '"You came in. Everyone in this city knows what you are, and you came in anyway, and you stood at the back where you thought nobody was looking."'));
+    body.appendChild(U.make('div','p good', `Your honor rises by ${gain}.`));
+  } else {
+    body.appendChild(U.make('div','p dim center',
+      '"Coin buys bread. Souls buy the other thing. Do not confuse the two at this rail."'));
+  }
+
+  body.appendChild(U.make('div','balance',
+    `<span class="g">✦ ${p.gold} Gold</span><span class="s">◈ ${Save.souls()} Souls</span>`));
+
+  body.appendChild(U.make('div','sect','The offering'));
+  for (const [gold, souls] of [[60, 4], [150, 12], [400, 36]]){
+    body.appendChild(shopLine(`Give ${gold} gold`, `The ledger records ${souls} Souls`,
+      `<span class="price g">✦ ${gold}</span>`, p.gold < gold,
+      () => { p.gold -= gold; Save.addSouls(souls); Save.putChar(ch);
+              log(`The Choir takes the coin and writes down ${souls} Souls.`, 'mag'); showChapel(ch); }));
+  }
+  body.appendChild(shopLine('Ask for coin back', 'The Choir returns 40 gold for 6 Souls',
+    `<span class="price s">◈ 6</span>`, Save.souls() < 6,
+    () => { if (!Save.spendSouls(6)) return; p.gold += 40; Save.putChar(ch);
+            log('The rail opens and forty gold comes back across it.', 'gold'); showChapel(ch); }));
+
+  body.appendChild(U.make('div','sect','Behind the rail'));
+  ch.chapelStock = ch.chapelStock || chapelStock(ch);
+  for (const id of ch.chapelStock){
+    const it = Data.ITEMS[id];
+    if (p.equip.trinket === id) continue;
+    const cost = relicPriceSouls(id);
+    body.appendChild(shopLine(it.name, modStr(it.mods),
+      `<span class="price s">◈ ${cost}</span>`, Save.souls() < cost,
+      () => { if (!Save.spendSouls(cost)) return; forceEquip(id); Save.putChar(ch); showChapel(ch); }));
+  }
+
+  // and it will take what you are carrying off your hands, in the coin it prefers
+  body.appendChild(U.make('div','sect','What you carry'));
+  let sold = false;
+  for (const slot of ['weapon','armor','trinket']){
+    const id = p.equip[slot]; if (!id) continue;
+    const it = Data.ITEMS[id], worth = Math.max(4, Math.round(relicPriceSouls(id) * 0.4));
+    sold = true;
+    body.appendChild(shopLine(`Give up ${it.name}`, `${slot} — ${modStr(it.mods)}`,
+      `<span class="price s">◈ ${worth}</span>`, false,
+      () => { p.equip[slot] = null; recomputeStats(p); Save.addSouls(worth); Save.putChar(ch);
+              log(`The Choir takes ${theName(it.name)} and enters ${worth} Souls against your name.`, 'mag');
+              showChapel(ch); }));
+  }
+  if (!sold) body.appendChild(U.make('div','p dim','You are carrying nothing the Choir wants.'));
+  setModal(sheet);
+}
+
+// ================= GALLOWS MARKET =================
+// Nothing is for sale. The people are the point.
+function showMarket(ch){
+  ch = ch || Save.activeChar(); if (!ch) return showRoster();
+  const { sheet, body } = pagedSheet('Gallows Market', ()=>showCity(ch));
+  body.appendChild(U.make('div','p dim',
+    'Two rows of stalls with nothing on them and a gallows nobody has taken down, because taking it down would be a decision and nobody here makes those any more.'));
+  body.appendChild(U.make('div','sect','Who is out today'));
+  let any = false;
+  for (const key in City.CITY_NPCS){
+    const npc = City.CITY_NPCS[key];
+    if (npc.where !== 'market') continue;
+    any = true;
+    const card = U.make('div','codex-item open');
+    card.appendChild(U.make('h4', null, npc.name + (ch.met[npc.id] ? '' : ' — ' + T('new'))));
+    card.appendChild(U.make('div','d', npc.role));
+    card.onclick = () => showNpc(ch, npc, showMarket);
+    body.appendChild(card);
+  }
+  if (!any) body.appendChild(U.make('div','p dim','The square is empty today.'));
+  setModal(sheet);
+}
+
 // ================= RETURNING =================
 // Survived: the soul keeps everything and the city takes it back. The Deep Dark
 // gets harder because it has now seen you do this once.
@@ -280,6 +521,8 @@ function returnToCity(won){
     if (ch.contract){ ch.player.gold += ch.contract.pay; ch.flags['did_' + ch.contract.id] = true; }
   }
   ch.contract = null;
+  // the city restocks between descents, and the chapel will bless a soul once per stay
+  ch.forgeStock = null; ch.chapelStock = null; delete ch.flags.chapelSeen;
   // a soul that came back up is whole again, and its offer of skills is reshuffled
   ch.player.hp = ch.player.maxhp; ch.player.sp = ch.player.maxsp;
   ch.player.statuses = {}; ch.player.shield = 0;
@@ -297,7 +540,8 @@ function soulLost(){
 }
 
 if (typeof window !== 'undefined'){
-  Object.assign(window, { showRoster, showCity, showTavern, showNpc, showContracts,
+  Object.assign(window, { showForge, showChapel, showMarket, forgeCost, confirmLetGo,
+                          showRoster, showCity, showTavern, showNpc, showContracts,
                           characterMade, returnToCity, soulLost, dreadOf, cityTier,
                           showBounties, bountyWorth, npcLines, contractOffer, confirmDescent });
 }
