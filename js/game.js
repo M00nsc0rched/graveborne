@@ -1,7 +1,7 @@
 // ================= GRAVEBORNE — main engine =================
 // shown on the title screen; keep in step with CACHE in sw.js — the game is
 // served from that cache, so the number you see is the build you're running
-const GAME_VERSION = 61;
+const GAME_VERSION = 62;
 let VW = 21, VH = 13;                 // viewport in tiles — reshaped to the stage on phones
 const TS = 32;                        // tile size in canvas pixels
 const TU = TS / 16;                   // old design unit -> new, for art not yet re-authored
@@ -330,15 +330,20 @@ function fovRadius(){
   return Math.max(2, FOV_R + (b.fov || 0) + (cm.fov || 0) + (G.floorFov || 0));
 }
 // each new depth has a chance to shift terrain; depth 1 is always the Dungeon
-// entry, and the Gloamlord keeps his throne in the Whitemarrow
+// entry, and the last floor belongs to whichever throne this descent drew
+// The throne drawn for this descent. Everything about the last floor - its
+// biome, its keeper, and the drop - hangs off this one id.
+function bossDef(){ return Data.ENEMIES[G.bossId] || Data.ENEMIES.boss; }
+
 function rollBiome(){
   if (G.depth === 1) return 'dungeon';
-  if (G.depth === FINAL_DEPTH) return 'ossuary';
+  if (G.depth === FINAL_DEPTH) return bossDef().throne || 'ossuary';
   // guarantee the Sunken Harbor turns up once per descent (that is where the
   // potion-maker is), so his quest — and the Alchemist unlock — stays reachable
   if (G.depth === FINAL_DEPTH - 1 && !G.harborSeen) return 'drowned';
   if (G.biome && U.chance(0.30)) return G.biome;
-  return U.choice(Object.keys(Data.BIOMES).filter(k => k !== G.biome && k !== 'ossuary'));
+  const throne = bossDef().throne;
+  return U.choice(Object.keys(Data.BIOMES).filter(k => k !== G.biome && k !== throne));
 }
 
 // ---- Bounty / Heat: the hunt ramps the longer you linger while Marked ----
@@ -775,7 +780,7 @@ function grantItem(id){
   const curScore = cur ? statSum(Data.ITEMS[cur].mods) + extras(Data.ITEMS[cur]) : -1;
   if (newScore > curScore){
     p.equip[slot] = id; recomputeStats(p);
-    log(`You equip the ${it.name}.`, 'gold');
+    log(`You equip ${theName(it.name)}.`, 'gold');
     if (cur){ const g = 6 + Math.round(statSum(Data.ITEMS[cur].mods)); p.gold += g; log(`Sold your old ${Data.ITEMS[cur].name} for ${g} gold.`, 'dim'); }
   } else {
     const g = 6 + Math.round(statSum(it.mods)); p.gold += g;
@@ -792,6 +797,7 @@ function startRun(){
   G.busy = false; G.moving = false; G.combat = null;
   G.pendingEvent = null; G.usedActives = {}; G.shop = null;
   G.biome = null; G.harborSeen = false;
+  G.bossId = U.choice(Data.BOSSES);   // who is waiting at the bottom of this one
   if (G.selClass !== 'necromancer') G.necroStyle = null;   // keep the chosen path only for this run
   G.player = newPlayer(G.selClass);
   G.depth = 1;
@@ -836,7 +842,7 @@ function enterFloor(){
   let eventCount = U.clamp(1 + Math.floor(G.depth/2), 1, 3);
   if (align === 'HALLOWED') eventCount = U.clamp(eventCount + 1, 1, 4);   // the kind draw near
 
-  G.floor = makeDungeon(G.depth, { finalFloor: final, eventKeys, eventCount, eventsOrdered: true, biome: G.biome });
+  G.floor = makeDungeon(G.depth, { finalFloor: final, eventKeys, eventCount, eventsOrdered: true, biome: G.biome, bossId: G.bossId });
   G.player.x = G.floor.playerStart.x;
   G.player.y = G.floor.playerStart.y;
   snapPlayerVisual();                    // start the new floor without sliding in from the old spot
@@ -1947,9 +1953,11 @@ function win(){
   const earnedSouls = gainSouls((en.boss ? 15 : en.guardian ? 10 : en.elite ? 6 : 2) * (en.hunter ? 3 : 1) * mods.soulMult);
   G.floor.removeEntity(c.origin);
   if (en.boss){
-    log(`The Gloamlord's death releases ${earnedSouls} Souls.`, 'mag');
-    grantItem('gloamheart');
-    log('From the collapsing ribcage you take the Gloamheart — still beating, to a slower clock.', 'gold');
+    if (en.dialogue && en.dialogue.defeat) log(`${en.name}: ${en.dialogue.defeat}`, 'mag');
+    log(`The throne empties. ${earnedSouls} Souls come loose with it.`, 'mag');
+    const spoil = en.drop || 'gloamheart';
+    grantItem(spoil);
+    log(`You take ${Data.ITEMS[spoil].name} off what is left of it.`, 'gold');
     G.combat=null; setTimeout(victory, 700); updateHUD(); return;
   }
   // drops — guardians and elites pay a guaranteed premium; hunters likewise; alignment shifts the rest
@@ -2021,7 +2029,7 @@ function lose(force){
 }
 function victory(){
   G.state = 'VICTORY'; clearSavedRun(); Save.recordWin();
-  log('The Gloamlord collapses into dust. The depths fall silent.', 'good');
+  log(`${bossDef().name} comes apart. The depths fall silent.`, 'good');
   showVictory();
 }
 
@@ -3092,6 +3100,10 @@ function renderActions(){
   updateStageBtn();
 }
 
+// Some relics are named with their article already on - the Last Garrison, the
+// Thousandth Knife - and 'the the' reads like a stutter in the log.
+function theName(n){ return /^the /i.test(n) ? n : 'the ' + n; }
+
 function Btn(label, fn, cls, key){
   const b = U.make('button', cls||'btn');
   if (label) b.innerHTML = (key?`<span class="k">${key}</span>`:'') + T(label);
@@ -3987,7 +3999,7 @@ const RUN_KEY = 'graveborne_run_v1';
 function serializeRun(){
   const f = G.floor;
   return {
-    v:1, ts:Date.now(), depth:G.depth, biome:G.biome, floorFov:G.floorFov || 0,
+    v:1, ts:Date.now(), depth:G.depth, biome:G.biome, bossId:G.bossId, floorFov:G.floorFov || 0,
     player:G.player,
     floor: f ? { w:f.w, h:f.h, depth:f.depth, isFinal:f.isFinal, tiles:f.tiles, rooms:f.rooms,
                  visible:f.visible, explored:f.explored, entities:f.entities,
@@ -4023,6 +4035,7 @@ function loadRun(){
   try { d = JSON.parse(localStorage.getItem(RUN_KEY)); } catch(e){}
   if (!d || !d.player || !d.floor) return false;
   G.player = d.player; G.depth = d.depth; G.biome = d.biome; G.floorFov = d.floorFov || 0;
+  G.bossId = d.bossId || 'boss';        // saves from before the thrones all held the Gloamlord
   G.floor = rehydrateFloor(d.floor);
   G.combat = null; G.busy = false; G.moving = false; G.state = 'EXPLORE';
   G.pendingEvent = null; G.usedActives = {}; G.shop = null;
@@ -4840,7 +4853,7 @@ function showVictory(){
   const s = U.make('div','sheet');
   s.appendChild(U.make('div','title-big','VICTORY'));
   const tier = Data.honorTier(G.player.honor);
-  s.appendChild(U.make('div','p center','The Gloamlord is unmade. You climb back toward a sun you had almost forgotten.'));
+  s.appendChild(U.make('div','p center',`${bossDef().name} is unmade. You climb back toward a sun you had almost forgotten.`));
   s.appendChild(U.make('div','p center dim',`Final honor: <span style="color:${tier.color}">${tier.name} (${G.player.honor})</span> · Codex: ${Save.discoveredCount()}/${Data.CODEX.length}`));
   s.appendChild(U.make('div','p center dim','Try a darker — or purer — soul to uncover the encounters you did not see.'));
   const row = U.make('div','row');

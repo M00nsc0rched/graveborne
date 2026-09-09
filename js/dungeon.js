@@ -135,7 +135,7 @@ function makeDungeon(depth, opts){
     }
     if (!placed) d.entities.push({ type:'guardian', enemyId:gid, x:last.cx, y:Math.max(1,last.cy-1) });
   } else {
-    d.entities.push({ type:'enemy', enemyId:'boss', x:last.cx, y:last.cy, boss:true });
+    d.entities.push({ type:'enemy', enemyId:opts.bossId || 'boss', x:last.cx, y:last.cy, boss:true });
   }
 
   // helper: a random free floor tile inside a room, avoiding occupied/reserved
