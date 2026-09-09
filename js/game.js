@@ -1,7 +1,7 @@
 // ================= GRAVEBORNE — main engine =================
 // shown on the title screen; keep in step with CACHE in sw.js — the game is
 // served from that cache, so the number you see is the build you're running
-const GAME_VERSION = 60;
+const GAME_VERSION = 61;
 let VW = 21, VH = 13;                 // viewport in tiles — reshaped to the stage on phones
 const TS = 32;                        // tile size in canvas pixels
 const TU = TS / 16;                   // old design unit -> new, for art not yet re-authored
@@ -4751,23 +4751,48 @@ function improvisedSplash(){
   setTimeout(beginEnemyTurn, 560);
 }
 
+// A sheet that pages: the head stays put and only the body scrolls, so the way
+// out is always in the corner instead of at the bottom of ninety-four entries.
+function pagedSheet(titleText, onClose, backFn){
+  const s = U.make('div','sheet paged');
+  const head = U.make('div','sheet-head');
+  if (backFn) head.appendChild(Btn('‹', backFn, 'x-btn back'));
+  head.appendChild(U.make('div','sect', titleText));
+  head.appendChild(Btn('✕', onClose, 'x-btn'));
+  const body = U.make('div','sheet-body');
+  s.appendChild(head); s.appendChild(body);
+  return { sheet:s, body };
+}
+
 function showCodex(fromGame){
-  const s = U.make('div','sheet');
-  s.appendChild(U.make('div','sect', `Codex of Encounters — ${Save.discoveredCount()}/${Data.CODEX.length}`));
-  s.appendChild(U.make('div','p dim','The same place wears a different face for a different soul. Discover both by walking two different roads of honor.'));
+  const close = () => { if (fromGame){ hideModal(); } else showTitle(); };
+  const { sheet, body } = pagedSheet(
+    `Codex of Encounters — ${Save.discoveredCount()}/${Data.CODEX.length}`, close);
+  body.appendChild(U.make('div','p dim','The same place wears a different face for a different soul. Discover both by walking two different roads of honor. Anything you have found opens.'));
   const grid = U.make('div','codex-grid');
   for (const c of Data.CODEX){
     const known = Save.isDiscovered(c.id);
-    const item = U.make('div','codex-item'+(known?'':' locked'));
+    const item = U.make('div','codex-item'+(known?' open':' locked'));
     item.appendChild(U.make('h4',null, known ? c.title : '??? — '+({good:'a mercy',bad:'a cruelty',mag:'a mystery'}[c.tag]||'unknown')));
     item.appendChild(U.make('div','d', known ? c.hint : '<i>Undiscovered. '+c.hint+'</i>'));
+    if (known) item.onclick = () => showCodexEntry(c, fromGame);
     grid.appendChild(item);
   }
-  s.appendChild(grid);
-  const row = U.make('div','row');
-  row.appendChild(Btn('Close', ()=>{ if (fromGame){ hideModal(); } else showTitle(); }, 'btn center'));
-  s.appendChild(row);
-  setModal(s);
+  body.appendChild(grid);
+  setModal(sheet);
+}
+
+// What the hint was only the smell of. Reached by opening an entry you own.
+function showCodexEntry(c, fromGame){
+  const close = () => { if (fromGame){ hideModal(); } else showTitle(); };
+  const { sheet, body } = pagedSheet(c.title, close, () => showCodex(fromGame));
+  const tag = { good:'A mercy', bad:'A cruelty', mag:'A mystery' }[c.tag] || 'Recorded';
+  body.appendChild(U.make('div','codex-tag '+c.tag, tag));
+  body.appendChild(U.make('div','p',`<i>${c.hint}</i>`));
+  const lore = Data.CODEX_LORE && Data.CODEX_LORE[c.id];
+  body.appendChild(U.make('div','p codex-lore', lore ||
+    'The Codex holds the deed but has not yet found the words for it.'));
+  setModal(sheet);
 }
 
 function confirmAbandon(){

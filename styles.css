@@ -318,6 +318,33 @@ body.force-landscape .blackout span{transform:rotate(90deg)}
 .codex-item h4{color:var(--gold);font-size:11px;margin-bottom:3px}
 .codex-item .d{font-size:10.5px;color:var(--ink-dim)}
 .codex-item.locked h4{color:var(--ink-dim)}
+.codex-item.open{cursor:pointer}
+.codex-item.open h4::after{content:' >';color:var(--gold);opacity:.7}
+.codex-item.open:hover{border-color:var(--gold);background:#191323}
+.codex-item.open:active{background:#221a30}
+.codex-tag{display:inline-block;font-size:10px;letter-spacing:2px;text-transform:uppercase;
+  border:1px solid var(--edge);border-radius:3px;padding:3px 8px;margin-bottom:12px;color:var(--ink-dim)}
+.codex-tag.good{color:#7fae3a;border-color:#3d5620}
+.codex-tag.bad{color:#b4443c;border-color:#5c231f}
+.codex-tag.mag{color:#9a5cc0;border-color:#4a2b5e}
+.codex-lore{line-height:1.75}
+
+/* A sheet whose head stays put while its body scrolls, so the way out sits in
+   the corner instead of below however many entries the list happens to hold. */
+.sheet.paged{display:flex;flex-direction:column;overflow:hidden}
+.sheet-head{flex:0 0 auto;display:flex;align-items:flex-start;gap:8px}
+.sheet-head .sect{flex:1 1 auto;margin:4px 0 10px;min-width:0}
+.sheet-body{flex:1 1 auto;overflow-y:auto;min-height:0}
+.sheet-body::-webkit-scrollbar{width:8px}
+.sheet-body::-webkit-scrollbar-thumb{background:var(--edge);border-radius:4px}
+.x-btn{
+  flex:0 0 auto;width:30px;height:30px;padding:0;margin-top:1px;
+  background:linear-gradient(180deg,#191325,#120d1c);color:var(--gold);
+  border:1px solid var(--edge);border-radius:3px;cursor:pointer;
+  font-family:inherit;font-size:14px;line-height:1;
+}
+.x-btn:hover{border-color:var(--gold);background:#221a30}
+.x-btn.back{font-size:18px}
 
 /* shop */
 .balance{display:flex;gap:14px;justify-content:center;margin:2px 0 14px;font-size:13px}

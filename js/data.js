@@ -1854,7 +1854,171 @@ const PAINT = {
   monastery: { gh:37,  gs:26, gl:69, sh:35,  ss:20, sl:63, oh:80,  os:34 },
 };
 
-const Data = { SKILLS, PASSIVES, CLASSES, FOLLOWERS, ENEMIES, EVENT_ICONS, SETS, RARITY, ITEMS, CONSUMABLES, PLANTS, POTIONS, ITEM_POOL, HUNTER_POOL, BIOME_ELITES, BIOME_GUARDIANS, BIOME_PROPS, HONOR_TIERS, EVENTS, CODEX, SANCTUM, BIOMES, PAINT, WHISPERS, DISCOURAGEMENTS, DESERTIONS,
+
+// ---------- Codex stories ----------
+// A hint is the smell of a thing. This is the thing. An unlocked entry opens
+// into one of these, so a discovery is worth reading and not only counting.
+const CODEX_LORE = {
+  // -- the well --
+  well_mercy: "Her name was Ordra, and she drew water for a garrison that stopped coming up for it. She kept drawing anyway; the rope wore a groove in the stone lip that you can still put a finger into. She has offered that cup to four hundred travellers. Most drew steel. She remembers the ones who drank, and she says their names into the shaft where the echo keeps them.",
+  well_lore: "She was down here before the throne was filled, and she watched them carry the first Gloamlord past her well on a bier of green wood. What she told you is not prophecy. It is a witness statement, four centuries late, given to the first person who stood still long enough to hear it out.",
+  well_truth: "Under the water-light she was grey and wrong, and every instinct you own said kill it. You did not. What fell away was not a mask but a habit — four hundred years of being met with a blade teaches a face to expect one. Beneath it: a tired woman, embarrassed, still holding out the cup.",
+  well_bloodied: "She was reaching for the cup. You saw a claw. The stone around the well took the stain and would not give it up, and now the water tastes of iron for anyone who comes after you. She had been drawing it clean since before your grandmother's grandmother had a name.",
+
+  // -- the cage --
+  cage_freed: "The cage was Choir work — thin bars, a good lock, and a plate reading PROPERTY OF THE ASHEN SEE. Whatever they caught in the Weald had been in there long enough to wear its own shape smooth against the corner. It did not thank you. It fell in beside you at the next corridor and has not left your flank since, which is a thank-you with the words taken out.",
+  cage_slain: "It was already starving when the Choir hung the cage. It could not reach you. It could not have reached you in a week of trying. You are not the first to make certain through the bars, and the small bones on the floor of it are not all its own — the last three were mercy, or something that agreed to be called mercy.",
+
+  // -- the beggar --
+  beg_alms: "He had a name and traded it for a warmer coat two winters ago; he says the deal was fair. What he gives back is not gratitude but information — he counts who goes down and who comes up, and the difference is the only ledger anyone keeps down here. You are in it now, on the good page.",
+  beg_blood: "The hand came up out of the dark towards your purse, and you were right about that much. You were wrong about the rest. He was ninety, he weighed as much as a wet cloak, and the only thing in his fist was the copper he was trying to give back because you had overpaid him at the stair.",
+
+  // -- the shrine --
+  shr_rest: "Twelve of the order were laid here without rite because the priest went down the stairs first and never came back up to say the words. You said them badly, from memory, with three lines missing. It was enough. The stone went cold in the ordinary way that stone does when nothing is inside it any more.",
+  shr_pact: "The thing under the altar is not a god and has never claimed to be. It is a lender. Its terms are plain, its interest is patient, and it has never once failed to collect — not in nine hundred years, not from anyone, not from the four who thought that dying settled it.",
+
+  // -- the mirror --
+  mir_saint: "The glass does not flatter and it does not lie; it only removes the distance between what you are and what you can see. A crown appeared because a crown was already there. Twenty-two travellers have stood at that mirror. Three have been shown this.",
+  mir_gray: "Half-lit, undecided, neither one thing nor the other — the glass shows the ledger open and the sum not yet taken. It is the commonest reflection by far. Most people go into the dark unfinished and come out of it the same way, if they come out.",
+  mir_fiend: "The teeth are yours. That is the part that takes the longest to sit down with. The glass did not add anything; it stopped subtracting, and what stood there was a thing that has stopped being afraid of itself. It reached through and gave you what you had already earned.",
+  mir_shatter: "Some travellers will not look. They go at the glass with the pommel before it can finish showing them, and the shards keep working — every piece on that floor still holds a sliver of a face that refused to be seen whole. The mirror does not mind. It has been broken eleven times and has not lost the habit.",
+
+  // -- the gibbet --
+  hang_rite: "The cage on the chain held a woman who was hung for a crime the records now spell three different ways. Nobody cut her down because nobody wanted the cage. You gave her what her own city would not: the ground, and the words, and about four minutes of somebody's day.",
+  hang_robbed: "The charm at her throat was a pilgrim's token, the cheap kind, stamped tin — carried by someone who intended to walk somewhere holy and got as far as this. It was worth almost nothing and she had kept it through the trial, the sentence, and the chain. Now you have it.",
+
+  // -- the child --
+  child_kind: "She is not lost, whatever she tells you; she has been down here longer than the stair has been unsafe, and she knows exactly where she is. What she has lost is the expectation of a kind hand. You gave her one. She will tell the next thing that asks about you, and she will tell it well.",
+  child_truth: "Fear had already made a monster of her twice over — once in her own mind, and once in every traveller who came around that corner with a blade up. You looked twice. Under the second look she was a frightened girl with dirt on her, which was all she had ever been, and all that had ever been required of anyone was the second look.",
+  child_blood: "The Codex keeps this one at the front of its bad ledger and does not soften it. She was seven. She was seven for a very long time before you came, and she was seven when you finished. Whatever you told yourself in the corridor afterwards, the grave is small, and it is the right size, and that is the whole argument.",
+
+  // -- the oath --
+  oath_kept: "Ser Hallam of the Ninth, bleeding out against a wall he had held for two days after there was any reason to. He did not want to be saved and did not ask to be. He asked for the blade to keep working. You swore, so it does — and the vow is a weight, and the weight is the point.",
+  oath_freely: "You did not reach for it. That was the whole test, and he set it four hundred years ago for a fault of his own that the records no longer hold. Everyone else grabbed. You waited, and he put it in your hands himself, which is worth more than the steel is.",
+  oath_broken: "He was still talking when you took it. The blade came away easily — he had no grip left to argue with — and the sentence he did not finish was probably the terms. A gift refused is a theft, and steel remembers which one it was.",
+
+  // -- the lightbearer --
+  light_blessed: "She does not appear to most. She is not hiding; there is simply nothing in the majority worth the walk. The light she carries is not a lamp and does not run out, and being met with it openly is a statement about you that no one else down here will ever make.",
+  light_ward: "The ward she set will hold exactly as long as your hands stay clean, and she said so plainly, and she meant it as a kindness rather than a threat. It is the only protection in the depths with a moral clause, and the only one that has never been broken from the outside.",
+
+  // -- the envoy --
+  envoy_bribe: "The Choir's writ names you and the Envoy carries it, and the Envoy also carries a purse and an understanding of how far from the See she currently is. Doctrine is for the surface. Down here the Inquisition is a small cold woman doing arithmetic, and the arithmetic came out in your favour.",
+  envoy_defiant: "Standing orders for the Marked are clear and she was reciting them when you drew. She had done this eleven times and won eleven times, and none of those eleven had anything on them worth the weight of carrying back. You do. The writ is still in her coat.",
+  envoy_scorn: "You could have paid. You could have fought. You spat at the Choir instead, which costs nothing at the time and is entered into a ledger in the See the same evening. The bounty on you did not double because of the insult. It doubled because insults get filed.",
+
+  // -- the sporewife --
+  spore_mercy: "In the Fungal Deep the Deep provides, and she is the part of it that pours. The tea is made of things that should not brew and it will do you nothing but good, which is the single most suspicious fact in the region. She has been hosting for a hundred and some years and has never once poisoned a guest who sat down politely.",
+  spore_graft: "What she put into you is alive, it is hers, and it is now also yours — the paperwork on that is genuinely unclear. You are more than you were. Some small percentage of the additional is on loan, and the Deep does not send notices, but it does keep count.",
+  spore_slain: "The hum you cut through was a lullaby; the tendrils you cut were the hands of someone reaching for a kettle. She hosted four hundred years of travellers in a place that grows nothing kind, and the last thing she understood was that the guest had come in with the blade already out.",
+  spore_truth: "You watched instead of cutting, which in the Fungal Deep is a survival skill nobody teaches. The wrongness resolved the way wrongness usually does when you give it a minute: not a horror at all, only an old woman with an unusual body and a kettle on.",
+
+  // -- the ferryman --
+  ferry_toll: "The crossing has a price and the price is a coin, and it has been a coin since before the halls drowned. He is not greedy. The coin is not for him. He puts every one into the lockbox under the seat and could not tell you who he is saving them for, only that the arrangement was made and he intends to keep his end.",
+  ferry_robbed: "The lockbox held fares from travellers going back a very long way — other people's crossings, other people's debts, kept honestly by something that no longer remembers why. He did not stop you. He watched you take it and then went back to the pole, and the boat still goes across for anyone who asks.",
+  ferry_truth: "Everyone else pays him or robs him. You spoke to him. Somewhere under the water in his chest a name surfaced that had not been used since the halls were dry, and he answered to it, and for a moment the thing at the pole was a man who had a job.",
+
+  // -- the forge widow --
+  forge_temper: "She keeps a working forge in the Ember Chasm, which is either the best or the worst place for one depending on how you feel about heat. She took your steel, looked at it the way a physician looks at a limb, and gave it back better. She did not ask your name and she did not need to.",
+  forge_gift: "She stamps a maker's mark on the ones who feed her coals — the old mark, from before the See regulated the trade. It is not decorative. Things made under that mark hold an edge past what the metal should allow, and the four smiths who knew why are all dead.",
+  forge_blood: "On her bench when you were done: plowshares, hinges, a pot with a mended handle, and a toy sword sized for a child's hand. No Choir work. No relics. No reason. She had been down here making useful things for people who never came back for them.",
+  forge_truth: "You were certain, and then you looked at the bench, and the certainty had to sit down. A cooking pot is a hard thing to be afraid of. She let you look as long as you needed and then asked, without any edge in it, whether you wanted your blade seen to.",
+
+  // -- the bone choir --
+  choir_hymn: "Nine cantors went down with the last procession and nine cantors are still singing, which is either devotion or the deepest rut ever worn into a habit. The hymn is not for a god. It is a door held shut with sound, and it has been held for three hundred years by voices that no longer have throats.",
+  choir_smashed: "The shrieking stopped, which was the point. What the singing was holding shut did not stop, which was not explained to you at the time and would not have been believed. Some doors only stay closed while someone sings at them. Nine did. Now none do.",
+  choir_truth: "It only shrieks if you arrive expecting a shriek. Stand still through eight bars and the noise resolves into nine parts in genuine harmony, badly out of practice and absolutely committed. They made room for a tenth without breaking the line, which is the most anyone down here has ever offered a stranger.",
+
+  // -- the lamplighter --
+  lamp_guided: "He has been blind since before the Weald went dark, which is why the dark did not inconvenience him and why he never stopped lighting the road. He lights it for people he will never see, on a route he cannot walk any more, and he has never once been thanked by anyone who did not need something.",
+  lamp_snuffed: "The bobbing light in the Blackwood is a lure, everyone agrees, and everyone is wrong. It was held by someone. He heard you coming and lifted it higher so you would not lose the path, and that is the position it was in when you took the pole off him.",
+  lamp_truth: "You followed it carefully instead of charging it, which is the only way to find out. Bobbing, because he limps. Weaving, because he counts the trees by touch. Not a lure at all — a moth of a man, going out ahead of strangers with the only light in the Weald.",
+
+  // -- the soldier --
+  sold_pass: "The Broken Keep fell and the garrison did not leave, and most of them have stopped being anything at all. He has not. He is still on the gate, still waiting for the watchword, and the watchword has not changed because there is nobody left with the authority to change it.",
+  sold_loot: "He never raised the weapon. He was at attention when you took the shield off his arm, because attention is the last thing he has, and the strap had gone into the bone a long time ago and had to be worked free.",
+  sold_truth: "You gave him an old marching-word from a war two before this one, badly pronounced. He stood aside. He has stood aside for exactly nobody else, and for a moment there was a soldier in the husk who remembered being relieved of a post.",
+
+  // -- the bride --
+  bride_ring: "A thin gold band, in water past your depth, on a hand that has been holding it up out of the silt for longer than the harbour has been under. She is not offering it. She is showing it. There is a difference, and every traveller who has waded out there has failed to notice it.",
+  bride_dowry: "Coin by coin over eleven years, for a wedding that the flood got to first. She kept the box through the water, the dark, and the slow business of stopping being alive, and she was still keeping it when you found the latch.",
+  bride_truth: "Most travellers take. One spoke — asked her, out loud, in the water, who the ring was for. She has been waiting a hundred and forty years for the question, and the answer took some time to assemble, and it was worth the wait for both of you.",
+
+  // -- the cindermonk --
+  monk_vigil: "The order kept one fire alight as a matter of doctrine and then the order ended, and he did not get the message, and the fire is still alight. He will not explain the doctrine. He will let you sit the vigil with him, which is the only initiation that survived.",
+  monk_quench: "The ember-heart in his chest was a warm stone, roughly the size of a fist, and it had never in three hundred years been used to burn anything. He did not defend it. He watched the water go on and looked, mostly, apologetic — as though the trouble of quenching him had been an imposition on you.",
+  monk_truth: "You waited in the fire pit while he took a very long breath, which is what patience buys down here: the coal-breath, the old blessing, given only to those who did not fill the silence. It is rare fuel. He has given it four times.",
+
+  // -- the saint --
+  saint_relics: "Thirty-one pieces, scattered across four regions by people who wanted a knuckle each. The last one clicked home and something that had been in thirty-one places at once was finally, briefly, in one — and whatever it said in that moment was not in any language the See recorded.",
+  saint_theft: "Collectors do not ask where a knuckle came from and the trade above ground is brisk. You have removed one bone from an arrangement that thirty other people have also removed one bone from, and the arithmetic on that only ever goes one direction.",
+  saint_truth: "Not a ritual. A rescue, begun by someone who ran out of time about a century in, and continued by nobody until you. The remaining pieces are where they are because a person was carrying them somewhere, and got as far as this.",
+
+  // -- the wolfmother --
+  wolf_offer: "She is nursing in a place that grows nothing, and she came out to meet you because staying in the den was worse. You fed her. The pack-scent she marked you with is not affection; it is a note left for everything else in the Blackwood, and it reads: not this one.",
+  wolf_den: "The pelt is worth a month above ground and the den behind her is worth nothing to anybody. She put herself between you and it and stayed there, which is the entire job, and she did it correctly right up to the end.",
+  wolf_truth: "She was not stalking you. She was weighing you, from a distance, for as long as it took — and she has done this to sixty travellers and moved off from fifty-nine. Whatever the criterion is, you met it.",
+
+  // -- the red door --
+  butcher_faced: "The sign on the door says FRESH MEAT and it is not advertising. He is very good at the work, he has been at it a long time, and he was genuinely pleased to see you — the way a tradesman is pleased when the material walks in on its own legs.",
+  butcher_freed: "The man on the hook had learned not to scream, which takes a while, and he had also learned exactly how the room worked. That was the useful part. He came off the hook, and he remembered the way out, and he walked it ahead of you without once looking at the wall of the previous customers.",
+  butcher_meat: "It was warm and it was wrapped well and it went down like forgiveness. You did not ask. There was one obvious question and you carried the parcel past it, and the not-asking is the part the Codex has written down.",
+
+  // -- the coin --
+  coin_bless: "The coin has no faces. You have seen it, so you know. It landed, something on the other side of it was amused, and amusement in that quarter comes out as a gift roughly half the time — which is a better rate than prayer.",
+  coin_curse: "Something was taken. The god was amused either way; that is the entire nature of the arrangement and it was never concealed from you. It does not punish. It does not reward. It flips, and it laughs at both results, and it has been doing this since before there was a floor here.",
+  coin_theft: "You pocketed it instead of flipping it, which is not theft exactly — nobody owns it — but it is a way of declining to play while keeping the table stakes. Debts like that are not collected. They are grown, quietly, and presented much later, fully mature.",
+
+  // -- the prince --
+  prince_truth: "The grace was real once. He was married in the upper chapel with four hundred guests and he has not been able to stop being at that wedding since. Look directly at it and the whole thing comes down at once — the court, the manners, the bride's chair — and what is left is a man standing in a hall alone.",
+  prince_feast: "An empty cup raised at a hundred-year-old wedding, by the only guest who has ever turned up. He noticed. He has been receiving nobody for a very long time and he knows exactly how many that is, and one is a number he had stopped expecting.",
+  prince_slain: "He was a groom at the grave of his bride, and he was in the middle of an introduction. He would have let you leave. He has let everyone leave. The hall is quieter now, which some travellers have described as an improvement.",
+
+  // -- the parlor --
+  seam_refused: "She does alterations. She said so at the door, plainly, and the terms were on the table where you could read them. You kept your skin, which she took no offence at — she has a waiting list, and a customer who walks out is simply a customer who has not come round to it yet.",
+  seam_traded: "A hand's width, taken neatly, sewn shut before you had finished agreeing. Somewhere in that parlor a glove now fits somebody perfectly, and she has your measurements on a card in a drawer with three hundred others.",
+  seam_faced: "Every needle in the room came up at once, which is the moment most people understand the business model. She had you down for a winter coat. The pattern was already chalked, and she was, in her way, disappointed to have to hurry it.",
+
+  // -- the banquet --
+  banq_ate: "The finest meal ever set in front of you, in a hall where the plates have not been cleared since the siege. You wept while you chewed and you did not stop chewing. There was never any question of stopping. That is what makes it his table and not yours.",
+  banq_fed: "You put food in front of the Starveling King, which nobody has done in the entire time he has been sitting there, and he has been sitting there since the city above forgot its own name. He ate slowly. He has eaten kingdoms fast and this took him some time.",
+  banq_faced: "He has eaten kingdoms. He rose without any particular urgency, the way a man rises for a small course between two large ones, and the fact that you are reading this at all is the most remarkable line in the Codex.",
+
+  // -- the chapel --
+  velvet_yielded: "Two candles were lit for you and you woke rested, which is the rarest thing in the depths and should have been the warning. You are lighter. You cannot say by what, and neither can anyone else who has come out of that chapel sleeping well.",
+  velvet_prayed: "You prayed to something older than comfort, in a chapel built for the opposite, and the cold came in and stayed. Nothing was given. Nothing was taken either, and in the Shattered Cathedral a clean exchange of nothing is a considerable win.",
+  velvet_faced: "It is not a face. It has been patient for a very long time under that veil and patience is not the same as gentleness — it is only the shape gentleness leaves behind when it goes. The veil came up. Very few entries in this Codex were written afterwards.",
+
+  // -- the larder --
+  lard_fed: "Bread and salt fish, taken as a guest takes them, with two coins left on the shelf for the trouble. Whatever keeps that larder stocked has a strong opinion about the difference between a guest and a thief, and it does not need to explain the opinion twice.",
+  lard_gorged: "You ate until you could not, and something on the stair listened to you doing it, and approved. Approval from that direction is a category of attention, and attention is how livestock gets counted.",
+  lard_took: "You took what you needed and left the rest, and the door closed behind you gently — the way something closes a door when it has decided you may come back. That is the whole entry. It is a small thing and it is not nothing.",
+
+  // -- butchery, by your own hand --
+  sever_first: "The first one is a technical achievement and nothing else, and it goes in the ledger as such. Something lost a piece of itself and kept coming, which teaches you the useful half of the lesson: pieces are not the same as the whole, and the whole is what is trying to kill you.",
+  head_taken: "There is a stroke that ends every argument at once, and once your arm knows it, your arm will keep offering it. That is the part worth writing down. Not that you took the head — that you now have a first idea, and it is that one.",
+
+  // -- hunger --
+  starved_hollow: "Past a certain point the body stops asking and starts selling: the fat, then the muscle, then the parts it was using for thinking. The ledger is real, it is itemised, and the depths have watched a great many people read it all the way to the bottom.",
+  meat_price: "It was filling. It was warm. It was not free, and it was not, in the ordinary sense, meat. You knew all three of those things at the time, in the order given, and you ate anyway — which is the datum the Codex actually wanted.",
+
+  // -- the coin, mid-fight --
+  coin_war_heads: "Asking an old god for help with a blade already in motion is not prayer, it is arbitration, and it is a genuinely stupid thing to do. It came up heads. The arbitration went your way. Do not read anything into it; there is nothing in it to read.",
+  coin_war_tails: "You asked mid-swing, and the answer arrived mid-swing, and it was no. The god was amused. It is always amused. The only thing that varies is which side of the amusement you are standing on when the coin comes down.",
+
+  // -- the oathless --
+  oath_taken: "She followed you out of a cell she could have opened herself at any point in the last four months, which tells you what she was actually waiting for. Not a rescue. A reason. She has decided you are one, and she is not going to check the work.",
+  oath_sent: "You sent her up, and she went, because you asked and because going up is the one instruction nobody down here ever gives. Whether she made the surface is not recorded. The Codex only keeps what it saw, and what it saw was somebody choosing to spend a chance on another person.",
+  oath_seen: "She spent the whole descent expecting to be spent — used for a door, a trap, a distraction, the way the last three did it. You looked at her instead, once, as a person. She has not mentioned it and she will not, and it is the single most important thing in her half of this Codex.",
+  follower_lost: "She went where you led her. That is the whole of it and there is no reading of it that comes out otherwise. The Codex records the honor floor as an absolute because the depths, for once, agree with the surface about something.",
+
+  // -- sinclair --
+  eliza_taken: "Your wife, and the better thief of the two of you, which was settled years ago and is not reopened. She did not follow you down. She was here first, working, and she stepped in at your shoulder as though the intervening time had been a long errand you were late back from.",
+  eliza_sent: "You sent her away and she went, at a walk, without an argument — which from her is the loudest available response. She does not die in holes like this one. That was the arrangement, and the arrangement is hers, and she is holding up her end whether or not you are.",
+  eliza_gone: "Out the crack, in the dark, at speed, with the thing that was killing her still deciding where she had gone. She does not die in holes like this one. She has said it to you often enough that it has stopped being a joke and become a working method.",
+  eliza_stall: "A crate, a folded cloak, bread priced for people who have no coin, and two knives within reach under the cloth. She set up a shop in the depths and undercut the Hollow Merchant, and the stall is not a disguise — she is genuinely trading, and she is genuinely armed, and both are true at once.",
+};
+
+const Data = { SKILLS, PASSIVES, CLASSES, FOLLOWERS, ENEMIES, EVENT_ICONS, SETS, RARITY, ITEMS, CONSUMABLES, PLANTS, POTIONS, ITEM_POOL, HUNTER_POOL, BIOME_ELITES, BIOME_GUARDIANS, BIOME_PROPS, HONOR_TIERS, EVENTS, CODEX, CODEX_LORE, SANCTUM, BIOMES, PAINT, WHISPERS, DISCOURAGEMENTS, DESERTIONS,
   honorTier(h){ for (const t of HONOR_TIERS){ if (h >= t.min) return t; } return HONOR_TIERS[HONOR_TIERS.length-1]; },
   enemyPool(depth){
     const ids = [];
