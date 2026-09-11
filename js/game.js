@@ -1,7 +1,7 @@
 // ================= GRAVEBORNE — main engine =================
 // shown on the title screen; keep in step with CACHE in sw.js — the game is
 // served from that cache, so the number you see is the build you're running
-const GAME_VERSION = 65;
+const GAME_VERSION = 66;
 let VW = 21, VH = 13;                 // viewport in tiles — reshaped to the stage on phones
 const TS = 32;                        // tile size in canvas pixels
 const TU = TS / 16;                   // old design unit -> new, for art not yet re-authored
@@ -620,7 +620,8 @@ function onKey(e){
     if (k === 'arrowleft' || k === 'a'){ G.deck.prev(); e.preventDefault(); return; }
     if (k === 'arrowright' || k === 'd'){ G.deck.next(); e.preventDefault(); return; }
     if (k === 'arrowup' || k === 'w' || k === 'enter'){ G.deck.draw(); e.preventDefault(); return; }
-    if (k === 'arrowdown' || k === 's'){ G.deck.detail(); e.preventDefault(); return; }
+    // ArrowDown used to unfold the dossier. It stands open now, so the key is
+    // left to the browser, where it scrolls the dossier into view.
   }
   // modal-driven states ignore movement keys; a slide in progress holds the next
   // step until it settles, so a held key chains smoothly instead of racing ahead
@@ -3146,29 +3147,10 @@ function hideModal(){ U.el('modal').classList.add('hidden'); }
 // it rises, and the run begins. Locked classes are chained and never show their
 // art; you get a sigil and nothing more.
 
-// Which stats a class is notably strong and weak in, measured against the
-// average of every class, so the card can show its bargain at a glance.
-const DECK_STATS = [['hp','HP'], ['sp','SP'], ['atk','ATK'], ['def','DEF'], ['mag','MAG'], ['spd','SPD']];
-function classStatDeltas(id){
-  const ids = Object.keys(Data.CLASSES);
-  const cls = Data.CLASSES[id].base;
-  const n = ids.length;
-  // Rank against the other classes rather than measure distance from the mean:
-  // one extreme class (the Necromancer's 47 MAG) blows the spread up far enough
-  // to hide that the Hollow Witch is the second-best caster in the game.
-  const scored = DECK_STATS.map(([k, label]) => {
-    const vals = ids.map(o => Data.CLASSES[o].base[k]).sort((a, b) => b - a);
-    return { k, label, rank: vals.indexOf(cls[k]), val: cls[k] };
-  });
-  const byRank = scored.slice().sort((a, b) => a.rank - b.rank);
-  let up = byRank.filter(s => s.rank <= 1).slice(0, 2);
-  // the Oathwarden is middling in all six, which left its card with an empty
-  // box; every class always names at least its best and its worst
-  if (!up.length) up = [byRank[0]];
-  let dn = byRank.filter(s => s.rank >= n - 2 && !up.includes(s)).reverse().slice(0, 2);
-  if (!dn.length) dn = byRank.filter(s => !up.includes(s)).slice(-1);
-  return { up, dn };
-}
+// The card used to carry a small +/− plate summarising which stats a class was
+// notably strong and weak in. The dossier below the deck now stands open with
+// the whole stat line in it, so the plate was saying a worse version of what was
+// already on screen an inch lower.
 
 // Draw a hero using its 100x100 combat figure when one exists, else the low-res
 // sprite. `smooth` gives a soft downscale (map, portrait); the card sits near 1:1
@@ -3245,7 +3227,6 @@ function showCharSelect(){
   const s = U.make('div','sheet');
   const head = U.make('div','deck-head');
   head.appendChild(U.make('div','sect','Choose Your Doomed'));
-  head.appendChild(U.make('div','p dim','Each begins at a different point on the road of honor — and will meet the depths differently for it.'));
   s.appendChild(head);
 
   const deck = U.make('div','deck');
@@ -3277,33 +3258,12 @@ function showCharSelect(){
 
     el.appendChild(U.make('div','tcard-tag', locked ? 'Sealed to you' : c.role));
 
-    const mods = U.make('div','tcard-mods');
-    if (locked){
-      for (let i = 0; i < 4; i++) mods.appendChild(U.make('span', i < 2 ? 'up' : 'dn', '???'));
-    } else {
-      const d = classStatDeltas(id);
-      const cells = [];
-      for (const u of d.up) cells.push(['up', '+' + u.label]);
-      while (cells.length < 2) cells.push(['up', '']);
-      for (const v of d.dn) cells.push(['dn', '−' + v.label]);
-      while (cells.length < 4) cells.push(['dn', '']);
-      for (const [cls, txt] of cells) mods.appendChild(U.make('span', cls, txt));
-    }
-    el.appendChild(mods);
-
     rail.appendChild(el);
     cardEls.push(el);
   });
 
   deck.appendChild(rail);
   s.appendChild(deck);
-
-  // pulled down, a card opens its dossier: the full stat line, the passive and
-  // the flavour that no longer fit on the face of the card itself
-  const detail = U.make('div','deck-detail');
-  const detailInner = U.make('div','dd-inner');
-  detail.appendChild(detailInner);
-  s.appendChild(detail);
 
   const nav = U.make('div','deck-nav');
   const prevB = U.make('button', null, '◀');
@@ -3313,8 +3273,20 @@ function showCharSelect(){
   nav.appendChild(prevB); nav.appendChild(pips); nav.appendChild(nextB);
   s.appendChild(nav);
 
-  const hint = U.make('div','deck-hint','Pull up to draw  ·  down for details  ·  swipe to turn');
+  const hint = U.make('div','deck-hint','Pull up to draw  ·  swipe to turn');
   s.appendChild(hint);
+
+  // the dossier: the full stat line, the passive and the flavour. It used to be
+  // folded away behind a downward pull, which meant the one screen where you are
+  // actually comparing classes opened showing none of the numbers.
+  //
+  // It sits below the pips rather than above them on purpose: open, it is tall
+  // enough that putting it directly under the deck pushed the arrows you page
+  // with off the bottom of a phone.
+  const detail = U.make('div','deck-detail');
+  const detailInner = U.make('div','dd-inner');
+  detail.appendChild(detailInner);
+  s.appendChild(detail);
 
   const row = U.make('div','row');
   row.appendChild(Btn('Back', showRoster, 'btn center'));
@@ -3326,7 +3298,6 @@ function showCharSelect(){
   // a previous visit's window listeners go before this one installs its own
   if (G.deckTeardown) G.deckTeardown();
 
-  let detailOpen = false;
   function renderDetail(){
     const id = ids[cur], c = Data.CLASSES[id], locked = isLocked(id);
     detailInner.innerHTML = '';
@@ -3359,11 +3330,6 @@ function showCharSelect(){
       detailInner.appendChild(U.make('div','dd-line', `<em>◈ ${pv.name}</em> — ${pv.desc}`));
     detailInner.appendChild(U.make('div','dd-flavor', c.flavor));
   }
-  function setDetail(on){
-    detailOpen = !!on;
-    detail.classList.toggle('open', detailOpen);
-    if (detailOpen) renderDetail();
-  }
 
   // the rail's resting offset, kept so a swipe can drag away from it and snap back
   let railX = 0;
@@ -3384,9 +3350,9 @@ function showCharSelect(){
     if (!isLocked(id)) G.selClass = id;
     hint.innerHTML = isLocked(id)
       ? T('This one is sealed. Earn it, and it will take your hand.')
-      : T('Pull up to draw  ·  down for details  ·  swipe to turn');
+      : T('Pull up to draw  ·  swipe to turn');
     prevB.disabled = cur <= 0; nextB.disabled = cur >= ids.length - 1;
-    if (detailOpen) renderDetail();
+    renderDetail();
   }
   function go(d){
     if (drawing) return;
@@ -3405,15 +3371,15 @@ function showCharSelect(){
     });
   });
 
-  // ---- one gesture, three meanings ----
-  // Sideways pages the deck, up draws the card, down opens its dossier. The axis
-  // is decided once, at the first few pixels, and then held — otherwise a swipe
-  // that drifts upward starts burning the card it was only trying to leave.
+  // ---- one gesture, two meanings ----
+  // Sideways pages the deck and up draws the card. The axis is decided once, at
+  // the first few pixels, and then held — otherwise a swipe that drifts upward
+  // starts burning the card it was only trying to leave. Down used to unfold the
+  // dossier; the dossier no longer folds, so downward is simply not a gesture.
   //
   // It is tracked here rather than per card, so the window listeners are a single
   // pair that gets torn down when the deck closes; per card, every visit to this
   // screen left another twelve behind.
-  const DETAIL_PULL = 34;   // how far down before the dossier commits to opening
   const AXIS_LOCK = 7;      // how far before the drag decides which way it is going
   const SWIPE = 44;         // how far sideways before the release pages the deck
   const DRAW_PULL = 46;     // how far up before the release draws the card
@@ -3424,6 +3390,7 @@ function showCharSelect(){
 
   let dragging = false, dragEl = null, axis = null;
   let startX = 0, startY = 0, moved = 0, movedX = 0;
+  let prevY = 0, scrolling = false;
   let burning = null, swallowClick = false;
   const ptrX = (e) => (e.touches && e.touches[0]) ? e.touches[0].clientX : e.clientX;
   const ptrY = (e) => (e.touches && e.touches[0]) ? e.touches[0].clientY : e.clientY;
@@ -3436,8 +3403,13 @@ function showCharSelect(){
     if (!axis){
       if (Math.max(Math.abs(dx), Math.abs(dy)) < AXIS_LOCK) return;
       axis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
-      // only the centred card can be pulled; a swipe may start on any of them
-      if (axis === 'y' && !dragEl){ dragging = false; return; }
+      if (axis === 'y'){
+        // a downward drag is a scroll wherever on the deck it starts; only the
+        // centred card can be pulled up, so an upward drag on anything else is
+        // abandoned (a swipe may still start on any card)
+        if (dy < 0) scrolling = true;
+        else if (!dragEl){ dragging = false; return; }
+      }
     }
     if (e.cancelable) e.preventDefault();
 
@@ -3447,6 +3419,17 @@ function showCharSelect(){
       // reads as bounded rather than broken
       const atEnd = (dx > 0 && cur === 0) || (dx < 0 && cur === ids.length - 1);
       setRail(railX + (atEnd ? dx * 0.3 : dx), false);
+      return;
+    }
+
+    if (scrolling){
+      // The deck owns every touch that starts on it (touch-action:none, so the
+      // sideways swipe is ours), which means it has to do the browser's job for a
+      // downward one: scroll the sheet, the way dragging down anywhere else on it
+      // would. Once a drag has scrolled it stays a scroll until release, so
+      // reversing it cannot start burning the card.
+      s.scrollTop -= ptrY(e) - prevY;
+      prevY = ptrY(e);
       return;
     }
 
@@ -3461,21 +3444,15 @@ function showCharSelect(){
         dragEl.classList.add('drawing');
         dragEl.style.transform = `translateY(${-Math.min(moved, 90)}px) scale(1)`;
       }
-    } else if (moved < 0){
-      // pulling down peeks at the dossier, and opens it once you commit
-      dropBurn();
-      dragEl.classList.add('drawing');
-      dragEl.style.transform = `translateY(${Math.min(-moved, 26)}px) scale(1)`;
-      if (-moved > DETAIL_PULL && !detailOpen) setDetail(true);
     }
   };
 
   const onUp = () => {
     if (!dragging) return;
-    const el = dragEl, ax = axis;
-    dragging = false; dragEl = null; axis = null;
+    const el = dragEl, ax = axis, wasScroll = scrolling;
+    dragging = false; dragEl = null; axis = null; scrolling = false;
     // releasing also fires a click; an aborted gesture must not act on it
-    if (Math.abs(moved) > 4 || Math.abs(movedX) > 4) swallowClick = true;
+    if (Math.abs(moved) > 4 || Math.abs(movedX) > 4 || wasScroll) swallowClick = true;
 
     if (ax === 'x'){
       const d = Math.abs(movedX) > SWIPE ? (movedX < 0 ? 1 : -1) : 0;
@@ -3483,15 +3460,13 @@ function showCharSelect(){
       if (d && cur + d >= 0 && cur + d < ids.length) go(d); else setRail(railX, true);
       return;
     }
-    if (!el) return;
+    if (wasScroll || !el) return;   // a scroll never touched the card
     if (moved > DRAW_PULL && !isLocked(el.dataset.id)){
       const b = burning; burning = null;
       beginDraw(el, b);
       return;
     }
     dropBurn();
-    // a downward pull that never reached the threshold closes it again
-    if (moved < 0 && -moved <= DETAIL_PULL) setDetail(false);
     el.classList.remove('drawing');
     el.style.transform = ''; el.style.opacity = '';
     moved = 0;
@@ -3499,8 +3474,13 @@ function showCharSelect(){
 
   const down = (e) => {
     if (drawing) return;
-    dragging = true; axis = null; moved = 0; movedX = 0;
-    startX = ptrX(e); startY = ptrY(e);
+    // The release of a drag sets swallowClick so the click it fires is ignored.
+    // On touch that click never comes — preventDefault on the move suppresses it —
+    // so the flag survived and ate the player's next real tap instead. A fresh
+    // gesture clears it: by then any click the last one owed has already arrived.
+    swallowClick = false;
+    dragging = true; axis = null; moved = 0; movedX = 0; scrolling = false;
+    startX = ptrX(e); startY = ptrY(e); prevY = startY;
     dragEl = (cardEls[cur] && cardEls[cur].contains(e.target)) ? cardEls[cur] : null;
   };
   deck.addEventListener('touchstart', down, { passive:true });
@@ -3530,8 +3510,7 @@ function showCharSelect(){
 
   // arrow keys and Enter drive the deck too (see onKey)
   G.deck = { prev:()=>go(-1), next:()=>go(1),
-             draw:()=>{ if (!isLocked(ids[cur])) beginDraw(cardEls[cur]); },
-             detail:()=>setDetail(!detailOpen) };
+             draw:()=>{ if (!isLocked(ids[cur])) beginDraw(cardEls[cur]); } };
   G.deckTeardown = teardown;
 
   setModal(s);
@@ -3710,7 +3689,7 @@ function showAllotment(){
     for (const [key, label, sub] of [['offense','⚔ Offensive','bone, poison, curses that kill'],['defense','⛨ Defensive','bone armor, the golem, curses that unstring']]){
       const on = G.necroStyle === key;
       const t = U.make('button','tbtn'+(on?' sel':''));
-      t.innerHTML = `${label}<span class="lhp">${sub}</span>`;
+      t.innerHTML = `${T(label)}<span class="lhp">${T(sub)}</span>`;
       t.onclick = () => { G.necroStyle = key; showAllotment(); };
       prow.appendChild(t);
     }

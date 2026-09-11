@@ -74,8 +74,6 @@ const I18N = (function(){
     'Buriedbornes-style skill combat · roguelike depths · your <b style="color:#c8a24a">HONOR</b> decides what the dark shows you.':
       'Buriedbornes-stílusú képességharc · roguelike mélységek · a <b style="color:#c8a24a">BECSÜLETED</b> dönti el, mit mutat neked a sötét.',
     'Choose Your Doomed': 'Válaszd ki az elkárhozottad',
-    'Each begins at a different point on the road of honor — and will meet the depths differently for it.':
-      'Mindegyik más pontról indul a becsület útján — és ezért másképp találkozik a mélységgel.',
     '<span style="color:#7fb0d0">Sanctum boons active:</span> ': '<span style="color:#7fb0d0">Aktív szentélyáldások:</span> ',
     'What You Were Before': 'Ami előtte voltál',
     'The Cursed Path': 'Az átkozott ösvény',
@@ -99,8 +97,8 @@ const I18N = (function(){
     'Sealed to you': 'Előtted lepecsételve',
     'Nothing of this one is written down yet. Earn the card, and the page fills in.':
       'Erről még semmi nincs feljegyezve. Érdemeld ki a kártyát, és kitöltődik a lap.',
-    'Pull up to draw  ·  down for details  ·  swipe to turn':
-      'Húzd fel a lapot  ·  le a részletekért  ·  ujjal lapozz',
+    'Pull up to draw  ·  swipe to turn':
+      'Húzd fel a lapot  ·  ujjal lapozz',
     'LOCKED': 'ZÁROLVA',
     '???': '???',
     'Spread them evenly': 'Oszd el egyenletesen',

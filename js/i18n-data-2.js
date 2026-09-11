@@ -813,3 +813,32 @@ I18N.addPatterns([
   [/^The merchant takes your old (.+) for (\d+) gold\.$/,
     'A kereskedő elveszi a régi darabodat — $1 —, $2 aranyért.'],
 ]);
+
+// ================= v66: the point ledger, which the sweep had walked past =================
+// "What You Were Before" — the allotment screen between the deck and the city —
+// still spoke English in its explanation, its balance line, its six stat rows
+// and the Necromancer's two disciplines. The deck now opens straight onto the
+// class dossier, which makes this the next thing a new player reads.
+I18N.addUI({
+  'Twenty points of whoever you used to be, and the dark gets everything after that. No more than ten into any one of them.':
+    'Húsz pontnyi abból, aki azelőtt voltál — a többit a sötét kapja. Egyetlen tulajdonságba sem mehet tíznél több.',
+  'Nothing. There is no before — she traded it, and the terms were not favourable.':
+    'Semmi. Nincs azelőtt — elcserélte, és a feltételek nem voltak kedvezőek.',
+  '⚔ Offensive': '⚔ Támadó',
+  'bone, poison, curses that kill': 'csont, méreg, átkok, amelyek ölnek',
+  '⛨ Defensive': '⛨ Védekező',
+  'bone armor, the golem, curses that unstring': 'csontpáncél, a gólem, átkok, amelyek szétzilálnak',
+});
+
+I18N.addPatterns([
+  // "20 points left of twenty" / "1 point left of twenty", inside its coloured span
+  [/^<span class="(g|s)">(\d+) points? left of twenty<\/span>$/,
+    '<span class="$1">$2 pont maradt a húszból</span>'],
+  // the six rows: "<b>Max HP</b> <span class="dim">+3 each</span>"
+  [/^<b>(Max HP|Max SP|ATK|DEF|MAG|SPD)<\/b> <span class="dim">\+(\d+) each<\/span>$/,
+    (m, label, n) => `<b>${HU_STAT_WORDS(label)}</b> <span class="dim">+${n} pontonként</span>`],
+  // the summary line under the portrait: "<b>Max HP</b> 60 · <b>Max SP</b> 6 · <b>ATK</b> 14 ..."
+  // with an optional green "+3" after any of them once points are spent
+  [/^<b>Max HP<\/b> \d+(?: <span[^>]*>\+\d+<\/span>)?(?: · <b>(?:Max SP|ATK|DEF|MAG|SPD)<\/b> \d+(?: <span[^>]*>\+\d+<\/span>)?)+$/,
+    (m) => HU_STAT_WORDS(m)],
+]);
