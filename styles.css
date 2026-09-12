@@ -288,8 +288,6 @@ button{touch-action:manipulation}
 /* the veil hangs off <body>, outside the rotated frame — turn its line to match */
 body.force-landscape .blackout span{transform:rotate(90deg)}
 
-.scene-art{display:block;margin:0 auto 12px;image-rendering:pixelated;width:120px;height:120px;background:#0a0810;border:2px solid var(--edge);border-radius:4px}
-
 /* the ☰ Menu's option list */
 .menu-list{display:flex;flex-direction:column;gap:8px;margin:6px 0 12px}
 .menu-list .btn{width:100%;text-align:left}
@@ -361,7 +359,6 @@ body.force-landscape .blackout span{transform:rotate(90deg)}
 .shop-item .price.g{color:var(--gold)} .shop-item .price.s{color:#7fb0d0}
 .shop-item .sub{color:var(--ink-dim);font-size:10px;margin-top:2px}
 .shop-item.sold{opacity:.45}
-.merchant-art{display:block;margin:0 auto 6px;image-rendering:pixelated;width:64px;height:64px}
 
 /* limb-targeting row in combat */
 .target-row{display:flex;gap:4px;margin-bottom:6px;flex-wrap:wrap}

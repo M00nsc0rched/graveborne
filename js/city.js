@@ -84,8 +84,6 @@ function characterMade(ch){
   const bs = City.BACKSTORY[ch.classId] || {};
   const s = U.make('div','sheet');
   s.appendChild(U.make('div','sect', bs.title || ch.player.name));
-  const art = U.make('canvas'); art.width = 120; art.height = 120; art.className = 'scene-art';
-  s.appendChild(art); try { Sprites.toCanvas(art, ch.player.sprite, 9); } catch(e){}
   s.appendChild(U.make('div','p', bs.long || ''));
   if (bs.goal) s.appendChild(U.make('div','p dim', `<i>${T('What you came for:')} ${bs.goal}</i>`));
   const row = U.make('div','row');
@@ -237,8 +235,6 @@ function showNpc(ch, npc, back){
   ch.met[npc.id] = true; Save.putChar(ch);
   const home = back || ((c)=>showTavern(c));
   const { sheet, body } = pagedSheet(npc.name, ()=>home(ch));
-  const art = U.make('canvas'); art.width = 120; art.height = 120; art.className = 'scene-art';
-  body.appendChild(art); try { Sprites.toCanvas(art, npc.sprite, 9); } catch(e){}
   body.appendChild(U.make('div','p dim', npc.intro));
   for (const l of npcLines(npc, ch)) body.appendChild(U.make('div','p', l.text));
 
@@ -369,8 +365,6 @@ function showForge(ch){
   const p = ch.player;
   p.forge = p.forge || { atk:0, def:0, mag:0 };
   const { sheet, body } = pagedSheet('The Cold Forge', ()=>showCity(ch));
-  const art = U.make('canvas'); art.width = 96; art.height = 96; art.className = 'merchant-art';
-  body.appendChild(art); try { Sprites.toCanvas(art, 'npc_smith', 6); } catch(e){}
   body.appendChild(U.make('div','p dim center',
     '"The fire is only cold when nobody is paying. Show me coin and show me what you carry."'));
   body.appendChild(U.make('div','balance', `<span class="g">✦ ${p.gold} Gold</span>`));
@@ -422,8 +416,6 @@ function showChapel(ch){
   ch = ch || Save.activeChar(); if (!ch) return showRoster();
   const p = ch.player;
   const { sheet, body } = pagedSheet('The Grey Chapel', ()=>showCity(ch));
-  const art = U.make('canvas'); art.width = 96; art.height = 96; art.className = 'merchant-art';
-  body.appendChild(art); try { Sprites.toCanvas(art, 'npc_lightbearer', 6); } catch(e){}
 
   // Two classes get something out of walking in that the others do not: one
   // because the order still means something to him, one because she is the only

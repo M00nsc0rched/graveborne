@@ -1157,8 +1157,6 @@ function potionMaker(e){
   G.state = 'EVENT';
   const close = () => { hideModal(); G.state = 'EXPLORE'; G.busy = false; renderActions(); };
   const s = U.make('div','sheet');
-  const art = U.make('canvas'); art.width = 120; art.height = 120; art.className = 'scene-art';
-  s.appendChild(art); Sprites.toCanvas(art, 'npc_alchemist', 9);
   s.appendChild(U.make('div','sect','The Potion-Maker'));
 
   if (q.stage === 'done'){
@@ -2068,10 +2066,6 @@ function triggerEvent(eventId, entity){
   G.pendingEvent = { eventId, entity };
 
   const sheet = U.make('div', 'sheet');
-  const art = U.make('canvas'); art.width = 120; art.height = 120; art.className = 'scene-art';
-  sheet.appendChild(art);
-  Sprites.toCanvas(art, v.art, 9);
-
   sheet.appendChild(U.make('div', 'sect', ev.name));
   if (variantKey === 'warped')
     sheet.appendChild(U.make('div', 'p dim', '<i>Your dishonor colors what you see…</i>'));
@@ -2136,8 +2130,6 @@ function elizaStall(){
   const meatCost  = goldPrice(30 + G.depth*5);
 
   const s = U.make('div','sheet');
-  const art = U.make('canvas'); art.width=64; art.height=64; art.className='merchant-art';
-  s.appendChild(art); Sprites.toCanvas(art, 'npc_eliza', 5);
   s.appendChild(U.make('div','sect','Eliza Sinclair'));
   s.appendChild(U.make('div','p dim center','“Bread and a little else. I said that already.”'));
   s.appendChild(U.make('div','balance',`<span class="g">✦ ${p.gold} Gold</span>`));
@@ -3776,8 +3768,6 @@ function guardianConfront(entity){
   G.state = 'EVENT';
 
   const s = U.make('div','sheet');
-  const art = U.make('canvas'); art.width = 120; art.height = 120; art.className = 'scene-art';
-  s.appendChild(art); Sprites.toCanvas(art, def.sprite, 9);
   s.appendChild(U.make('div','sect', '◆ ' + def.name + ' — Guardian of the Stair'));
   if (dlg.intro) s.appendChild(U.make('div','p', dlg.intro));
 
@@ -3839,8 +3829,6 @@ function shopLine(labelHTML, subHTML, priceHTML, disabled, onBuy){
 function renderShop(){
   const p=G.player, sh=G.shop, next=sh.nextDepth, souls=Save.souls();
   const s=U.make('div','sheet');
-  const art=U.make('canvas'); art.width=64; art.height=64; art.className='merchant-art';
-  s.appendChild(art); Sprites.toCanvas(art, 'npc_merchant', 5);
   s.appendChild(U.make('div','sect','The Hollow Merchant'));
   s.appendChild(U.make('div','p dim center','“Coin for the road, souls for the deep. Spend before the dark spends you.”'));
   s.appendChild(U.make('div','balance',`<span class="g">✦ ${p.gold} Gold</span><span class="s">◈ ${souls} Souls</span>`));
@@ -4176,8 +4164,6 @@ function showFollowers(){
     }
   } else {
     const fh = followerHunger(fo);
-    const art = U.make('canvas'); art.width = 64; art.height = 64; art.className = 'merchant-art';
-    s.appendChild(art); Sprites.toCanvas(art, fo.sprite, 5);
     s.appendChild(U.make('div','p center', `<b style="color:#9a5cc0">${fo.name}</b>`));
     s.appendChild(U.make('div','p',
       `<b>HP</b> <span style="color:${fo.hp < fo.maxhp*0.35 ? '#c05070' : '#c9bfd6'}">${fo.hp}/${fo.maxhp}</span> · ` +
